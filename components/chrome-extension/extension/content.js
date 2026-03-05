@@ -1681,6 +1681,13 @@ async function handleTrackFromForm() {
       // Update the scoring, resume, and blurb sections after successful tracking
       await updateScoringSection(extractResponse.jobId);
       await updateResumeSection(extractResponse.jobId);
+
+      // Auto-generate résumé if Apply reminder is checked
+      if (selectedReminders.includes('apply')) {
+        console.log('Career Catalyst: Apply reminder checked — auto-generating résumé');
+        await handleGenerateResume();
+      }
+
       await updateBlurbSection(extractResponse.jobId, 'third');
       await updateBlurbSection(extractResponse.jobId, 'first');
     } else {
