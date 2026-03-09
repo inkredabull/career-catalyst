@@ -2,16 +2,16 @@
 
 ```mermaid
 flowchart TD
-    A[Load Job Data\nfrom logs/{jobId}/job-*.json] --> B[Scope CV Content\nfilter roles by relevance to job]
-    B --> C[Generate Tailored Markdown\nLLM tailors content to job description]
-    C --> D{First run or\n--regen flag?}
-    D -->|Yes| E[Critique Pass\nscores alignment, tone, domain vocab]
-    E --> F[Regenerate with Recommendations\nincorporate critique feedback into new draft]
-    F --> G[Generate PDF\npandoc converts Markdown to PDF]
+    A["Load Job Data<br/>logs/jobId/job-*.json"] --> B["Scope CV Content<br/>filter roles by relevance to job"]
+    B --> C["Generate Tailored Markdown<br/>LLM tailors content to job description"]
+    C --> D{"First run or<br/>--regen flag?"}
+    D -->|Yes| E["Critique Pass<br/>scores alignment, tone, domain vocab"]
+    E --> F["Regenerate with Recommendations<br/>incorporate critique feedback into new draft"]
+    F --> G["Generate PDF<br/>pandoc converts Markdown to PDF"]
     D -->|No| G
-    G --> H[PDF Judge Validation\nverify <= 2 pages, required sections present]
-    H -->|Fail - up to 2 attempts| C
-    H -->|Pass| I[Done\nPDF saved to outputs/]
+    G --> H["PDF Judge Validation<br/>verify &lt;= 2 pages, required sections present"]
+    H -->|"Fail - up to 2 attempts"| C
+    H -->|Pass| I["Done<br/>PDF saved to outputs/"]
 ```
 
 ## Stage Details
