@@ -1503,6 +1503,22 @@ Each category receives a 0-100% score, then weighted to produce the final percen
 
 ### Resume Generation Process
 
+See also: [docs/resume-generation-pipeline.md](docs/resume-generation-pipeline.md)
+
+```mermaid
+flowchart TD
+    A[Load Job Data\nfrom logs/{jobId}/job-*.json] --> B[Scope CV Content\nfilter roles by relevance to job]
+    B --> C[Generate Tailored Markdown\nLLM tailors content to job description]
+    C --> D{First run or\n--regen flag?}
+    D -->|Yes| E[Critique Pass\nscores alignment, tone, domain vocab]
+    E --> F[Regenerate with Recommendations\nincorporate critique feedback into new draft]
+    F --> G[Generate PDF\npandoc converts Markdown to PDF]
+    D -->|No| G
+    G --> H[PDF Judge Validation\nverify <= 2 pages, required sections present]
+    H -->|Fail - up to 2 attempts| C
+    H -->|Pass| I[Done\nPDF saved to outputs/]
+```
+
 The ResumeCreatorAgent follows a 5-step intelligent process:
 
 1. **CV Parsing**: Uses AI to extract structured data from your plain text CV
