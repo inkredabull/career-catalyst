@@ -779,30 +779,21 @@ export class ResumeCreatorAgent {
     
     try {
       const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      // Check for recommendations.txt file in job directory
-      const recommendationsFile = path.join(jobDir, 'recommendations.txt');
-      if (fs.existsSync(recommendationsFile)) {
-        const content = fs.readFileSync(recommendationsFile, 'utf-8');
-        const lines = content.split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0 && !line.startsWith('#')); // Skip comments and empty lines
-        recommendations.push(...lines);
-        console.log(`📋 Loaded ${lines.length} recommendations from recommendations.txt`);
-      }
-      
-      // Also check for latest critique file recommendations
+
+      // Load ONLY from the most recent critique JSON to avoid confusing the LLM
+      // with stale recommendations from earlier runs. recommendations.txt is
+      // retained as a human-readable history log.
       if (fs.existsSync(jobDir)) {
         const files = fs.readdirSync(jobDir);
         const critiqueFiles = files
           .filter(file => file.startsWith('critique-') && file.endsWith('.json'))
           .sort()
           .reverse(); // Most recent first
-        
+
         if (critiqueFiles.length > 0) {
           const latestCritiqueFile = path.join(jobDir, critiqueFiles[0]);
           const critiqueData = JSON.parse(fs.readFileSync(latestCritiqueFile, 'utf-8'));
-          
+
           if (critiqueData.recommendations && Array.isArray(critiqueData.recommendations)) {
             recommendations.push(...critiqueData.recommendations);
             console.log(`📋 Loaded ${critiqueData.recommendations.length} recommendations from latest critique`);
@@ -812,9 +803,8 @@ export class ResumeCreatorAgent {
     } catch (error) {
       console.warn(`⚠️  Failed to load recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    // Remove duplicates
-    return [...new Set(recommendations)];
+
+    return recommendations;
   }
 
   private loadCompanyValues(jobId?: string): string | null {
