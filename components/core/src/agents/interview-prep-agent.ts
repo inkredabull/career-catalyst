@@ -2586,14 +2586,15 @@ IMPORTANT: Structure the story to lead with impact (key results), tell the compl
       }
       
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const promptLogFile = path.join(jobDir, `prompt-${type}-${timestamp}.txt`);
-      
+      const promptLogFile = path.join(jobDir, `prompt-${type}-${timestamp}.md`);
+
       const logContent = [
-        `📝 Prompt being sent to Claude for ${type.replace('-', ' ')} material generation:`,
-        '='.repeat(80),
+        `# ${type.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())} Prompt`,
+        `Generated at: ${new Date().toISOString()}`,
+        '',
+        '## Prompt',
+        '',
         prompt,
-        '='.repeat(80),
-        `\nGenerated at: ${new Date().toISOString()}`
       ].join('\n');
       
       fs.writeFileSync(promptLogFile, logContent, 'utf-8');

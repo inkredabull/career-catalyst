@@ -1210,18 +1210,19 @@ If the theme mentions specific technologies, standards, or domains (e.g., FHIR, 
         }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const promptLogFile = path.join(jobDir, `prompt-${timestamp}.txt`);
+        const promptLogFile = path.join(jobDir, `prompt-${timestamp}.md`);
 
         const logContent = [
-          '📝 Prompt being sent to Claude for resume tailoring:',
-          '='.repeat(80),
-          'CACHED CV CONTENT:',
+          '# Resume Tailoring Prompt',
+          `Generated at: ${new Date().toISOString()}`,
+          '',
+          '## CV Content (excerpt)',
+          '',
           formattedCV.substring(0, 500) + '...',
           '',
-          'PROMPT:',
+          '## Prompt',
+          '',
           prompt,
-          '='.repeat(80),
-          `\nGenerated at: ${new Date().toISOString()}`
         ].join('\n');
 
         fs.writeFileSync(promptLogFile, logContent, 'utf-8');
