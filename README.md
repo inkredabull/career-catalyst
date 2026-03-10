@@ -610,8 +610,8 @@ The tool supports two distinct resume generation approaches that can be configur
 After generating a resume with critique enabled, an LLM-based judge automatically validates the PDF output:
 - **One-Page Enforcement**: Verifies the resume meets the strict one-page requirement
 - **Section Validation**: Ensures required sections (Summary, Experience, Skills, Technologies) are present
-- **Iterative Improvement**: If validation fails, provides specific condensation suggestions and regenerates (up to 2 attempts)
-- **Human-in-the-Loop Fallback**: If the resume still exceeds one page after 2 attempts, returns the best version with a warning for manual editing
+- **Iterative Improvement**: If validation fails, provides specific condensation suggestions and regenerates (up to `PDF_JUDGE_MAX_ATTEMPTS` attempts, default: 2)
+- **Human-in-the-Loop Fallback**: If the resume still exceeds one page after `PDF_JUDGE_MAX_ATTEMPTS` attempts, returns the best version with a warning for manual editing
 
 **Example output:**
 ```bash
@@ -1515,7 +1515,7 @@ flowchart TD
     F --> G["Generate PDF<br/>pandoc converts Markdown to PDF"]
     D -->|No| G
     G --> H["PDF Judge Validation<br/>verify &lt;= 2 pages, required sections present"]
-    H -->|"Fail - up to 2 attempts"| C
+    H -->|"Fail - retry (PDF_JUDGE_MAX_ATTEMPTS)"| C
     H -->|Pass| I["Done<br/>PDF saved to outputs/"]
 ```
 
@@ -1619,7 +1619,7 @@ After generating an improved resume (with critique recommendations), the ResumeP
 1. **PDF Parsing**: Extracts page count and text content using the `pdf-parse` library
 2. **LLM Validation**: Sends PDF metadata to Claude for intelligent validation against guidance criteria
 3. **Specific Feedback**: If validation fails, receives concrete, actionable condensation suggestions
-4. **Iterative Regeneration**: Automatically regenerates content with judge feedback (up to 2 attempts)
+4. **Iterative Regeneration**: Automatically regenerates content with judge feedback (up to `PDF_JUDGE_MAX_ATTEMPTS` attempts, default: 2)
 5. **Result Logging**: Saves all validation attempts to `logs/{jobId}/judge-attempt-N-{timestamp}.json`
 
 **Validation Criteria:**
@@ -1657,12 +1657,12 @@ The judge provides specific, tactical feedback:
 
 **Validation Attempts:**
 - **Attempt 1**: Validates initial PDF after critique-based improvements
-- **Attempt 2**: If failed, regenerates with judge suggestions and validates again
-- **After 2 attempts**: If still failing, returns best version with warning for manual editing (HITL)
+- **Attempt N**: If failed, regenerates with judge suggestions and validates again (controlled by `PDF_JUDGE_MAX_ATTEMPTS`, default: 2)
+- **After `PDF_JUDGE_MAX_ATTEMPTS` attempts**: If still failing, returns best version with warning for manual editing (HITL)
 
 **When validation fails:**
 ```bash
-⚠️  PDF validation failed after 2 attempts. Returning best attempt.
+⚠️  PDF validation failed after PDF_JUDGE_MAX_ATTEMPTS attempts. Returning best attempt.
    Violations: Exceeds 1 page - currently 2 pages
    Manual editing may be required (HITL).
 ```

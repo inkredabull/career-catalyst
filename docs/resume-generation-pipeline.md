@@ -10,7 +10,7 @@ flowchart TD
     F --> G["Generate PDF<br/>pandoc converts Markdown to PDF"]
     D -->|No| G
     G --> H["PDF Judge Validation<br/>verify &lt;= 2 pages, required sections present"]
-    H -->|"Fail - up to 2 attempts"| C
+    H -->|"Fail - retry (PDF_JUDGE_MAX_ATTEMPTS)"| C
     H -->|Pass| I["Done<br/>PDF saved to outputs/"]
 ```
 
@@ -38,6 +38,6 @@ flowchart TD
 ## Notes
 
 - **Caching**: Subsequent runs reuse cached tailored markdown unless `--regen` is passed
-- **Page limit**: PDF Judge enforces ≤ 2 pages; will iteratively condense and retry up to 2 times
+- **Page limit**: PDF Judge enforces ≤ 2 pages; will iteratively condense and retry up to `PDF_JUDGE_MAX_ATTEMPTS` times (default: 2)
 - **Modes**: `leader` (default) emphasizes management/strategy; `builder` emphasizes hands-on technical work
 - **Format auto-detection**: Chooses standard single-section or split RELEVANT/RELATED sections based on role alignment
