@@ -905,7 +905,7 @@ export class ResumeCreatorAgent {
     recommendationsSection: string;
     companyValuesSection: string;
     themesSection?: string;
-  }): string {
+  }, forLog = false): string {
     try {
       // Load base template
       const basePath = path.resolve('prompts', 'resume-creator-base.md');
@@ -967,18 +967,24 @@ export class ResumeCreatorAgent {
         .replace(/{{themesSection}}/g, variables.themesSection || '');
       
       // Then remove markdown headers and formatting to get clean prompt
-      prompt = prompt
-        .replace(/^# .+$/gm, '') // Remove markdown headers
-        .replace(/^## (.+)$/gm, '$1') // Convert ## headers to plain text
-        .replace(/^### (.+)$/gm, '$1') // Convert ### headers to plain text
-        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold formatting
-        .replace(/\*(.*?)\*/g, '$1') // Remove italic formatting
-        .replace(/```json[\s\S]*?```/g, (match) => {
-          // Extract JSON from code block
-          return match.replace(/```json\n?/, '').replace(/\n?```/, '');
-        })
-        .replace(/- \[ \]/g, '-') // Remove checkbox formatting
-        .trim();
+      if (!forLog) {
+        prompt = prompt
+          .replace(/^# .+$/gm, '') // Remove markdown headers
+          .replace(/^## (.+)$/gm, '$1') // Convert ## headers to plain text
+          .replace(/^### (.+)$/gm, '$1') // Convert ### headers to plain text
+          .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold formatting
+          .replace(/\*(.*?)\*/g, '$1') // Remove italic formatting
+          .replace(/```json[\s\S]*?```/g, (match) => {
+            // Extract JSON from code block
+            return match.replace(/```json\n?/, '').replace(/\n?```/, '');
+          })
+          .replace(/- \[ \]/g, '-') // Remove checkbox formatting
+          .trim();
+      } else {
+        prompt = prompt
+          .replace(/^# .+$/gm, '') // Remove top-level title only
+          .trim();
+      }
       
       
       return prompt;
@@ -1212,6 +1218,15 @@ If the theme mentions specific technologies, standards, or domains (e.g., FHIR, 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const promptLogFile = path.join(jobDir, `prompt-${timestamp}.md`);
 
+        const promptForLog = this.loadPromptTemplate({
+          job,
+          cvContent: cvContentPlaceholder,
+          maxRoles: this.maxRoles,
+          recommendationsSection,
+          companyValuesSection,
+          themesSection
+        }, true);
+
         const logContent = [
           '# Resume Tailoring Prompt',
           `Generated at: ${new Date().toISOString()}`,
@@ -1222,7 +1237,7 @@ If the theme mentions specific technologies, standards, or domains (e.g., FHIR, 
           '',
           '## Prompt',
           '',
-          prompt,
+          promptForLog,
         ].join('\n');
 
         fs.writeFileSync(promptLogFile, logContent, 'utf-8');
