@@ -2004,6 +2004,7 @@ python examples/langsmith_evaluation.py
 | `ANTHROPIC_MODEL` | Anthropic model to use | `claude-sonnet-4-5-20250929` |
 | `ANTHROPIC_MAX_TOKENS` | Maximum tokens in response | `4000` |
 | `LANGSMITH_API_KEY` | LangSmith API key (optional, for evaluation and monitoring) | - |
+| `PDF_JUDGE_MAX_ATTEMPTS` | Max PDF validation/regeneration attempts before returning best effort | `2` |
 | `AUTO_RESUME_THRESHOLD` | Score threshold for automatic resume generation (0-100) | `80` |
 | `AUTO_RESUME_CV_PATH` | Path to CV file for automatic resume generation | - |
 | `MIN_SALARY` | Minimum salary requirement for profile generation | `225000` |

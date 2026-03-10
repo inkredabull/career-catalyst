@@ -1,5 +1,6 @@
 import { JobListing, ResumeResult, PDFValidationGuidance } from '../types';
 import { resolveFromProjectRoot } from '../utils/project-root';
+import { getPDFJudgeMaxAttempts } from '../config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -286,7 +287,7 @@ export class ResumeCreatorAgent {
 
     // Run PDF judge validation (unless skipped)
     if (!skipJudge) {
-      const maxAttempts = 2;
+      const maxAttempts = getPDFJudgeMaxAttempts();
 
       // Set guidance based on experience format (now correctly updated from roleSelection)
       const guidance: PDFValidationGuidance = {
