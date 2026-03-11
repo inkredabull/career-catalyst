@@ -16,4 +16,9 @@ module.exports = {
   },
   resolve: { extensions: ['.ts', '.js'] },
   plugins: [new GasPlugin()],
+  optimization: {
+    minimize: false,
+    concatenateModules: true,
+  },
+  devtool: false,
 };
