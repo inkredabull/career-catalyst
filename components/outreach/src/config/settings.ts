@@ -5,8 +5,17 @@ export const SCRIPT_PROPS = {
   SENDGRID_API_KEY: 'SENDGRID_API_KEY',
   MY_EMAIL: 'MY_EMAIL',
   MY_PHONE: 'MY_PHONE',
+  RESUME_URL: 'RESUME_URL',
+  CALENDLY_URL: 'CALENDLY_URL',
   NGROK_SMS_URL: 'NGROK_SMS_URL',
 } as const;
+
+/** Read a required Script Property — throws with a clear message if not set. */
+export function requireProp(key: string): string {
+  const val = PropertiesService.getScriptProperties().getProperty(key);
+  if (!val) throw new Error(`Script Property not set: ${key}`);
+  return val;
+}
 
 // Column name constants — must match spreadsheet header row
 export const COLS = {

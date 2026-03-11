@@ -4,12 +4,12 @@ import { PROFILE } from './config/profile';
 import { generateOutreachMessage, OutreachContext } from './services/message-generator';
 import { sendEmails, queueEmails, sendViaGmail } from './services/gmail';
 import { fetchContactToSheet, getLinkedInUrlToSheet, pickRandomContacts } from './services/contacts';
-import { SCRIPT_PROPS, COLS } from './config/settings';
+import { SCRIPT_PROPS, COLS, requireProp } from './config/settings';
 
 // ── Custom sheet functions — callable from cells as =resumeURL(), =blurb() ───
 
 function resumeURL(): string {
-  return PROFILE.resumeURL;
+  return requireProp(SCRIPT_PROPS.RESUME_URL);
 }
 
 function blurb(): readonly string[] {
@@ -29,7 +29,7 @@ function queueEmailsFn(subjectLine?: string): void {
 // ── Warmup ────────────────────────────────────────────────────────────────────
 
 function sendWarmup(): void {
-  const row: Record<string, string> = { [COLS.RECIPIENT]: PROFILE.myEmail };
+  const row: Record<string, string> = { [COLS.RECIPIENT]: requireProp(SCRIPT_PROPS.MY_EMAIL) };
   sendViaGmail(row, { subject: 'Morning Warmup', text: pickRandomContacts(), html: '' }, null);
 }
 

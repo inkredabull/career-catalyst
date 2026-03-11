@@ -2,8 +2,7 @@
 // API key must be set via GAS Script Properties: SENDGRID_API_KEY
 // (Never hardcode — the old key from Code.gs has been revoked.)
 
-import { COLS, SCRIPT_PROPS } from '../config/settings';
-import { PROFILE } from '../config/profile';
+import { COLS, SCRIPT_PROPS, requireProp } from '../config/settings';
 
 interface MsgObj {
   subject: string;
@@ -22,7 +21,7 @@ export function sendEmailWithSendGrid(
 
   const payload = {
     personalizations: [{ to: [{ email: row[COLS.RECIPIENT] }] }],
-    from: { email: PROFILE.myEmail },
+    from: { email: requireProp(SCRIPT_PROPS.MY_EMAIL) },
     subject: msgObj.subject,
     content: [{ type: 'text/html', value: msgObj.html }],
   };

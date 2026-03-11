@@ -1,6 +1,6 @@
 // Gmail-based email sending and mail merge.
 
-import { COLS, FLAGS, SCRIPT_PROPS } from '../config/settings';
+import { COLS, FLAGS, SCRIPT_PROPS, requireProp } from '../config/settings';
 import {
   valediction, ideal, accomplishments, aboutMe, reciprocate,
   who, whatAndWhere, why, cmf, ask, connection, intro, followup,
@@ -22,7 +22,7 @@ interface SendParams {
 // ── Core send ─────────────────────────────────────────────────────────────────
 
 export function emailDrivePdf(): GoogleAppsScript.Base.Blob {
-  const driveUrl = PROFILE.resumeURL;
+  const driveUrl = requireProp(SCRIPT_PROPS.RESUME_URL);
   const match = driveUrl.match(/[-\w]{25,}/);
   if (!match) throw new Error('Could not extract Drive file ID from resume URL');
   const file = DriveApp.getFileById(match[0]);
