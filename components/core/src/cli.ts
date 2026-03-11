@@ -1098,6 +1098,79 @@ program
   });
 
 program
+  .command('parallel-resume')
+  .description('Generate resumes with multiple LLMs for side-by-side comparison')
+  .argument('<jobId>', 'Job ID to tailor resumes for')
+  .argument('[cvFile]', 'Path to CV file (auto-detected if not provided)')
+  .option('-c, --config <file>', 'Config file path', 'parallel-config.json')
+  .option('-n, --num-models <n>', 'Use first N models from config (default: all)', parseInt)
+  .option('--no-critique', 'Skip critique workflow (faster)')
+  .option('--skip-judge', 'Skip PDF judge validation')
+  .option('--output <dir>', 'Output directory (default: RESUME_OUTPUT_DIR from .env)')
+  .action(async (jobId: string, cvFile: string | undefined, options) => {
+    try {
+      console.log('🔄 Parallel Resume Generation');
+      console.log('════════════════════════════════\n');
+
+      // Import orchestrator
+      const { ParallelResumeOrchestrator } = await import('./agents/parallel-resume-orchestrator');
+
+      // Find CV file if not provided
+      if (!cvFile) {
+        cvFile = await findCvFile();
+      }
+      console.log(`📋 CV File: ${cvFile}\n`);
+
+      // Load job data
+      const logsDir = path.join(process.cwd(), 'logs');
+      const jobDir = path.join(logsDir, jobId);
+
+      if (!fss.existsSync(jobDir)) {
+        throw new Error(`Job directory not found: ${jobDir}`);
+      }
+
+      // Find job JSON file
+      const files = fss.readdirSync(jobDir);
+      const jobFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
+
+      if (!jobFile) {
+        throw new Error(`No job file found in ${jobDir}`);
+      }
+
+      const jobData = JSON.parse(fss.readFileSync(path.join(jobDir, jobFile), 'utf-8'));
+
+      // Create orchestrator
+      const configPath = options.config ? path.resolve(options.config) : undefined;
+      const orchestrator = new ParallelResumeOrchestrator(configPath);
+
+      // Run parallel generation
+      const result = await orchestrator.generateParallelResumes(
+        jobId,
+        cvFile,
+        jobData,
+        {
+          numModels: options.numModels,
+          skipCritique: !options.critique,
+          skipJudge: options.skipJudge,
+          outputDir: options.output
+        }
+      );
+
+      // Success message
+      console.log('\n✅ Done! Open the comparison folder to view PDFs side-by-side');
+
+      if (process.platform === 'darwin') {
+        // Open folder on macOS
+        execSync(`open "${result.comparisonFolder}"`);
+      }
+
+    } catch (error) {
+      console.error('\n❌ Error:', error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+program
   .command('critique')
   .description('Critique a tailored resume for a specific job')
   .argument('<jobId>', 'Job ID to critique resume for (from the log filename)')

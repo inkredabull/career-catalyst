@@ -633,6 +633,60 @@ After generating a resume with critique enabled, an LLM-based judge automaticall
 - If a `company-values.txt` file exists in the job directory (`logs/{jobId}/company-values.txt`), the tool will automatically incorporate those values into the resume generation to ensure alignment with company culture.
 - PDF judge validation runs automatically after critique-based resume generation. Use `--skip-judge` to bypass validation if needed.
 
+#### Parallel Resume Generation
+
+Generate multiple resumes simultaneously using different LLM models for side-by-side comparison:
+
+```bash
+# Generate resumes with all 3 configured models (Claude Sonnet 4.5, Claude Haiku 4.5, GPT-4o)
+career-catalyst parallel-resume "4c32e01e"
+
+# Use only first 2 models (faster, cheaper)
+career-catalyst parallel-resume "4c32e01e" --num-models 2
+
+# Skip critique for faster generation
+career-catalyst parallel-resume "4c32e01e" --no-critique
+
+# Custom configuration file
+career-catalyst parallel-resume "4c32e01e" --config fast-models.json
+
+# With npm run dev
+npm run dev -- parallel-resume "4c32e01e"
+```
+
+**How it works:**
+- **Step 1**: Classifier analyzes job once (Claude Haiku 4.5, ~3-5s, ~$0.001)
+- **Step 2**: Multiple generators run in parallel with shared classification
+- **Step 3**: PDFs organized in timestamped comparison folder
+
+**Configured Models:**
+
+| Model | Provider | Cost | Speed | Best For |
+|-------|----------|------|-------|----------|
+| Claude Sonnet 4.5 | Anthropic | ~$0.11 | Medium | Best overall quality |
+| Claude Haiku 4.5 | Anthropic | ~$0.03 | Fast | Speed & cost optimization |
+| GPT-4o | OpenAI | ~$0.08 | Medium | Alternative perspective |
+
+**Performance:**
+- **Time**: ~25s for 3 resumes (vs ~60-90s sequential)
+- **Cost**: ~$0.22 total (~$0.10 with prompt caching)
+- **Output**: PDFs in `~/Google Drive/.../Resumes/Comparisons/{JobId}-{Company}-{Date}/`
+
+**Options:**
+- `-c, --config <file>`: Custom config file (default: `parallel-config.json`)
+- `-n, --num-models <n>`: Use first N models from config
+- `--no-critique`: Skip critique workflow
+- `--skip-judge`: Skip PDF validation
+- `--output <dir>`: Custom output directory
+
+**Key Benefits:**
+- ⚡ Fast: Parallel execution 2.4× faster than sequential
+- 💰 Cost-effective: Shared classification + prompt caching
+- 🎯 Fair comparison: All models use same job analysis
+- 🔄 Resilient: Partial failures don't block other models
+
+**See full documentation:** [docs/PARALLEL-RESUME-GENERATION.md](./docs/PARALLEL-RESUME-GENERATION.md)
+
 #### Auto-Resume Generation
 
 The tool can automatically generate tailored resumes when job scores exceed a configurable threshold. This feature integrates seamlessly with the job scoring workflow:

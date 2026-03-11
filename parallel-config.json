@@ -1,0 +1,28 @@
+{
+  "models": [
+    {
+      "label": "Claude Sonnet 4.5",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-5-20250929",
+      "maxTokens": 8000
+    },
+    {
+      "label": "Claude Haiku 4.5",
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "maxTokens": 8000
+    },
+    {
+      "label": "GPT-4o",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "maxTokens": 4000
+    }
+  ],
+  "sharedSettings": {
+    "maxRoles": 4,
+    "temperature": 0.3,
+    "mode": "leader",
+    "experienceFormat": "standard"
+  }
+}
