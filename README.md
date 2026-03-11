@@ -659,6 +659,11 @@ npm run dev -- parallel-resume "4c32e01e"
 - **Step 2**: Multiple generators run in parallel with shared classification
 - **Step 3**: PDFs organized in timestamped comparison folder
 
+**Configuration:**
+- **No setup required** - Uses models from your `.env` file (RESUME_LLM_* and CRITIQUE_LLM_*)
+- **Optional**: Create `parallel-config.json` to customize 3+ models
+- **Single source of truth**: All model settings in `.env`, advanced overrides in config file
+
 **Configured Models:**
 
 | Model | Provider | Cost | Speed | Best For |
@@ -673,11 +678,18 @@ npm run dev -- parallel-resume "4c32e01e"
 - **Output**: PDFs in `~/Google Drive/.../Resumes/Comparisons/{JobId}-{Company}-{Date}/`
 
 **Options:**
-- `-c, --config <file>`: Custom config file (default: `parallel-config.json`)
+- `-c, --config <file>`: Custom config file (default: auto-generated from `.env`)
 - `-n, --num-models <n>`: Use first N models from config
 - `--no-critique`: Skip critique workflow
 - `--skip-judge`: Skip PDF validation
 - `--output <dir>`: Custom output directory
+
+**Advanced Customization:**
+```bash
+# Optional: Create custom config for 3+ models
+cp parallel-config.example.json parallel-config.json
+# Edit parallel-config.json with your preferred models
+```
 
 **Key Benefits:**
 - ⚡ Fast: Parallel execution 2.4× faster than sequential

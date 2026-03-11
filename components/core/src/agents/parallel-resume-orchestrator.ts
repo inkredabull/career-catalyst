@@ -68,12 +68,15 @@ export class ParallelResumeOrchestrator {
   constructor(configPath?: string) {
     const resolvedPath = configPath || path.join(process.cwd(), 'parallel-config.json');
 
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(`Configuration file not found: ${resolvedPath}`);
+    // Try to load config file, fall back to .env if not found
+    if (fs.existsSync(resolvedPath)) {
+      console.log(`📋 Loading config from: ${path.basename(resolvedPath)}`);
+      const configContent = fs.readFileSync(resolvedPath, 'utf-8');
+      this.config = JSON.parse(configContent);
+    } else {
+      console.log('📋 No parallel-config.json found, generating from .env settings');
+      this.config = this.generateConfigFromEnv();
     }
-
-    const configContent = fs.readFileSync(resolvedPath, 'utf-8');
-    this.config = JSON.parse(configContent);
 
     // Validate configuration
     this.validateConfig();
@@ -83,6 +86,82 @@ export class ParallelResumeOrchestrator {
     if (!this.classifierApiKey) {
       throw new Error('ANTHROPIC_API_KEY environment variable not set (required for classifier)');
     }
+  }
+
+  /**
+   * Generate default configuration from environment variables
+   * Uses RESUME_LLM_* and CRITIQUE_LLM_* settings from .env
+   */
+  private generateConfigFromEnv(): ParallelConfig {
+    const resumeProvider = process.env.RESUME_LLM_PROVIDER as 'anthropic' | 'openai' | undefined;
+    const resumeModel = process.env.RESUME_LLM_MODEL;
+    const critiqueProvider = process.env.CRITIQUE_LLM_PROVIDER as 'anthropic' | 'openai' | undefined;
+    const critiqueModel = process.env.CRITIQUE_LLM_MODEL;
+
+    if (!resumeProvider || !resumeModel) {
+      throw new Error(
+        'RESUME_LLM_PROVIDER and RESUME_LLM_MODEL environment variables are required when parallel-config.json is not present.\n\n' +
+        'Add to your .env file:\n' +
+        '  RESUME_LLM_PROVIDER=anthropic  # or "openai"\n' +
+        '  RESUME_LLM_MODEL=claude-sonnet-4-5-20250929\n' +
+        '  CRITIQUE_LLM_PROVIDER=anthropic\n' +
+        '  CRITIQUE_LLM_MODEL=claude-sonnet-4-5-20250929\n\n' +
+        'Or create a parallel-config.json file for custom model configurations.'
+      );
+    }
+
+    const models: ParallelConfig['models'] = [
+      {
+        label: this.getModelLabel(resumeProvider, resumeModel),
+        provider: resumeProvider,
+        model: resumeModel,
+        maxTokens: resumeProvider === 'anthropic' ? 8000 : 4000
+      }
+    ];
+
+    // Add critique model if different from resume model
+    if (critiqueProvider && critiqueModel &&
+        (critiqueProvider !== resumeProvider || critiqueModel !== resumeModel)) {
+      models.push({
+        label: this.getModelLabel(critiqueProvider, critiqueModel),
+        provider: critiqueProvider,
+        model: critiqueModel,
+        maxTokens: critiqueProvider === 'anthropic' ? 8000 : 4000
+      });
+    }
+
+    console.log(`   Configured ${models.length} model(s) from .env:`);
+    models.forEach((m, i) => console.log(`   ${i + 1}. ${m.label} (${m.provider})`));
+
+    return {
+      models,
+      sharedSettings: {
+        maxRoles: 4,
+        temperature: 0.3,
+        mode: 'leader',
+        experienceFormat: 'standard'
+      }
+    };
+  }
+
+  /**
+   * Generate human-readable label from model identifier
+   */
+  private getModelLabel(provider: string, model: string): string {
+    // Claude models
+    if (model.includes('sonnet')) return 'Claude Sonnet 4.5';
+    if (model.includes('haiku')) return 'Claude Haiku 4.5';
+    if (model.includes('opus')) return 'Claude Opus 4.5';
+
+    // OpenAI models
+    if (model === 'gpt-4o') return 'GPT-4o';
+    if (model === 'gpt-4o-mini') return 'GPT-4o-mini';
+    if (model.startsWith('gpt-5')) return 'GPT-5';
+    if (model.startsWith('o1')) return 'OpenAI o1';
+    if (model.startsWith('o3')) return 'OpenAI o3';
+
+    // Fallback: capitalize provider + truncated model
+    return `${provider.charAt(0).toUpperCase() + provider.slice(1)} (${model.slice(0, 20)})`;
   }
 
   async generateParallelResumes(

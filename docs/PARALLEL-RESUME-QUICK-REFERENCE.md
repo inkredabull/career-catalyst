@@ -58,8 +58,15 @@ npm run dev parallel-resume job123 --config fast-models.json
 
 ## Configuration
 
-Edit `parallel-config.json`:
+**Default:** Uses `.env` settings (no config file needed)
 
+**To customize:**
+```bash
+cp parallel-config.example.json parallel-config.json
+# Edit parallel-config.json
+```
+
+**Format:**
 ```json
 {
   "models": [
@@ -78,11 +85,22 @@ Edit `parallel-config.json`:
 
 In `.env`:
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...  # Required
-OPENAI_API_KEY=sk-...         # Only if using GPT models
-RESUME_OUTPUT_DIR=~/path      # Optional
-LLM_AUTO_CONFIRM=true         # Optional (skip cost prompt)
+# API Keys
+ANTHROPIC_API_KEY=sk-ant-...               # Required
+OPENAI_API_KEY=sk-...                      # Only if using GPT models
+
+# Model Configuration (used if parallel-config.json doesn't exist)
+RESUME_LLM_PROVIDER=anthropic              # Default primary model
+RESUME_LLM_MODEL=claude-sonnet-4-5-20250929
+CRITIQUE_LLM_PROVIDER=anthropic            # Default critique model
+CRITIQUE_LLM_MODEL=claude-haiku-4-5-20251001
+
+# Optional Settings
+RESUME_OUTPUT_DIR=~/path                   # Custom output location
+LLM_AUTO_CONFIRM=true                      # Skip cost prompts
 ```
+
+**Note:** No config file needed! Uses `.env` by default. Create `parallel-config.json` only for 3+ model comparisons.
 
 ## Troubleshooting
 

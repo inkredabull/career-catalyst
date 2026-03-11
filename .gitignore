@@ -122,6 +122,7 @@ jspm_packages/
 !requirements.txt
 !examples/**/*.py
 !.claude/settings.json
+!parallel-config.example.json
 data/
 
 # Personal configuration files

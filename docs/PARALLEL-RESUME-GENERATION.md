@@ -54,14 +54,18 @@ The default configuration (`parallel-config.json`) uses 3 models:
 
 ### 1. Prerequisites
 
-Ensure your `.env` file has the required API keys:
+Ensure your `.env` file has the required settings:
 
 ```bash
-# Required: Anthropic API key (for classifier + Claude models)
-ANTHROPIC_API_KEY=sk-ant-...
+# Required: API keys
+ANTHROPIC_API_KEY=sk-ant-...                    # Required for classifier + Claude models
+OPENAI_API_KEY=sk-...                           # Only if using GPT models
 
-# Optional: OpenAI API key (only if using GPT models)
-OPENAI_API_KEY=sk-...
+# Required: Model configuration (used if parallel-config.json doesn't exist)
+RESUME_LLM_PROVIDER=anthropic                   # or "openai"
+RESUME_LLM_MODEL=claude-sonnet-4-5-20250929     # Primary model
+CRITIQUE_LLM_PROVIDER=anthropic                 # or "openai"
+CRITIQUE_LLM_MODEL=claude-sonnet-4-5-20250929   # Critique model (optional if same as primary)
 
 # Optional: Custom output directory
 RESUME_OUTPUT_DIR=~/Google Drive/My Drive/Professional/Job Search/Applications/Resumes
@@ -69,6 +73,8 @@ RESUME_OUTPUT_DIR=~/Google Drive/My Drive/Professional/Job Search/Applications/R
 # Optional: Auto-confirm costs without prompt
 LLM_AUTO_CONFIRM=true
 ```
+
+**Important:** The `parallel-config.json` file is **optional**. If not present, the system will automatically use the models configured in your `.env` file (RESUME_LLM_* and CRITIQUE_LLM_* settings). Create `parallel-config.json` only if you want to compare 3+ different models.
 
 ### 2. Basic Usage
 
@@ -181,9 +187,42 @@ Resumes are organized in timestamped comparison folders:
 
 ## Configuration
 
-### Customizing Models
+### Default Behavior (No Config File)
 
-Edit `parallel-config.json` to customize:
+**If `parallel-config.json` doesn't exist**, the system automatically generates configuration from your `.env` file:
+
+```bash
+# In your .env:
+RESUME_LLM_PROVIDER=anthropic
+RESUME_LLM_MODEL=claude-sonnet-4-5-20250929
+CRITIQUE_LLM_PROVIDER=anthropic
+CRITIQUE_LLM_MODEL=claude-haiku-4-5-20251001
+```
+
+**Results in:**
+- Model 1: Claude Sonnet 4.5 (from RESUME_LLM_*)
+- Model 2: Claude Haiku 4.5 (from CRITIQUE_LLM_*, only if different)
+
+This gives you 1-2 models automatically with **no additional configuration needed**.
+
+### Customizing Models (Advanced)
+
+**Create `parallel-config.json`** only if you want to:
+- Compare 3+ models simultaneously
+- Use specific model combinations
+- Fine-tune generation settings per comparison
+
+**To customize:**
+
+```bash
+# Copy the example template
+cp parallel-config.example.json parallel-config.json
+
+# Edit your copy (this file is gitignored)
+vim parallel-config.json
+```
+
+**Configuration format:**
 
 ```json
 {
