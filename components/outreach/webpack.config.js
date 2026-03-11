@@ -6,6 +6,7 @@ module.exports = {
   output: {
     filename: 'Code.js',
     path: path.resolve(__dirname, 'dist'),
+    iife: false,
   },
   module: {
     rules: [{
