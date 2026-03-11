@@ -1,7 +1,17 @@
 // GAS entry point — all functions assigned to global scope are callable from the sheet.
 import { onOpen } from './ui/menu';
 import { SCRIPT_PROPS } from './config/settings';
+import { PROFILE } from './config/profile';
 import { generateOutreachMessage, OutreachContext } from './services/message-generator';
+
+// Custom sheet functions — callable from cells as =resumeURL(), =blurb()
+function resumeURL(): string {
+  return PROFILE.resumeURL;
+}
+
+function blurb(): readonly string[] {
+  return PROFILE.blurb;
+}
 
 function generateMessageForRow(): void {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -29,5 +39,8 @@ function generateMessageForRow(): void {
 }
 
 // Expose to GAS global scope
-(global as unknown as Record<string, unknown>)['onOpen'] = onOpen;
-(global as unknown as Record<string, unknown>)['generateMessageForRow'] = generateMessageForRow;
+const g = global as unknown as Record<string, unknown>;
+g['onOpen'] = onOpen;
+g['resumeURL'] = resumeURL;
+g['blurb'] = blurb;
+g['generateMessageForRow'] = generateMessageForRow;
