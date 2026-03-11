@@ -6,5 +6,6 @@ export function onOpen(): void {
     .addItem('Do lookup', 'fetchContactToSheet')
     .addItem('Get Linkedin URL', 'getLinkedInUrlToSheet')
     .addItem('Generate Message', 'generateMessageForRow')
+    .addItem('Refresh Job Metadata', 'refreshJobMetadata')
     .addToUi();
 }

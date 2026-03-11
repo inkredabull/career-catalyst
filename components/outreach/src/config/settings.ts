@@ -4,6 +4,7 @@ export const SCRIPT_PROPS = {
   OPENAI_API_KEY: 'OPENAI_API_KEY',
   SENDGRID_API_KEY: 'SENDGRID_API_KEY',
   MY_EMAIL: 'MY_EMAIL',
+  TEST_EMAIL: 'TEST_EMAIL',
   MY_PHONE: 'MY_PHONE',
   RESUME_URL: 'RESUME_URL',
   CALENDLY_URL: 'CALENDLY_URL',
@@ -24,6 +25,7 @@ export const COLS = {
   FIRST_NAME: 'First',
   EMAIL_SENT: 'Email Sent',
   SUBJECT: 'Subject',
+  JOB_ID: 'JobID',
 } as const;
 
 // Sheet names — update to match your spreadsheet

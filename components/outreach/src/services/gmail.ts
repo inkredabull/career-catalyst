@@ -1,6 +1,7 @@
 // Gmail-based email sending and mail merge.
 
 import { COLS, FLAGS, SCRIPT_PROPS, requireProp } from '../config/settings';
+import { getJobMetadata } from './job-metadata';
 import {
   valediction, ideal, accomplishments, aboutMe, reciprocate,
   who, why, cmf, ask, connection, intro, followup,
@@ -167,7 +168,20 @@ function fillInTemplateFromObject(template: MsgObj, data: Record<string, string>
     s = s.replace(new RegExp(token.replace(/[{}]/g, '\\$&'), 'g'), escapeData(value));
   }
 
-  // Generic token replacement from row data
+  // Stage 1.5: Inject job metadata into data map if JobID present
+  const jobId = data[COLS.JOB_ID];
+  if (jobId) {
+    const meta = getJobMetadata(jobId);
+    if (meta) {
+      data['Company'] = meta.Company;
+      data['JobTitleActual'] = meta.jobTitle;
+      data['JobTitleShorthand'] = meta.jobTitleShorthand;
+      data['JobURL'] = meta.jobURL;
+      if (meta.thirdPersonBlurb && !data['Blurb']) data['Blurb'] = meta.thirdPersonBlurb;
+    }
+  }
+
+  // Stage 2: Generic token replacement from row data
   s = s.replace(/{{[^{}]+}}/g, key => escapeData(data[key.replace(/[{}]+/g, '')] ?? ''));
 
   return JSON.parse(s) as MsgObj;
