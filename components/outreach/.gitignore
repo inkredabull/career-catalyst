@@ -2,3 +2,5 @@ dist/
 node_modules/
 coverage/
 .clasp.json
+src/**/*.d.ts
+src/**/*.d.ts.map
