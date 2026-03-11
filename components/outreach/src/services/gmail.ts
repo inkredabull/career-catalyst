@@ -142,6 +142,20 @@ function escapeData(str: string): string {
 function fillInTemplateFromObject(template: MsgObj, data: Record<string, string>): MsgObj {
   let s = JSON.stringify(template);
 
+  // Stage 0: Fetch job metadata first so {{Blurb}} and {{Intro}} can use it below
+  const jobId = data[COLS.JOB_ID];
+  if (jobId) {
+    const meta = getJobMetadata(jobId);
+    if (meta) {
+      data['Company'] = meta.Company;
+      data['JobTitleActual'] = meta.jobTitle;
+      data['JobTitleShorthand'] = meta.jobTitleShorthand;
+      data['JobURL'] = meta.jobURL;
+      if (meta.thirdPersonBlurb) data['Blurb'] = meta.thirdPersonBlurb;
+    }
+  }
+
+  // Stage 1: Named token substitutions (Blurb falls back to PROFILE if no job blurb)
   const subs: Record<string, string> = {
     '{{Valediction}}': valediction(),
     '{{Ideal}}': ideal(),
@@ -159,7 +173,7 @@ function fillInTemplateFromObject(template: MsgObj, data: Record<string, string>
     '{{Get}}': ask(),
     '{{Give}}': reciprocate(),
     '{{Followup}}': followup(),
-    '{{Blurb}}': PROFILE.blurb[0],
+    '{{Blurb}}': data['Blurb'] || PROFILE.blurb[0],
     '{{Connection}}': connection(data['PersonName'], data['PersonURL']),
     '{{Intro}}': intro(data['PersonName'] ?? '', data['JobTitleActual'] ?? '', data['Blurb']),
   };
@@ -168,20 +182,7 @@ function fillInTemplateFromObject(template: MsgObj, data: Record<string, string>
     s = s.replace(new RegExp(token.replace(/[{}]/g, '\\$&'), 'g'), escapeData(value));
   }
 
-  // Stage 1.5: Inject job metadata into data map if JobID present
-  const jobId = data[COLS.JOB_ID];
-  if (jobId) {
-    const meta = getJobMetadata(jobId);
-    if (meta) {
-      data['Company'] = meta.Company;
-      data['JobTitleActual'] = meta.jobTitle;
-      data['JobTitleShorthand'] = meta.jobTitleShorthand;
-      data['JobURL'] = meta.jobURL;
-      if (meta.thirdPersonBlurb && !data['Blurb']) data['Blurb'] = meta.thirdPersonBlurb;
-    }
-  }
-
-  // Stage 2: Generic token replacement from row data
+  // Stage 2: Generic {{key}} replacement from row data
   s = s.replace(/{{[^{}]+}}/g, key => escapeData(data[key.replace(/[{}]+/g, '')] ?? ''));
 
   return JSON.parse(s) as MsgObj;

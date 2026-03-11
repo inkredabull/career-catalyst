@@ -48,16 +48,54 @@ export function getJobMetadata(jobId: string): JobMetadata | null {
     return null;
   }
 
+  let thirdPersonBlurb = data['third-person-blurb'] ?? '';
+
+  // If no blurb on file, ask the server to generate one
+  if (!thirdPersonBlurb) {
+    Logger.log('No third-person blurb for %s — triggering generation (may take ~30s)', jobId);
+    thirdPersonBlurb = generateThirdPersonBlurb(baseUrl, jobId) ?? '';
+  }
+
   const meta: JobMetadata = {
     jobTitle: data['jobTitle'] ?? '',
     jobTitleShorthand: data['jobTitleShorthand'] ?? '',
     Company: data['Company'] ?? '',
     jobURL: data['jobURL'] ?? '',
     resumeURL: data['resumeURL'] ?? '',
-    thirdPersonBlurb: data['third-person-blurb'] ?? '',
+    thirdPersonBlurb,
   };
   cache.put(`job_${jobId}`, JSON.stringify(meta), CACHE_TTL);
   return meta;
+}
+
+function generateThirdPersonBlurb(baseUrl: string, jobId: string): string | null {
+  Logger.log('Calling /generate-blurb for %s', jobId);
+  let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
+  try {
+    response = UrlFetchApp.fetch(`${baseUrl}/generate-blurb`, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ jobId }),
+      muteHttpExceptions: true,
+    });
+  } catch (e) {
+    Logger.log('Error calling /generate-blurb for %s: %s', jobId, e);
+    return null;
+  }
+
+  if (response.getResponseCode() !== 200) {
+    Logger.log('/generate-blurb failed [%s]: %s', response.getResponseCode(), response.getContentText());
+    return null;
+  }
+
+  const result = JSON.parse(response.getContentText()) as Record<string, string>;
+  if (!result['success']) {
+    Logger.log('/generate-blurb error for %s: %s', jobId, result['error']);
+    return null;
+  }
+
+  Logger.log('Blurb generated for %s (%s chars)', jobId, String(result['blurb']?.length ?? 0));
+  return result['blurb'] ?? null;
 }
 
 export function clearJobMetadataCache(jobId: string): void {
