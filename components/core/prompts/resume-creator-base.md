@@ -146,7 +146,7 @@ Return a JSON object with:
 ```json
 {
   "markdownContent": "The complete resume as markdown formatted text",
-  "changes": ["List of specific changes made to tailor the resume"]
+  "changes": ["List of at most 5 specific changes made to tailor the resume"]
 }
 ```
 Respond with ONLY the JSON object.

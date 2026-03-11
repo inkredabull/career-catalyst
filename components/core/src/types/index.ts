@@ -161,6 +161,14 @@ export interface RoleSelection {
   reasoning: string;
 }
 
+export interface ClassificationResult {
+  domain: 'regulated' | 'enterprise' | 'platform' | 'general';
+  format: 'standard' | 'split';
+  rolesIncluded: number;
+  reasoning: string;
+  domainSignals: string[];
+}
+
 export interface ResumeResult {
   success: boolean;
   pdfPath?: string;

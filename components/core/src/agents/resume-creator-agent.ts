@@ -1,4 +1,4 @@
-import { JobListing, ResumeResult, PDFValidationGuidance } from '../types';
+import { JobListing, ResumeResult, PDFValidationGuidance, ClassificationResult } from '../types';
 import { resolveFromProjectRoot } from '../utils/project-root';
 import { getPDFJudgeMaxAttempts } from '../config';
 import * as fs from 'fs';
@@ -19,6 +19,7 @@ export class ResumeCreatorAgent {
   private experienceFormat: 'standard' | 'split';
   private maxTokens: number;
   private totalCost: number = 0; // Track total cost for current resume generation
+  private precomputedClassification?: ClassificationResult;
 
   constructor(
     resumeProviderConfig: LLMProviderConfig,
@@ -43,11 +44,13 @@ export class ResumeCreatorAgent {
     generate: boolean | string = false,
     critique: boolean = true,
     source: 'cli' | 'programmatic' = 'programmatic',
-    skipJudge: boolean = false
+    skipJudge: boolean = false,
+    classification?: ClassificationResult
   ): Promise<ResumeResult> {
     try {
       // Reset cost tracking for this generation
       this.totalCost = 0;
+      this.precomputedClassification = classification;
 
       // Load job data
       let jobData = this.loadJobData(jobId);
@@ -895,14 +898,24 @@ export class ResumeCreatorAgent {
     recommendationsSection: string;
     companyValuesSection: string;
     themesSection?: string;
+    classificationSection?: string;
+    skipDomainDetection?: boolean;
   }, forLog = false): string {
     try {
       // Load base template
       const basePath = path.resolve('prompts', 'resume-creator-base.md');
       let promptTemplate = fs.readFileSync(basePath, 'utf-8');
 
-      // Filter domain adaptation to include only relevant sections (saves tokens)
-      promptTemplate = this.filterDomainAdaptation(promptTemplate, variables.job.description);
+      // Filter domain adaptation — skip if classification was pre-computed
+      if (!variables.skipDomainDetection) {
+        promptTemplate = this.filterDomainAdaptation(promptTemplate, variables.job.description);
+      } else {
+        // Strip the domain detection section entirely since it was pre-computed
+        promptTemplate = promptTemplate.replace(
+          /## Domain Adaptation & Vocabulary[\s\S]*?(?=\n## |$)/,
+          ''
+        );
+      }
 
       // First, replace the maxRoles placeholder to ensure it's not lost
       promptTemplate = promptTemplate.replace(/\{\{maxRoles\}\}/g, variables.maxRoles.toString());
@@ -955,6 +968,11 @@ export class ResumeCreatorAgent {
         .replace(/{{recommendationsSection}}/g, variables.recommendationsSection)
         .replace(/{{companyValuesSection}}/g, variables.companyValuesSection)
         .replace(/{{themesSection}}/g, variables.themesSection || '');
+
+      // Prepend pre-computed classification context when provided
+      if (variables.classificationSection) {
+        prompt = variables.classificationSection + '\n\n' + prompt;
+      }
       
       // Then remove markdown headers and formatting to get clean prompt
       if (!forLog) {
@@ -1178,6 +1196,21 @@ If the theme mentions specific technologies, standards, or domains (e.g., FHIR, 
     // Format CV content for caching
     const formattedCV = `Current CV Content:\n${this.formatCVForPrompt(cvContent)}`;
 
+    // Build pre-classification section if provided (skips domain detection in Sonnet)
+    const classification = this.precomputedClassification;
+    let classificationSection = '';
+    if (classification) {
+      classificationSection = `
+PRE-CLASSIFIED DOMAIN CONTEXT (skip domain detection step):
+Domain: ${classification.domain}
+Domain Signals: ${classification.domainSignals.join(', ') || 'none'}
+Format Decision: ${classification.format} with ${classification.rolesIncluded} roles
+Classification Reasoning: ${classification.reasoning}
+
+Instructions: Use the pre-classified domain above. Skip the domain detection step. Apply the corresponding language shifts and emphasis rules for this domain directly.
+`;
+    }
+
     // Build prompt with reference to cached content
     // When caching is used, we tell Claude the CV is provided above
     const cvContentPlaceholder = 'See the "Current CV Content" section provided above.';
@@ -1185,10 +1218,12 @@ If the theme mentions specific technologies, standards, or domains (e.g., FHIR, 
     const prompt = this.loadPromptTemplate({
       job,
       cvContent: cvContentPlaceholder,
-      maxRoles: this.maxRoles,
+      maxRoles: classification ? classification.rolesIncluded : this.maxRoles,
       recommendationsSection,
       companyValuesSection,
-      themesSection
+      themesSection,
+      classificationSection,
+      skipDomainDetection: !!classification
     });
 
     // Write prompt to log file in job subdirectory
@@ -1211,10 +1246,12 @@ If the theme mentions specific technologies, standards, or domains (e.g., FHIR, 
         const promptForLog = this.loadPromptTemplate({
           job,
           cvContent: cvContentPlaceholder,
-          maxRoles: this.maxRoles,
+          maxRoles: this.precomputedClassification ? this.precomputedClassification.rolesIncluded : this.maxRoles,
           recommendationsSection,
           companyValuesSection,
-          themesSection
+          themesSection,
+          classificationSection,
+          skipDomainDetection: !!this.precomputedClassification
         }, true);
 
         const logContent = [
@@ -1368,7 +1405,7 @@ If the theme mentions specific technologies, standards, or domains (e.g., FHIR, 
 
       return {
         markdownContent: this.addHeaderToMarkdown(result.markdownContent),
-        changes: result.changes,
+        changes: Array.isArray(result.changes) ? result.changes.slice(0, 5) : result.changes,
         roleSelection: result.roleSelection
       };
     } catch (error) {
