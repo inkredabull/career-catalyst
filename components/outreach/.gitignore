@@ -4,3 +4,10 @@ coverage/
 .clasp.json
 src/**/*.d.ts
 src/**/*.d.ts.map
+
+# Personal data — gitignored, use *.template.ts as reference
+src/config/profile.ts
+src/config/messages.ts
+
+# Migration source — contains PII and revoked credentials
+src/migration/Code.gs
