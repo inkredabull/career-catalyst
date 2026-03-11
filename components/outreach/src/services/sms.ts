@@ -1,0 +1,38 @@
+// SMS sending via ngrok tunnel.
+// Set NGROK_SMS_URL in Script Properties (changes each session).
+
+import { SCRIPT_PROPS } from '../config/settings';
+
+export function normalizePhoneNumber(input: string): string {
+  let digits = String(input).replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  if (digits.length !== 10) throw new Error(`Invalid phone number: ${input}`);
+  return `+1${digits}`;
+}
+
+export function sendRealSms(to: string, message: string): void {
+  const ngrokUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.NGROK_SMS_URL);
+  if (!ngrokUrl) {
+    Logger.log('NGROK_SMS_URL not set in Script Properties');
+    return;
+  }
+  const url = `${ngrokUrl}/send`;
+  const res = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ to, message }),
+    followRedirects: true,
+    muteHttpExceptions: true,
+  });
+  Logger.log('SMS response %s: %s', res.getResponseCode(), res.getContentText());
+}
+
+export function notifyViaSMS(first: string, email: string, number: string): void {
+  const msg = [
+    `Hey ${first}, has been a while!`,
+    `Is ${email} still the best to reach you at? Just emailed you there; hope I didn't land in Spam... :-)`,
+    "Hope you've been well!",
+    '- Anthony Bull',
+  ].join('\n\n');
+  sendRealSms(normalizePhoneNumber(number), msg);
+}

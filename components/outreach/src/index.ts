@@ -1,10 +1,13 @@
 // GAS entry point — all functions assigned to global scope are callable from the sheet.
 import { onOpen } from './ui/menu';
-import { SCRIPT_PROPS } from './config/settings';
 import { PROFILE } from './config/profile';
 import { generateOutreachMessage, OutreachContext } from './services/message-generator';
+import { sendEmails, queueEmails, sendViaGmail } from './services/gmail';
+import { fetchContactToSheet, getLinkedInUrlToSheet, pickRandomContacts } from './services/contacts';
+import { SCRIPT_PROPS, COLS } from './config/settings';
 
-// Custom sheet functions — callable from cells as =resumeURL(), =blurb()
+// ── Custom sheet functions — callable from cells as =resumeURL(), =blurb() ───
+
 function resumeURL(): string {
   return PROFILE.resumeURL;
 }
@@ -12,6 +15,25 @@ function resumeURL(): string {
 function blurb(): readonly string[] {
   return PROFILE.blurb;
 }
+
+// ── Mail merge / send ─────────────────────────────────────────────────────────
+
+function sendEmailsFn(subjectLine?: string): void {
+  sendEmails(subjectLine);
+}
+
+function queueEmailsFn(subjectLine?: string): void {
+  queueEmails(subjectLine);
+}
+
+// ── Warmup ────────────────────────────────────────────────────────────────────
+
+function sendWarmup(): void {
+  const row: Record<string, string> = { [COLS.RECIPIENT]: PROFILE.myEmail };
+  sendViaGmail(row, { subject: 'Morning Warmup', text: pickRandomContacts(), html: '' }, null);
+}
+
+// ── Outreach message generation ───────────────────────────────────────────────
 
 function generateMessageForRow(): void {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -38,9 +60,15 @@ function generateMessageForRow(): void {
   sheet.getRange(row, 7).setValue(message.body);
 }
 
-// Expose to GAS global scope
+// ── Expose to GAS global scope ────────────────────────────────────────────────
+
 const g = global as unknown as Record<string, unknown>;
 g['onOpen'] = onOpen;
 g['resumeURL'] = resumeURL;
 g['blurb'] = blurb;
+g['sendEmails'] = sendEmailsFn;
+g['queueEmails'] = queueEmailsFn;
+g['fetchContactToSheet'] = fetchContactToSheet;
+g['getLinkedInUrlToSheet'] = getLinkedInUrlToSheet;
+g['sendWarmup'] = sendWarmup;
 g['generateMessageForRow'] = generateMessageForRow;
