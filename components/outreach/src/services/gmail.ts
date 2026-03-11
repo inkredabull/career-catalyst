@@ -3,7 +3,7 @@
 import { COLS, FLAGS, SCRIPT_PROPS, requireProp } from '../config/settings';
 import {
   valediction, ideal, accomplishments, aboutMe, reciprocate,
-  who, whatAndWhere, why, cmf, ask, connection, intro, followup,
+  who, why, cmf, ask, connection, intro, followup,
 } from '../config/messages';
 import { PROFILE } from '../config/profile';
 import { notifyViaSMS } from './sms';
@@ -151,7 +151,7 @@ function fillInTemplateFromObject(template: MsgObj, data: Record<string, string>
     '{{AboutMe}}': aboutMe(),
     '{{Reciprocate}}': reciprocate(),
     '{{Who}}': who(),
-    '{{WhatAndWhere}}': whatAndWhere(),
+    '{{WhatAndWhere}}': aboutMe(),
     '{{Why}}': why(),
     '{{CMF}}': cmf(),
     '{{Ask}}': ask(),
