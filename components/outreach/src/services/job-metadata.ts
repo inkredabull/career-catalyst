@@ -1,6 +1,8 @@
 // Fetch and cache job metadata from the unified-server /llm endpoint.
 // Base URL is read from the NGROK_SMS_URL Script Property (same server, same tunnel).
 
+import { log } from '../utils/logger';
+
 export interface JobMetadata {
   jobTitle: string;
   jobTitleShorthand: string;
@@ -12,8 +14,21 @@ export interface JobMetadata {
 
 const CACHE_TTL = 21600; // 6 hours — GAS CacheService maximum
 
+const parseJsonSafely = (text: string, context: string): Record<string, string> | null => {
+  if (text.trimStart().startsWith('<')) {
+    log('ERROR', '%s — server returned HTML instead of JSON (tunnel down?): %s', context, text.slice(0, 120));
+    return null;
+  }
+  try {
+    return JSON.parse(text) as Record<string, string>;
+  } catch (e) {
+    log('ERROR', '%s — JSON parse failed: %s | body: %s', context, e, text.slice(0, 200));
+    return null;
+  }
+};
+
 const generateThirdPersonBlurb = (baseUrl: string, jobId: string): string | null => {
-  Logger.log('Calling /generate-blurb for %s', jobId);
+  log('INFO', 'Calling /generate-blurb for %s', jobId);
   let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
   try {
     response = UrlFetchApp.fetch(`${baseUrl}/generate-blurb`, {
@@ -23,39 +38,46 @@ const generateThirdPersonBlurb = (baseUrl: string, jobId: string): string | null
       muteHttpExceptions: true,
     });
   } catch (e) {
-    Logger.log('Error calling /generate-blurb for %s: %s', jobId, e);
+    log('ERROR', 'Network error calling /generate-blurb for %s: %s', jobId, e);
     return null;
   }
+
+  log('DEBUG', '/generate-blurb response code: %s', response.getResponseCode());
 
   if (response.getResponseCode() !== 200) {
-    Logger.log('/generate-blurb failed [%s]: %s', response.getResponseCode(), response.getContentText());
+    log('ERROR', '/generate-blurb failed [%s]: %s', response.getResponseCode(), response.getContentText());
     return null;
   }
 
-  const result = JSON.parse(response.getContentText()) as Record<string, string>;
+  const result = parseJsonSafely(response.getContentText(), `/generate-blurb ${jobId}`);
+  if (!result) return null;
+
   if (!result['success']) {
-    Logger.log('/generate-blurb error for %s: %s', jobId, result['error']);
+    log('WARN', '/generate-blurb error for %s: %s', jobId, result['error']);
     return null;
   }
 
-  Logger.log('Blurb generated for %s (%s chars)', jobId, String(result['blurb']?.length ?? 0));
+  log('INFO', 'Blurb generated for %s (%s chars)', jobId, String(result['blurb']?.length ?? 0));
   return result['blurb'] ?? null;
 };
 
 export const getJobMetadata = (jobId: string): JobMetadata | null => {
   if (!jobId) return null;
 
-  // L1: ephemeral script-level cache (survives within a 6-hour window)
   const cache = CacheService.getScriptCache();
   const cached = cache.get(`job_${jobId}`);
-  if (cached) return JSON.parse(cached) as JobMetadata;
+  if (cached) {
+    log('DEBUG', 'Cache hit for job %s', jobId);
+    return JSON.parse(cached) as JobMetadata;
+  }
 
   const baseUrl = PropertiesService.getScriptProperties().getProperty('NGROK_SMS_URL');
   if (!baseUrl) {
-    Logger.log('NGROK_SMS_URL not set — cannot fetch job metadata for %s', jobId);
+    log('ERROR', 'NGROK_SMS_URL not set — cannot fetch job metadata for %s', jobId);
     return null;
   }
 
+  log('INFO', 'Fetching job metadata for %s', jobId);
   let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
   try {
     response = UrlFetchApp.fetch(`${baseUrl}/llm?jobID=${encodeURIComponent(jobId)}`, {
@@ -63,26 +85,29 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
       muteHttpExceptions: true,
     });
   } catch (e) {
-    Logger.log('Error fetching job metadata for %s: %s', jobId, e);
+    log('ERROR', 'Network error fetching job metadata for %s: %s', jobId, e);
     return null;
   }
+
+  log('DEBUG', '/llm response code for %s: %s', jobId, response.getResponseCode());
 
   if (response.getResponseCode() !== 200) {
-    Logger.log('Job metadata fetch failed [%s]: %s', response.getResponseCode(), response.getContentText());
+    log('ERROR', 'Job metadata fetch failed [%s] for %s: %s', response.getResponseCode(), jobId, response.getContentText().slice(0, 200));
     return null;
   }
 
-  const data = JSON.parse(response.getContentText()) as Record<string, string>;
+  const data = parseJsonSafely(response.getContentText(), `/llm ${jobId}`);
+  if (!data) return null;
+
   if (data['success'] === false as unknown) {
-    Logger.log('Job metadata error for %s: %s', jobId, data['error']);
+    log('WARN', 'Job metadata error for %s: %s', jobId, data['error']);
     return null;
   }
 
   let thirdPersonBlurb = data['third-person-blurb'] ?? '';
 
-  // If no blurb on file, ask the server to generate one
   if (!thirdPersonBlurb) {
-    Logger.log('No third-person blurb for %s — triggering generation (may take ~30s)', jobId);
+    log('INFO', 'No third-person blurb for %s — triggering generation (may take ~30s)', jobId);
     thirdPersonBlurb = generateThirdPersonBlurb(baseUrl, jobId) ?? '';
   }
 
@@ -95,9 +120,11 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
     thirdPersonBlurb,
   };
   cache.put(`job_${jobId}`, JSON.stringify(meta), CACHE_TTL);
+  log('INFO', 'Job metadata cached for %s (company: %s)', jobId, meta.Company);
   return meta;
 };
 
 export const clearJobMetadataCache = (jobId: string): void => {
   CacheService.getScriptCache().remove(`job_${jobId}`);
+  log('INFO', 'Cache cleared for job %s', jobId);
 };
