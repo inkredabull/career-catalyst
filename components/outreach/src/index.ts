@@ -22,16 +22,6 @@ function blurb(): readonly string[] {
   return PROFILE.blurb;
 }
 
-// ── Mail merge / send ─────────────────────────────────────────────────────────
-
-function sendEmailsFn(subjectLine?: string): void {
-  sendEmails(subjectLine);
-}
-
-function queueEmailsFn(subjectLine?: string): void {
-  queueEmails(subjectLine);
-}
-
 // ── Warmup ────────────────────────────────────────────────────────────────────
 
 function sendWarmup(): void {
@@ -91,8 +81,8 @@ g['onOpen'] = onOpen;
 g['resumeURL'] = resumeURL;
 g['testEmail'] = testEmail;
 g['blurb'] = blurb;
-g['sendEmails'] = sendEmailsFn;
-g['queueEmails'] = queueEmailsFn;
+g['sendEmails'] = sendEmails;
+g['queueEmails'] = queueEmails;
 g['fetchContactToSheet'] = fetchContactToSheet;
 g['getLinkedInUrlToSheet'] = getLinkedInUrlToSheet;
 g['sendWarmup'] = sendWarmup;
