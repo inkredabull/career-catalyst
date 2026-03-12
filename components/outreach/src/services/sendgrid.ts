@@ -9,10 +9,10 @@ interface MsgObj {
   html: string;
 }
 
-export function sendEmailWithSendGrid(
+export const sendEmailWithSendGrid = (
   row: Record<string, string>,
   msgObj: MsgObj
-): void {
+): void => {
   const apiKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SENDGRID_API_KEY);
   if (!apiKey) {
     Logger.log('SENDGRID_API_KEY not set in Script Properties');
@@ -45,4 +45,4 @@ export function sendEmailWithSendGrid(
   } catch (e) {
     Logger.log('Error sending via SendGrid: %s', e);
   }
-}
+};

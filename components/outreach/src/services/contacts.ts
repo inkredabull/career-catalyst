@@ -10,7 +10,7 @@ export interface ContactDetails {
 
 // ── LinkedIn URL lookup ────────────────────────────────────────────────────────
 
-export function getLinkedInUrlByName(fullName: string): string | null {
+export const getLinkedInUrlByName = (fullName: string): string | null => {
   const resp = People.People!.searchContacts({
     query: fullName,
     readMask: 'names,urls',
@@ -26,11 +26,11 @@ export function getLinkedInUrlByName(fullName: string): string | null {
 
   Logger.log('No LinkedIn URL found for %s', fullName);
   return null;
-}
+};
 
 // ── Full contact details ──────────────────────────────────────────────────────
 
-export function getContactDetails(fullName: string): ContactDetails {
+export const getContactDetails = (fullName: string): ContactDetails => {
   const response = People.People!.searchContacts({
     query: fullName,
     pageSize: 1,
@@ -64,11 +64,11 @@ export function getContactDetails(fullName: string): ContactDetails {
   }
 
   return result;
-}
+};
 
 // ── Sheet integration ─────────────────────────────────────────────────────────
 
-export function fetchContactToSheet(): void {
+export const fetchContactToSheet = (): void => {
   const spreadsheet = SpreadsheetApp.getActive();
   const sheet = spreadsheet.getSheetByName('Data');
   if (!sheet) throw new Error("Sheet 'Data' not found");
@@ -85,9 +85,9 @@ export function fetchContactToSheet(): void {
   currentCell.setValue(contact.email);
   currentCell.offset(0, 1).setValue(contact.mobile);
   currentCell.offset(0, 2).setValue(contact.linkedin);
-}
+};
 
-export function getLinkedInUrlToSheet(): void {
+export const getLinkedInUrlToSheet = (): void => {
   const spreadsheet = SpreadsheetApp.getActive();
   const sheet = spreadsheet.getSheetByName('Data');
   if (!sheet) throw new Error("Sheet 'Data' not found");
@@ -100,22 +100,21 @@ export function getLinkedInUrlToSheet(): void {
 
   const fullName = row[headers.indexOf('Full')];
   currentCell.setValue(getLinkedInUrlByName(fullName));
-}
+};
 
 // ── Warmup helpers ────────────────────────────────────────────────────────────
 
-export function getLocalURL(displayName: string): string {
-  return `https://contacts.google.com/search/${encodeURIComponent(displayName).replace(/%20/g, '+')}`;
-}
+export const getLocalURL = (displayName: string): string =>
+  `https://contacts.google.com/search/${encodeURIComponent(displayName).replace(/%20/g, '+')}`;
 
-export function getWorkUrl(person: PersonResource): string | null {
+export const getWorkUrl = (person: PersonResource): string | null => {
   for (const urlObj of person.urls ?? []) {
     if (urlObj.type?.toLowerCase() === 'work') return urlObj.value ?? null;
   }
   return null;
-}
+};
 
-export function getAllContacts(): PersonResource[] {
+export const getAllContacts = (): PersonResource[] => {
   let people: PersonResource[] = [];
   let pageToken: string | undefined;
 
@@ -130,16 +129,16 @@ export function getAllContacts(): PersonResource[] {
   } while (pageToken);
 
   return people;
-}
+};
 
-export function shuffle<T>(array: T[]): void {
+export const shuffle = <T>(array: T[]): void => {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j] as T, array[i] as T];
   }
-}
+};
 
-export function pickRandomContacts(count = 5): string {
+export const pickRandomContacts = (count = 5): string => {
   const all = getAllContacts();
   shuffle(all);
   const selected = all.slice(0, count);
@@ -150,11 +149,11 @@ export function pickRandomContacts(count = 5): string {
       return `${displayName}\n${getLocalURL(displayName)}`;
     })
     .join('\n\n');
-}
+};
 
 // ── Contact reclassification ──────────────────────────────────────────────────
 
-export function reclassifySingleOtherAsHome(): void {
+export const reclassifySingleOtherAsHome = (): void => {
   let pageToken: string | undefined;
 
   do {
@@ -185,4 +184,4 @@ export function reclassifySingleOtherAsHome(): void {
 
     pageToken = response.nextPageToken != null ? response.nextPageToken : undefined;
   } while (pageToken);
-}
+};

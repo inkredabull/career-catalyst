@@ -12,7 +12,37 @@ export interface JobMetadata {
 
 const CACHE_TTL = 21600; // 6 hours — GAS CacheService maximum
 
-export function getJobMetadata(jobId: string): JobMetadata | null {
+const generateThirdPersonBlurb = (baseUrl: string, jobId: string): string | null => {
+  Logger.log('Calling /generate-blurb for %s', jobId);
+  let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
+  try {
+    response = UrlFetchApp.fetch(`${baseUrl}/generate-blurb`, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ jobId }),
+      muteHttpExceptions: true,
+    });
+  } catch (e) {
+    Logger.log('Error calling /generate-blurb for %s: %s', jobId, e);
+    return null;
+  }
+
+  if (response.getResponseCode() !== 200) {
+    Logger.log('/generate-blurb failed [%s]: %s', response.getResponseCode(), response.getContentText());
+    return null;
+  }
+
+  const result = JSON.parse(response.getContentText()) as Record<string, string>;
+  if (!result['success']) {
+    Logger.log('/generate-blurb error for %s: %s', jobId, result['error']);
+    return null;
+  }
+
+  Logger.log('Blurb generated for %s (%s chars)', jobId, String(result['blurb']?.length ?? 0));
+  return result['blurb'] ?? null;
+};
+
+export const getJobMetadata = (jobId: string): JobMetadata | null => {
   if (!jobId) return null;
 
   // L1: ephemeral script-level cache (survives within a 6-hour window)
@@ -66,38 +96,8 @@ export function getJobMetadata(jobId: string): JobMetadata | null {
   };
   cache.put(`job_${jobId}`, JSON.stringify(meta), CACHE_TTL);
   return meta;
-}
+};
 
-function generateThirdPersonBlurb(baseUrl: string, jobId: string): string | null {
-  Logger.log('Calling /generate-blurb for %s', jobId);
-  let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
-  try {
-    response = UrlFetchApp.fetch(`${baseUrl}/generate-blurb`, {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify({ jobId }),
-      muteHttpExceptions: true,
-    });
-  } catch (e) {
-    Logger.log('Error calling /generate-blurb for %s: %s', jobId, e);
-    return null;
-  }
-
-  if (response.getResponseCode() !== 200) {
-    Logger.log('/generate-blurb failed [%s]: %s', response.getResponseCode(), response.getContentText());
-    return null;
-  }
-
-  const result = JSON.parse(response.getContentText()) as Record<string, string>;
-  if (!result['success']) {
-    Logger.log('/generate-blurb error for %s: %s', jobId, result['error']);
-    return null;
-  }
-
-  Logger.log('Blurb generated for %s (%s chars)', jobId, String(result['blurb']?.length ?? 0));
-  return result['blurb'] ?? null;
-}
-
-export function clearJobMetadataCache(jobId: string): void {
+export const clearJobMetadataCache = (jobId: string): void => {
   CacheService.getScriptCache().remove(`job_${jobId}`);
-}
+};

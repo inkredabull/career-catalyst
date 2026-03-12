@@ -22,20 +22,20 @@ interface SendParams {
 
 // ── Core send ─────────────────────────────────────────────────────────────────
 
-export function emailDrivePdf(driveUrl: string): GoogleAppsScript.Base.Blob {
+export const emailDrivePdf = (driveUrl: string): GoogleAppsScript.Base.Blob => {
   const match = driveUrl.match(/[-\w]{25,}/);
   if (!match) throw new Error(`Could not extract Drive file ID from: ${driveUrl}`);
   const file = DriveApp.getFileById(match[0]);
   let filename = file.getName();
   if (!filename.toLowerCase().endsWith('.pdf')) filename += '.pdf';
   return file.getBlob().setName(filename);
-}
+};
 
-export function sendViaGmail(
+export const sendViaGmail = (
   row: Record<string, string>,
   msgObj: MsgObj,
   emailTemplate?: { attachments: GoogleAppsScript.Base.Blob[] } | null
-): void {
+): void => {
   const subjectLine = msgObj.subject;
   Logger.log('Sending via Gmail: %s', subjectLine);
 
@@ -63,21 +63,21 @@ export function sendViaGmail(
     const number = row[COLS.CELL] || phoneKey || '';
     notifyViaSMS(row[COLS.FIRST_NAME], row[COLS.RECIPIENT], number);
   }
-}
+};
 
 // ── Queue / bulk send ─────────────────────────────────────────────────────────
 
-export function queueEmails(
+export const queueEmails = (
   _subjectLine?: string,
   _sheet = SpreadsheetApp.getActiveSheet()
-): void {
+): void => {
   // Placeholder — queueing logic to be implemented
-}
+};
 
-export function sendEmails(
+export const sendEmails = (
   subjectLine?: string,
   sheet = SpreadsheetApp.getActiveSheet()
-): void {
+): void => {
   let subject = subjectLine;
 
   if (!subject) {
@@ -116,14 +116,14 @@ export function sendEmails(
   }
 
   sheet.getRange(2, emailSentColIdx + 1, out.length).setValues(out);
-}
+};
 
 // ── Template helpers (private) ────────────────────────────────────────────────
 
-function getGmailTemplateFromDrafts(subjectLine: string): {
+const getGmailTemplateFromDrafts = (subjectLine: string): {
   message: MsgObj;
   attachments: GoogleAppsScript.Base.Blob[];
-} {
+} => {
   const drafts = GmailApp.getDrafts();
   const draft = drafts.find(d => d.getMessage().getSubject() === subjectLine);
   if (!draft) throw new Error("Oops - can't find Gmail draft");
@@ -132,10 +132,10 @@ function getGmailTemplateFromDrafts(subjectLine: string): {
     message: { subject: subjectLine, text: msg.getPlainBody(), html: msg.getBody() },
     attachments: msg.getAttachments() as unknown as GoogleAppsScript.Base.Blob[],
   };
-}
+};
 
-function escapeData(str: string): string {
-  return str
+const escapeData = (str: string): string =>
+  str
     .replace(/[\\]/g, '\\\\')
     .replace(/["]/g, '\\"')
     .replace(/[/]/g, '\\/')
@@ -144,9 +144,8 @@ function escapeData(str: string): string {
     .replace(/[\n]/g, '\\n')
     .replace(/[\r]/g, '\\r')
     .replace(/[\t]/g, '\\t');
-}
 
-function fillInTemplateFromObject(template: MsgObj, data: Record<string, string>): MsgObj {
+const fillInTemplateFromObject = (template: MsgObj, data: Record<string, string>): MsgObj => {
   let s = JSON.stringify(template);
 
   // Stage 0: Fetch job metadata first so {{Blurb}} and {{Intro}} can use it below
@@ -193,4 +192,4 @@ function fillInTemplateFromObject(template: MsgObj, data: Record<string, string>
   s = s.replace(/{{[^{}]+}}/g, key => escapeData(data[key.replace(/[{}]+/g, '')] ?? ''));
 
   return JSON.parse(s) as MsgObj;
-}
+};
