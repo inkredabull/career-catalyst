@@ -77,10 +77,11 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
     return null;
   }
 
-  log('INFO', 'Fetching job metadata for %s', jobId);
+  const url = `${baseUrl}/llm?jobID=${encodeURIComponent(jobId)}`;
+  log('INFO', 'Fetching job metadata for %s — URL: %s', jobId, url);
   let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
   try {
-    response = UrlFetchApp.fetch(`${baseUrl}/llm?jobID=${encodeURIComponent(jobId)}`, {
+    response = UrlFetchApp.fetch(url, {
       method: 'get',
       muteHttpExceptions: true,
     });
