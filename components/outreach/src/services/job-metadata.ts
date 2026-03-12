@@ -34,6 +34,7 @@ const generateThirdPersonBlurb = (baseUrl: string, jobId: string): string | null
     response = UrlFetchApp.fetch(`${baseUrl}/generate-blurb`, {
       method: 'post',
       contentType: 'application/json',
+      headers: { 'ngrok-skip-browser-warning': '1' },
       payload: JSON.stringify({ jobId }),
       muteHttpExceptions: true,
     });
@@ -83,6 +84,7 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
   try {
     response = UrlFetchApp.fetch(url, {
       method: 'get',
+      headers: { 'ngrok-skip-browser-warning': '1' },
       muteHttpExceptions: true,
     });
   } catch (e) {
