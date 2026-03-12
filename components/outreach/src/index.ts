@@ -7,14 +7,15 @@ import { fetchContactToSheet, getLinkedInUrlToSheet, pickRandomContacts } from '
 import { getJobMetadata, clearJobMetadataCache } from './services/job-metadata';
 import { SCRIPT_PROPS, COLS, requireProp } from './config/settings';
 
-// ── Custom sheet functions — callable from cells as =resumeURL(), =blurb() ───
+// ── Custom sheet functions — callable from cells as =blurb(), =resumeURL(jobId) ───
 
 function testEmail(): string {
   return requireProp(SCRIPT_PROPS.TEST_EMAIL);
 }
 
-function resumeURL(): string {
-  return requireProp(SCRIPT_PROPS.RESUME_URL);
+/** Returns the resume Drive URL for a given job ID, fetched from the /llm endpoint. */
+function resumeURL(jobId: string): string {
+  return getJobMetadata(jobId)?.resumeURL ?? '';
 }
 
 function blurb(): readonly string[] {

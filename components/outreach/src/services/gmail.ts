@@ -1,6 +1,6 @@
 // Gmail-based email sending and mail merge.
 
-import { COLS, FLAGS, SCRIPT_PROPS, requireProp } from '../config/settings';
+import { COLS, FLAGS, SCRIPT_PROPS } from '../config/settings';
 import { getJobMetadata } from './job-metadata';
 import {
   valediction, ideal, accomplishments, aboutMe, reciprocate,
@@ -22,10 +22,9 @@ interface SendParams {
 
 // ── Core send ─────────────────────────────────────────────────────────────────
 
-export function emailDrivePdf(): GoogleAppsScript.Base.Blob {
-  const driveUrl = requireProp(SCRIPT_PROPS.RESUME_URL);
+export function emailDrivePdf(driveUrl: string): GoogleAppsScript.Base.Blob {
   const match = driveUrl.match(/[-\w]{25,}/);
-  if (!match) throw new Error('Could not extract Drive file ID from resume URL');
+  if (!match) throw new Error(`Could not extract Drive file ID from: ${driveUrl}`);
   const file = DriveApp.getFileById(match[0]);
   let filename = file.getName();
   if (!filename.toLowerCase().endsWith('.pdf')) filename += '.pdf';
@@ -42,11 +41,19 @@ export function sendViaGmail(
 
   const params: SendParams = { htmlBody: msgObj.html };
 
-  const blob = emailDrivePdf();
-  if (emailTemplate && FLAGS.ATTACH_RESUME) {
-    params.attachments = [...emailTemplate.attachments, blob];
-  } else if (emailTemplate?.attachments) {
-    params.attachments = emailTemplate.attachments;
+  if (emailTemplate) {
+    if (FLAGS.ATTACH_RESUME) {
+      const jobId = row[COLS.JOB_ID];
+      const resumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
+      if (resumeUrl) {
+        params.attachments = [...emailTemplate.attachments, emailDrivePdf(resumeUrl)];
+      } else {
+        Logger.log('ATTACH_RESUME enabled but no resumeURL found for jobID %s', jobId ?? '(none)');
+        params.attachments = emailTemplate.attachments;
+      }
+    } else {
+      params.attachments = emailTemplate.attachments;
+    }
   }
 
   GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, params);
