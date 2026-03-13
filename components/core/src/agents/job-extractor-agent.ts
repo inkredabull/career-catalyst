@@ -89,10 +89,11 @@ export class JobExtractorAgent extends BaseAgent {
       const logFilePath = path.join(jobDir, logFileName);
 
       // Save JSON to log file with jobId included
-      const jobDataWithSource = { 
-        ...jobData, 
+      const jobDataWithSource = {
+        ...jobData,
         jobId,  // Add the jobId to the saved data
-        source: sourceUrl ? "extracted" : "html_parsed" 
+        titleShorthand: this.buildTitleShorthand(jobData.title || ''),
+        source: sourceUrl ? "extracted" : "html_parsed"
       };
       const jsonOutput = JSON.stringify(jobDataWithSource, null, 2);
       fs.writeFileSync(logFilePath, jsonOutput, 'utf-8');
@@ -155,7 +156,11 @@ export class JobExtractorAgent extends BaseAgent {
       const logFilePath = path.join(jobDir, logFileName);
 
       // Save JSON to log file
-      const jobDataWithSource = { ...normalizedJobData, source: "json_input" };
+      const jobDataWithSource = {
+        ...normalizedJobData,
+        titleShorthand: this.buildTitleShorthand(normalizedJobData.title || ''),
+        source: "json_input"
+      };
       const jsonOutput = JSON.stringify(jobDataWithSource, null, 2);
       fs.writeFileSync(logFilePath, jsonOutput, 'utf-8');
       console.log(`✅ Job information logged to ${logFilePath}`);
@@ -210,6 +215,14 @@ export class JobExtractorAgent extends BaseAgent {
         error: `Failed to read JSON file: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
+  }
+
+  private buildTitleShorthand(title: string): string {
+    return title
+      .split(/\s+/)
+      .filter(w => w.length > 0)
+      .map(w => w[0].toUpperCase())
+      .join('');
   }
 
   private cleanUrl(url: string | undefined): string | undefined {
