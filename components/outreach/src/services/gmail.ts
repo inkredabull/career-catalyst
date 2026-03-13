@@ -2,6 +2,7 @@
 
 import { COLS, FLAGS, SCRIPT_PROPS } from '../config/settings';
 import { getJobMetadata } from './job-metadata';
+import { log } from '../utils/logger';
 import {
   valediction, ideal, accomplishments, aboutMe, reciprocate,
   who, why, cmf, ask, connection, intro, followup,
@@ -150,8 +151,10 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
 
   // Stage 0: Fetch job metadata first so {{Blurb}} and {{Intro}} can use it below
   const jobId = data[COLS.JOB_ID];
+  log('INFO', 'Stage 0: jobId=%s', jobId || '(empty — check JobID column in sheet)');
   if (jobId) {
     const meta = getJobMetadata(jobId);
+    log('INFO', 'Stage 0: metadata %s', meta ? `found (company=${meta.Company})` : 'null — tokens will be empty');
     if (meta) {
       data['Company'] = meta.Company;
       data['JobTitleActual'] = meta.jobTitle;
