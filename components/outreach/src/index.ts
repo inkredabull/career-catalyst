@@ -64,10 +64,16 @@ function generateMessageForRow(): void {
 
 function refreshJobMetadataFn(): void {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const row = sheet.getActiveRange()?.getRow() ?? 2;
-  const jobId = sheet.getRange(row, 3).getValue() as string;
+  const activeRow = sheet.getActiveRange()?.getRow() ?? 2;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] as string[];
+  const jobIdCol = headers.indexOf(COLS.JOB_ID);
+  if (jobIdCol === -1) {
+    SpreadsheetApp.getUi().alert(`No "${COLS.JOB_ID}" column found in this sheet.`);
+    return;
+  }
+  const jobId = sheet.getRange(activeRow, jobIdCol + 1).getValue() as string;
   if (!jobId) {
-    SpreadsheetApp.getUi().alert('No JobID found in column C for this row.');
+    SpreadsheetApp.getUi().alert(`No JobID found in the "${COLS.JOB_ID}" column for this row.`);
     return;
   }
   clearJobMetadataCache(jobId);
