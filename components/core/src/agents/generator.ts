@@ -111,7 +111,7 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       // Make request with prompt caching if supported
       const response = await this.provider.makeRequest({
         prompt: dynamicContent,
-        cachedContent: this.provider.supportsPromptCaching() ? cachedContent : undefined,
+        cachedContent, // always pass; provider decides whether to cache or concatenate
         systemPrompt: 'You are a professional resume writer. Return ONLY a valid JSON object with exactly these three fields: markdownContent (string), changes (array of strings), roleSelection (object with format, rolesIncluded, reasoning). No other fields. No markdown code fences. No explanation.'
       });
 
