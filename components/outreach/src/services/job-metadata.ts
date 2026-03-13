@@ -12,7 +12,7 @@ export interface JobMetadata {
   thirdPersonBlurb: string;
 }
 
-const CACHE_TTL = 21600; // 6 hours — GAS CacheService maximum
+const CACHE_TTL = 300; // 5 minutes — short TTL for active debugging; raise to 21600 (6h) for production
 
 const parseJsonSafely = (text: string, context: string): Record<string, string> | null => {
   if (text.trimStart().startsWith('<')) {

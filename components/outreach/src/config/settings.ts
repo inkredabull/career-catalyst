@@ -39,6 +39,6 @@ export const SHEETS = {
 
 // Feature flags
 export const FLAGS = {
-  SEND_SMS: false,
-  ATTACH_RESUME: false,
+  SEND_SMS: true,
+  ATTACH_RESUME: true,
 } as const;
