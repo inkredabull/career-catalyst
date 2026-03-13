@@ -479,7 +479,8 @@ header-includes: |
 
     // Generate filename with model label prefix
     const candidateName = this.extractCandidateName(markdownContent);
-    const filename = `[${modelLabel}] ${candidateName} for ${job.title} at ${job.company}.pdf`;
+    const sanitize = (s: string) => s.replace(/[|<>:"/\\?*\x00-\x1f]/g, '').replace(/\s+/g, ' ').trim();
+    const filename = `[${sanitize(modelLabel)}] ${sanitize(candidateName)} for ${sanitize(job.title)} at ${sanitize(job.company)}.pdf`;
     const pdfPath = path.join(outputDir, filename);
 
     try {
@@ -502,12 +503,11 @@ header-includes: |
   }
 
   private extractCandidateName(markdownContent: string): string {
-    // Extract name from first line of markdown
-    const lines = markdownContent.split('\n');
-    for (const line of lines) {
+    // Extract name from the first # heading
+    for (const line of markdownContent.split('\n')) {
       const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('---')) {
-        return trimmed;
+      if (trimmed.startsWith('# ')) {
+        return trimmed.replace(/^#+\s*/, '').trim();
       }
     }
     return 'Resume';
