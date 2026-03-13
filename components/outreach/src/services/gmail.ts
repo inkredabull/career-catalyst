@@ -50,16 +50,18 @@ export const sendViaGmail = (
   const params: SendParams = { htmlBody: msgObj.html };
 
   if (emailTemplate) {
-    const jobId = row[COLS.JOB_ID];
-    const metaResumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
-    const fallbackResumeUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.RESUME_URL);
-    const resumeUrl = (metaResumeUrl?.includes('drive.google.com') ? metaResumeUrl : null)
-      ?? (fallbackResumeUrl?.includes('drive.google.com') ? fallbackResumeUrl : null);
+    params.attachments = emailTemplate.attachments;
 
-    if (resumeUrl) {
-      params.attachments = [...emailTemplate.attachments, emailDrivePdf(resumeUrl)];
-    } else {
-      params.attachments = emailTemplate.attachments;
+    if (FLAGS.ATTACH_RESUME) {
+      const jobId = row[COLS.JOB_ID];
+      const metaResumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
+      const fallbackResumeUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.RESUME_URL);
+      const resumeUrl = (metaResumeUrl?.includes('drive.google.com') ? metaResumeUrl : null)
+        ?? (fallbackResumeUrl?.includes('drive.google.com') ? fallbackResumeUrl : null);
+
+      if (resumeUrl) {
+        params.attachments = [...emailTemplate.attachments, emailDrivePdf(resumeUrl)];
+      }
     }
   }
 
