@@ -24,6 +24,35 @@ app.use((req, res, next) => {
 // ---- Health check ----
 app.get("/health", (_req, res) => res.status(200).send("ok"));
 
+// ---- Proxy: career-catalyst unified-server routes ----
+const UNIFIED_SERVER = "http://localhost:3000";
+
+app.get("/llm", async (req, res) => {
+  const url = new URL("/llm", UNIFIED_SERVER);
+  url.search = new URLSearchParams(req.query).toString();
+  try {
+    const upstream = await fetch(url.toString());
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: `upstream error: ${e.message}` });
+  }
+});
+
+app.post("/generate-blurb", async (req, res) => {
+  try {
+    const upstream = await fetch(`${UNIFIED_SERVER}/generate-blurb`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: `upstream error: ${e.message}` });
+  }
+});
+
 // ---- Helpers ----
 function normalizeToHandle(toRaw) {
   const s = String(toRaw || "").trim();
