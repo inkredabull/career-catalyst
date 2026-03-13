@@ -145,7 +145,7 @@ const escapeData = (str: string): string =>
     .replace(/[\r]/g, '\\r')
     .replace(/[\t]/g, '\\t');
 
-const fillInTemplateFromObject = (template: MsgObj, data: Record<string, string>): MsgObj => {
+export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, string>): MsgObj => {
   let s = JSON.stringify(template);
 
   // Stage 0: Fetch job metadata first so {{Blurb}} and {{Intro}} can use it below

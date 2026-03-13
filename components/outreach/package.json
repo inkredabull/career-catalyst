@@ -14,6 +14,7 @@
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:integration": "NGROK_SMS_URL=http://localhost:3000 jest --testPathPattern=integration --no-coverage",
+    "preview": "NGROK_SMS_URL=http://localhost:3000 ts-node --project tsconfig.test.json --transpile-only scripts/preview-email.ts",
     "clean": "rm -rf dist/*",
     "prebuild": "npm run clean",
     "postbuild": "cp appsscript.json dist/",
