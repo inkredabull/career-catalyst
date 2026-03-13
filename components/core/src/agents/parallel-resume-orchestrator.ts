@@ -473,31 +473,29 @@ header-includes: |
 `;
     const fullMarkdown = yamlHeader + markdownContent;
 
-    // Create temporary markdown file
-    const tempMd = path.join(outputDir, `temp-${Date.now()}.md`);
-    fs.writeFileSync(tempMd, fullMarkdown);
-
-    // Generate filename with model label prefix
+    // Generate filename base (shared between .md source and .pdf output)
     const candidateName = this.extractCandidateName(markdownContent);
     const sanitize = (s: string) => s.replace(/[|<>:"/\\?*\x00-\x1f]/g, '').replace(/\s+/g, ' ').trim();
-    const filename = `[${sanitize(modelLabel)}] ${sanitize(candidateName)} for ${sanitize(job.title)} at ${sanitize(job.company)}.pdf`;
-    const pdfPath = path.join(outputDir, filename);
+    const baseName = `[${sanitize(modelLabel)}] ${sanitize(candidateName)} for ${sanitize(job.title)} at ${sanitize(job.company)}`;
+
+    // Persist markdown source before pandoc — survives PDF generation failures
+    const mdPath = path.join(outputDir, `${baseName}.md`);
+    fs.writeFileSync(mdPath, fullMarkdown);
+
+    const pdfPath = path.join(outputDir, `${baseName}.pdf`);
 
     try {
       // Convert to PDF using pandoc
-      execSync(`pandoc "${tempMd}" -o "${pdfPath}" -V geometry:margin=0.5in`, {
+      execSync(`pandoc "${mdPath}" -o "${pdfPath}" -V geometry:margin=0.5in`, {
         stdio: 'inherit'
       });
 
-      // Clean up temporary file
-      fs.unlinkSync(tempMd);
+      // Remove markdown source now that PDF exists
+      fs.unlinkSync(mdPath);
 
       return pdfPath;
     } catch (error) {
-      // Clean up temporary file on error
-      if (fs.existsSync(tempMd)) {
-        fs.unlinkSync(tempMd);
-      }
+      // Leave mdPath in place — caller can retry pandoc manually
       throw error;
     }
   }
