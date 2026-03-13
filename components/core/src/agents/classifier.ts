@@ -51,7 +51,8 @@ export class ResumeClassifierAgent {
         throw new Error('No text content in classifier response');
       }
 
-      const result: ClassificationResult = JSON.parse(textBlock.text);
+      const raw = textBlock.text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+      const result: ClassificationResult = JSON.parse(raw);
       console.log(`✅ Classification: domain=${result.domain}, format=${result.format}, roles=${result.rolesIncluded}`);
       console.log(`   Signals: ${result.domainSignals.join(', ') || 'none'}`);
       return result;
