@@ -43,16 +43,16 @@ export const sendViaGmail = (
   const params: SendParams = { htmlBody: msgObj.html };
 
   if (emailTemplate) {
-    if (FLAGS.ATTACH_RESUME) {
-      const jobId = row[COLS.JOB_ID];
-      const resumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
-      if (resumeUrl) {
-        params.attachments = [...emailTemplate.attachments, emailDrivePdf(resumeUrl)];
-      } else {
-        Logger.log('ATTACH_RESUME enabled but no resumeURL found for jobID %s', jobId ?? '(none)');
-        params.attachments = emailTemplate.attachments;
-      }
+    const jobId = row[COLS.JOB_ID];
+    const resumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
+    const isDriveUrl = resumeUrl?.includes('drive.google.com') ?? false;
+
+    if (isDriveUrl || (FLAGS.ATTACH_RESUME && resumeUrl)) {
+      params.attachments = [...emailTemplate.attachments, emailDrivePdf(resumeUrl!)];
     } else {
+      if (FLAGS.ATTACH_RESUME && !resumeUrl) {
+        Logger.log('ATTACH_RESUME enabled but no resumeURL found for jobID %s', jobId ?? '(none)');
+      }
       params.attachments = emailTemplate.attachments;
     }
   }
