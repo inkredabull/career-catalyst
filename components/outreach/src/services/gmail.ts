@@ -51,15 +51,14 @@ export const sendViaGmail = (
 
   if (emailTemplate) {
     const jobId = row[COLS.JOB_ID];
-    const resumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
-    const isDriveUrl = resumeUrl?.includes('drive.google.com') ?? false;
+    const metaResumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
+    const fallbackResumeUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.RESUME_URL);
+    const resumeUrl = (metaResumeUrl?.includes('drive.google.com') ? metaResumeUrl : null)
+      ?? (fallbackResumeUrl?.includes('drive.google.com') ? fallbackResumeUrl : null);
 
-    if (isDriveUrl || (FLAGS.ATTACH_RESUME && resumeUrl)) {
-      params.attachments = [...emailTemplate.attachments, emailDrivePdf(resumeUrl!)];
+    if (resumeUrl) {
+      params.attachments = [...emailTemplate.attachments, emailDrivePdf(resumeUrl)];
     } else {
-      if (FLAGS.ATTACH_RESUME && !resumeUrl) {
-        Logger.log('ATTACH_RESUME enabled but no resumeURL found for jobID %s', jobId ?? '(none)');
-      }
       params.attachments = emailTemplate.attachments;
     }
   }
