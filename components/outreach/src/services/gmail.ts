@@ -82,6 +82,45 @@ export const sendViaGmail = (
 
 // ── Queue / bulk send ─────────────────────────────────────────────────────────
 
+export const sendTestEmail = (
+  subjectLine?: string,
+  sheet = SpreadsheetApp.getActiveSheet()
+): void => {
+  let subject = subjectLine;
+  if (!subject) {
+    subject = Browser.inputBox(
+      'Mail Merge',
+      'Type or copy/paste the subject line of the Gmail draft you would like to test:',
+      Browser.Buttons.OK_CANCEL
+    );
+    if (subject === 'cancel' || subject === '') return;
+  }
+
+  const testRecipient = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.TEST_EMAIL);
+  if (!testRecipient) {
+    Logger.log('TEST_EMAIL Script Property not set — aborting test send');
+    return;
+  }
+
+  const emailTemplate = getGmailTemplateFromDrafts(subject);
+  const data = sheet.getDataRange().getDisplayValues();
+  const heads = data.shift() as string[];
+  const rows = data.map(r =>
+    heads.reduce<Record<string, string>>((o, k, i) => { o[k] = r[i] ?? ''; return o; }, {})
+  );
+
+  const row = rows[0];
+  if (!row) {
+    Logger.log('No data rows found in sheet — aborting test send');
+    return;
+  }
+
+  row[COLS.RECIPIENT] = testRecipient;
+  const msgObj = fillInTemplateFromObject(emailTemplate.message, row);
+  sendViaGmail(row, msgObj, emailTemplate);
+  Logger.log('Test email sent to %s', testRecipient);
+};
+
 export const queueEmails = (
   _subjectLine?: string,
   _sheet = SpreadsheetApp.getActiveSheet()

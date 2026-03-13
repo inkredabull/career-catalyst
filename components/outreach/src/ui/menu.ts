@@ -2,6 +2,7 @@ export const onOpen = (): void => {
   SpreadsheetApp.getUi()
     .createMenu('Utils')
     .addItem('Send Emails', 'sendEmails')
+    .addItem('Send Test Email', 'sendTestEmail')
     .addItem('Queue Emails', 'queueEmails')
     .addItem('Do lookup', 'fetchContactToSheet')
     .addItem('Get Linkedin URL', 'getLinkedInUrlToSheet')
