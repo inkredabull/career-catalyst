@@ -112,7 +112,7 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       const response = await this.provider.makeRequest({
         prompt: dynamicContent,
         cachedContent: this.provider.supportsPromptCaching() ? cachedContent : undefined,
-        systemPrompt: 'You are a professional resume writer. Return ONLY valid JSON.'
+        systemPrompt: 'You are a professional resume writer. Return ONLY a valid JSON object with exactly these three fields: markdownContent (string), changes (array of strings), roleSelection (object with format, rolesIncluded, reasoning). No other fields. No markdown code fences. No explanation.'
       });
 
       clearInterval(timerInterval);
@@ -166,37 +166,87 @@ INSTRUCTIONS: Use the pre-classified domain above. The domain-specific language 
     changes: string[];
     roleSelection: RoleSelection;
   } {
+    // Strip markdown code fences (any variant: ```json, ```, with any surrounding whitespace)
+    let jsonText = responseText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+    let parsed: Record<string, unknown> | null = null;
     try {
-      // Try to extract JSON from response (handle cases where LLM adds markdown formatting)
-      let jsonText = responseText.trim();
-
-      // Remove markdown code blocks if present
-      if (jsonText.startsWith('```json')) {
-        jsonText = jsonText.replace(/```json\n?/, '').replace(/\n?```$/, '').trim();
-      } else if (jsonText.startsWith('```')) {
-        jsonText = jsonText.replace(/```\n?/, '').replace(/\n?```$/, '').trim();
+      parsed = JSON.parse(jsonText) as Record<string, unknown>;
+    } catch (_firstError) {
+      // JSON parse failed — try to extract markdownContent by scanning the raw string
+      const recovered = this.extractMarkdownContent(responseText);
+      if (recovered !== null) {
+        return {
+          markdownContent: recovered,
+          changes: [],
+          roleSelection: { format: 'standard', rolesIncluded: 4, reasoning: '' }
+        };
       }
-
-      const parsed = JSON.parse(jsonText);
-
-      // Validate required fields
-      if (!parsed.markdownContent || !Array.isArray(parsed.changes) || !parsed.roleSelection) {
-        throw new Error('Invalid response format: missing required fields');
-      }
-
-      return {
-        markdownContent: parsed.markdownContent,
-        changes: parsed.changes,
-        roleSelection: {
-          format: parsed.roleSelection.format,
-          rolesIncluded: parsed.roleSelection.rolesIncluded,
-          reasoning: parsed.roleSelection.reasoning || ''
-        }
-      };
-    } catch (error) {
-      console.error('Failed to parse generator response:', responseText.substring(0, 200));
-      throw new Error(`Failed to parse JSON response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to parse generator response:', responseText.substring(0, 300));
+      throw new Error(`Failed to parse JSON response: ${_firstError instanceof Error ? _firstError.message : 'Unknown error'}`);
     }
+
+    const markdownContent = typeof parsed['markdownContent'] === 'string' ? parsed['markdownContent'] : '';
+    if (!markdownContent) {
+      console.error('Failed to parse generator response:', responseText.substring(0, 300));
+      throw new Error('Invalid response format: markdownContent missing or empty');
+    }
+
+    const changesRaw = parsed['changes'];
+    const changes: string[] = Array.isArray(changesRaw) ? (changesRaw as string[]) : [];
+
+    const rsRaw = parsed['roleSelection'] as Record<string, unknown> | undefined;
+    const roleSelection: RoleSelection = {
+      format: (typeof rsRaw?.['format'] === 'string' ? rsRaw['format'] : 'standard') as 'standard' | 'split',
+      rolesIncluded: typeof rsRaw?.['rolesIncluded'] === 'number' ? (rsRaw['rolesIncluded'] as number) : 4,
+      reasoning: typeof rsRaw?.['reasoning'] === 'string' ? (rsRaw['reasoning'] as string) : ''
+    };
+
+    return { markdownContent, changes, roleSelection };
+  }
+
+  /**
+   * Scans raw LLM response text to extract the markdownContent string value
+   * even when the surrounding JSON is malformed (extra fields, unquoted keys, etc.).
+   */
+  private extractMarkdownContent(responseText: string): string | null {
+    const marker = '"markdownContent"';
+    const markerIdx = responseText.indexOf(marker);
+    if (markerIdx === -1) return null;
+
+    // Find the colon after the key
+    let i = markerIdx + marker.length;
+    while (i < responseText.length && /\s/.test(responseText[i]!)) i++;
+    if (responseText[i] !== ':') return null;
+    i++;
+    while (i < responseText.length && /\s/.test(responseText[i]!)) i++;
+    if (responseText[i] !== '"') return null;
+    i++; // skip opening quote
+
+    // Scan the string value, respecting escape sequences
+    let value = '';
+    while (i < responseText.length) {
+      const ch = responseText[i]!;
+      if (ch === '\\' && i + 1 < responseText.length) {
+        const next = responseText[i + 1]!;
+        switch (next) {
+          case '"': value += '"'; break;
+          case '\\': value += '\\'; break;
+          case 'n': value += '\n'; break;
+          case 'r': value += '\r'; break;
+          case 't': value += '\t'; break;
+          default: value += next;
+        }
+        i += 2;
+      } else if (ch === '"') {
+        // End of string
+        return value || null;
+      } else {
+        value += ch;
+        i++;
+      }
+    }
+    return null; // unterminated string
   }
 
   private escapeForPrompt(text: string): string {
