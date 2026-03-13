@@ -5,7 +5,7 @@ import { getJobMetadata } from './job-metadata';
 import { log } from '../utils/logger';
 import {
   valediction, ideal, accomplishments, aboutMe, reciprocate,
-  who, why, cmf, ask, connection, intro, followup,
+  who, why, cmf, ask, connection, intro, followup, personalization,
 } from '../config/messages';
 import { PROFILE } from '../config/profile';
 import { notifyViaSMS } from './sms';
@@ -32,6 +32,13 @@ export const emailDrivePdf = (driveUrl: string): GoogleAppsScript.Base.Blob => {
   return file.getBlob().setName(filename);
 };
 
+const driveFileAsBlob = (driveUrl: string): GoogleAppsScript.Base.Blob => {
+  const match = driveUrl.match(/[-\w]{25,}/);
+  if (!match) throw new Error(`Could not extract Drive file ID from: ${driveUrl}`);
+  const file = DriveApp.getFileById(match[0]);
+  return file.getBlob().setName(file.getName());
+};
+
 export const sendViaGmail = (
   row: Record<string, string>,
   msgObj: MsgObj,
@@ -55,6 +62,11 @@ export const sendViaGmail = (
       }
       params.attachments = emailTemplate.attachments;
     }
+  }
+
+  const photoUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.PHOTO_URL);
+  if (photoUrl && photoUrl.includes('drive.google.com')) {
+    params.attachments = [...(params.attachments ?? []), driveFileAsBlob(photoUrl)];
   }
 
   GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, params);
@@ -182,6 +194,7 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
     '{{Get}}': ask(),
     '{{Give}}': reciprocate(),
     '{{Followup}}': followup(),
+    '{{Personalization}}': personalization(),
     '{{Blurb}}': data['Blurb'] || PROFILE.blurb[0],
     '{{Connection}}': connection(data['PersonName'], data['PersonURL']),
     '{{Intro}}': intro(data['PersonName'] ?? '', data['JobTitleActual'] ?? '', data['Blurb']),

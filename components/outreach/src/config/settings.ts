@@ -8,6 +8,7 @@ export const SCRIPT_PROPS = {
   MY_PHONE: 'MY_PHONE',
   CALENDLY_URL: 'CALENDLY_URL',
   NGROK_SMS_URL: 'NGROK_SMS_URL',
+  PHOTO_URL: 'PHOTO_URL',
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */
