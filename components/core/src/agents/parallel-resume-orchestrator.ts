@@ -187,22 +187,40 @@ export class ParallelResumeOrchestrator {
     console.log(`📋 Job: ${job.title} at ${job.company}`);
     console.log(`📊 Models: ${modelsToUse.length} (${modelsToUse.map(m => m.label).join(', ')})\n`);
 
-    // Step 1: Run classifier (shared across all models)
+    // Step 1: Classification (shared across all models, cached per job)
     console.log('📍 Step 1: Classification (shared)');
     console.log('──────────────────────────────────');
-    const classifierStartTime = Date.now();
-    const classifier = new ResumeClassifierAgent(this.classifierApiKey);
-    const classification = await classifier.classify(job.description, cvSummary);
-    const classificationDuration = (Date.now() - classifierStartTime) / 1000;
+    const classificationCachePath = path.resolve('logs', jobId, 'classification.json');
+    let classification: Awaited<ReturnType<ResumeClassifierAgent['classify']>>;
+    let classificationCost: number;
 
-    // Estimate classifier cost (Haiku 4.5: ~$0.25/$1.25 per MTok, ~500 tokens in/200 out)
-    const classificationCost = (500 * 0.25 / 1000000) + (200 * 1.25 / 1000000);
+    if (fs.existsSync(classificationCachePath)) {
+      const cached = JSON.parse(fs.readFileSync(classificationCachePath, 'utf-8'));
+      classification = cached;
+      classificationCost = 0;
+      console.log(`✅ Classification loaded from cache (domain=${classification.domain}, $0.0000)`);
+      console.log(`   Domain: ${classification.domain}`);
+      console.log(`   Format: ${classification.format}`);
+      console.log(`   Roles: ${classification.rolesIncluded}\n`);
+    } else {
+      const classifierStartTime = Date.now();
+      const classifier = new ResumeClassifierAgent(this.classifierApiKey);
+      classification = await classifier.classify(job.description, cvSummary);
+      const classificationDuration = (Date.now() - classifierStartTime) / 1000;
 
-    console.log(`✅ Classification complete (${classificationDuration.toFixed(1)}s)`);
-    console.log(`   Domain: ${classification.domain}`);
-    console.log(`   Format: ${classification.format}`);
-    console.log(`   Roles: ${classification.rolesIncluded}`);
-    console.log(`   Cost: ~$${classificationCost.toFixed(4)}\n`);
+      // Estimate classifier cost (Haiku 4.5: ~$0.25/$1.25 per MTok, ~500 tokens in/200 out)
+      classificationCost = (500 * 0.25 / 1000000) + (200 * 1.25 / 1000000);
+
+      // Persist for future runs
+      fs.mkdirSync(path.dirname(classificationCachePath), { recursive: true });
+      fs.writeFileSync(classificationCachePath, JSON.stringify(classification, null, 2));
+
+      console.log(`✅ Classification complete (${classificationDuration.toFixed(1)}s)`);
+      console.log(`   Domain: ${classification.domain}`);
+      console.log(`   Format: ${classification.format}`);
+      console.log(`   Roles: ${classification.rolesIncluded}`);
+      console.log(`   Cost: ~$${classificationCost.toFixed(4)}\n`);
+    }
 
     // Step 2: Parallel generation with different models
     console.log('📝 Step 2: Parallel Generation');
