@@ -1705,111 +1705,13 @@ app.all('/llm', (req, res) => {
     const company  = jobData.company || jobData.company_name || jobData.employer || '';
     const jobURL   = jobData.url || jobData.jobUrl || jobData.sourceUrl || jobData.job_url || null;
 
-    // --- Derive short title with common abbreviations ---
-    const abbreviationMap = {
-      'Technical Program Manager': 'TPM',
-      'Program Manager': 'PM',
-      'Product Manager': 'PM',
-      'Software Engineer': 'SWE',
-      'Software Engineering': 'SWE',
-      'Site Reliability Engineer': 'SRE',
-      'Site Reliability Engineering': 'SRE',
-      'Engineering Manager': 'EM',
-      'Data Scientist': 'DS',
-      'Machine Learning Engineer': 'MLE',
-      'Machine Learning': 'ML',
-      'Generative AI': 'GenAI',
-      'Artificial Intelligence': 'AI',
-      'DevOps Engineer': 'DevOps',
-      'Quality Assurance': 'QA',
-      'User Experience': 'UX',
-      'User Interface': 'UI'
-    };
+    // Use titleShorthand from job data if it exists, otherwise null
+    const jobTitleShorthand = jobData.titleShorthand || null;
 
-    // Word-level abbreviations for aggressive shortening
-    const wordAbbreviations = {
-      'Director': 'DIR',
-      'Vice President': 'VP',
-      'Senior': 'Sr.',
-      'Junior': 'Jr.',
-      'Principal': 'Principal',
-      'Staff': 'Staff',
-      'Lead': 'Lead',
-      'Chief': 'Chief',
-      'Engineering': 'ENG',
-      'Engineer': 'ENG',
-      'Manager': 'MGR',
-      'Assistant': 'ASST',
-      'Associate': 'ASSOC',
-      'Foundation': 'FND'
-    };
-
-    let jobTitleShorthand = jobTitle;
-
-    // Check if title contains known abbreviation patterns
-    for (const [fullTitle, abbrev] of Object.entries(abbreviationMap)) {
-      const matchIndex = jobTitle.indexOf(fullTitle);
-      if (matchIndex !== -1) {
-        // Extract only the prefix BEFORE the matched phrase
-        let prefix = jobTitle.substring(0, matchIndex).trim();
-
-        // Remove trailing comma or other punctuation from prefix
-        prefix = prefix.replace(/[,\s]+$/, '');
-
-        if (prefix && prefix.length > 0 && !['a', 'an', 'the', 'and'].includes(prefix.toLowerCase())) {
-          // Abbreviate the prefix too
-          let abbreviatedPrefix = prefix;
-          for (const [word, wordAbbrev] of Object.entries(wordAbbreviations)) {
-            abbreviatedPrefix = abbreviatedPrefix.replace(new RegExp(`\\b${word}\\b`, 'gi'), wordAbbrev);
-          }
-
-          // If original had comma after prefix, preserve it
-          const hasComma = prefix.includes(',') || jobTitle.substring(0, matchIndex).includes(',');
-          jobTitleShorthand = hasComma ? `${abbreviatedPrefix}, ${abbrev}` : `${abbreviatedPrefix} ${abbrev}`;
-        } else {
-          jobTitleShorthand = abbrev;
-        }
-        break;
-      }
-    }
-
-    // If no abbreviation found, try intelligent word-level abbreviation
-    if (jobTitleShorthand === jobTitle) {
-      let abbreviated = jobTitle;
-
-      // Apply word-level abbreviations (longest matches first to avoid partial replacements)
-      const sortedAbbreviations = Object.entries(wordAbbreviations)
-        .sort((a, b) => b[0].length - a[0].length);
-
-      for (const [word, abbrev] of sortedAbbreviations) {
-        abbreviated = abbreviated.replace(new RegExp(`\\b${word}\\b`, 'gi'), abbrev);
-      }
-
-      // Remove filler words and clean up spacing
-      abbreviated = abbreviated
-        .replace(/\bof\b/gi, '')
-        .replace(/\bthe\b/gi, '')
-        .replace(/\s+/g, ' ')
-        .replace(/,\s+/g, ', ')
-        .trim();
-
-      // If we made any abbreviations, use that
-      if (abbreviated !== jobTitle && abbreviated.length <= 40) {
-        jobTitleShorthand = abbreviated;
-      } else {
-        // Fall back to first 3-4 significant words
-        const stopWords = new Set(['a', 'an', 'the', 'and', 'or', 'of', 'for', 'to', 'in', 'at', 'with', 'on']);
-        const significantWords = jobTitle
-          .split(/\s+/)
-          .filter(w => w.length > 0 && !stopWords.has(w.toLowerCase()))
-          .slice(0, 4);
-        jobTitleShorthand = significantWords.join(' ');
-      }
-    }
-
-    // Enforce max length
-    if (jobTitleShorthand.length > 40) {
-      jobTitleShorthand = jobTitleShorthand.substring(0, 37) + '...';
+    if (jobTitleShorthand) {
+      console.log(`  -> Using titleShorthand from job data: "${jobTitleShorthand}"`);
+    } else {
+      console.log(`  -> No titleShorthand found in job data`);
     }
 
     // --- Read most recent third-person blurb ---
