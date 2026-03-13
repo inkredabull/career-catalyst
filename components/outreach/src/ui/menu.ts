@@ -7,5 +7,6 @@ export const onOpen = (): void => {
     .addItem('Get Linkedin URL', 'getLinkedInUrlToSheet')
     .addItem('Generate Message', 'generateMessageForRow')
     .addItem('Refresh Job Metadata', 'refreshJobMetadata')
+    .addItem('Show Job Metadata', 'showJobMetadata')
     .addToUi();
 }

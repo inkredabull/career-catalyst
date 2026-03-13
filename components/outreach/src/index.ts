@@ -62,6 +62,37 @@ function generateMessageForRow(): void {
 
 // ── Job metadata cache management ─────────────────────────────────────────────
 
+function showJobMetadataFn(): void {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const activeRow = sheet.getActiveRange()?.getRow() ?? 2;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] as string[];
+  const jobIdCol = headers.indexOf(COLS.JOB_ID);
+  if (jobIdCol === -1) {
+    SpreadsheetApp.getUi().alert(`No "${COLS.JOB_ID}" column found in this sheet.`);
+    return;
+  }
+  const jobId = sheet.getRange(activeRow, jobIdCol + 1).getValue() as string;
+  if (!jobId) {
+    SpreadsheetApp.getUi().alert(`No JobID found in the "${COLS.JOB_ID}" column for this row.`);
+    return;
+  }
+  const meta = getJobMetadata(jobId);
+  if (!meta) {
+    SpreadsheetApp.getUi().alert(`No metadata found for job ${jobId}. Check NGROK_SMS_URL and server.`);
+    return;
+  }
+  const lines = [
+    `jobId: ${jobId}`,
+    `Company: ${meta.Company}`,
+    `jobTitle: ${meta.jobTitle}`,
+    `jobTitleShorthand: ${meta.jobTitleShorthand}`,
+    `jobURL: ${meta.jobURL}`,
+    `resumeURL: ${meta.resumeURL || '(empty)'}`,
+    `thirdPersonBlurb: ${meta.thirdPersonBlurb ? meta.thirdPersonBlurb.slice(0, 80) + '…' : '(empty)'}`,
+  ];
+  SpreadsheetApp.getUi().alert(lines.join('\n'));
+}
+
 function refreshJobMetadataFn(): void {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const activeRow = sheet.getActiveRange()?.getRow() ?? 2;
@@ -94,3 +125,4 @@ g['getLinkedInUrlToSheet'] = getLinkedInUrlToSheet;
 g['sendWarmup'] = sendWarmup;
 g['generateMessageForRow'] = generateMessageForRow;
 g['refreshJobMetadata'] = refreshJobMetadataFn;
+g['showJobMetadata'] = showJobMetadataFn;
