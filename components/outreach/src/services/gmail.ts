@@ -73,7 +73,8 @@ export const sendViaGmail = (
   if (FLAGS.SEND_SMS) {
     const phoneKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_PHONE);
     const number = row[COLS.CELL] || phoneKey || '';
-    notifyViaSMS(row[COLS.FIRST_NAME], row[COLS.RECIPIENT], number);
+    const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
+    notifyViaSMS(firstName, row[COLS.RECIPIENT], number);
   }
 };
 
@@ -201,6 +202,13 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
 
   for (const [token, value] of Object.entries(subs)) {
     s = s.replace(new RegExp(token.replace(/[{}]/g, '\\$&'), 'g'), escapeData(value));
+  }
+
+  // Stage 1.5: Derive First / L from Full Name if the dedicated columns are absent
+  if (!data['First'] && data[COLS.FULL_NAME]) {
+    const parts = data[COLS.FULL_NAME].trim().split(/\s+/);
+    data['First'] = parts[0] ?? '';
+    if (!data['L']) data['L'] = parts.length > 1 ? parts[parts.length - 1]! : '';
   }
 
   // Stage 2: Generic {{key}} replacement from row data
