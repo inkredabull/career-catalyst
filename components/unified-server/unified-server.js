@@ -1397,7 +1397,7 @@ app.get('/check-resume/:jobId', (req, res) => {
       const jobFile = path.join(jobDir, jobFiles.sort().reverse()[0]);
       try {
         const jobData = JSON.parse(fs.readFileSync(jobFile, 'utf-8'));
-        driveUrl = jobData.resumeGoogleDriveUrl || null;
+        driveUrl = jobData.resumeUrl || null;
         console.log(`  -> Drive URL from job JSON: ${driveUrl || 'not set'}`);
       } catch (error) {
         console.log(`  -> Could not read Drive URL from job JSON: ${error.message}`);
@@ -1619,8 +1619,8 @@ app.post('/save-resume-drive-url', (req, res) => {
     // Read existing job JSON
     const jobData = JSON.parse(fs.readFileSync(jobFile, 'utf-8'));
 
-    // Add or update the Google Drive URL
-    jobData.resumeGoogleDriveUrl = driveUrl;
+    // Add or update the resume URL
+    jobData.resumeUrl = driveUrl;
     jobData.updatedAt = new Date().toISOString();
 
     // Write back to file
@@ -1728,8 +1728,8 @@ app.all('/llm', (req, res) => {
       console.log('  -> No third-person blurb file found');
     }
 
-    // --- Extract resume Google Drive URL from job data ---
-    const resumeURL = jobData.resumeGoogleDriveUrl || jobData.resumeUrl || jobData.resume_url || null;
+    // --- Extract resume URL from job data ---
+    const resumeURL = jobData.resumeUrl || null;
     if (resumeURL) {
       console.log(`  -> Resume URL found: ${resumeURL}`);
     }
