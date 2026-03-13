@@ -11,11 +11,11 @@ export const SCRIPT_PROPS = {
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */
-export function requireProp(key: string): string {
+export const requireProp = (key: string): string => {
   const val = PropertiesService.getScriptProperties().getProperty(key);
   if (!val) throw new Error(`Script Property not set: ${key}`);
   return val;
-}
+};
 
 // Column name constants — must match spreadsheet header row
 export const COLS = {

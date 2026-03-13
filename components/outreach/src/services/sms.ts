@@ -3,14 +3,14 @@
 
 import { SCRIPT_PROPS } from '../config/settings';
 
-export function normalizePhoneNumber(input: string): string {
+export const normalizePhoneNumber = (input: string): string => {
   let digits = String(input).replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
   if (digits.length !== 10) throw new Error(`Invalid phone number: ${input}`);
   return `+1${digits}`;
-}
+};
 
-export function sendRealSms(to: string, message: string): void {
+export const sendRealSms = (to: string, message: string): void => {
   const ngrokUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.NGROK_SMS_URL);
   if (!ngrokUrl) {
     Logger.log('NGROK_SMS_URL not set in Script Properties');
@@ -25,9 +25,9 @@ export function sendRealSms(to: string, message: string): void {
     muteHttpExceptions: true,
   });
   Logger.log('SMS response %s: %s', res.getResponseCode(), res.getContentText());
-}
+};
 
-export function notifyViaSMS(first: string, email: string, number: string): void {
+export const notifyViaSMS = (first: string, email: string, number: string): void => {
   const msg = [
     `Hey ${first}, has been a while!`,
     `Is ${email} still the best to reach you at? Just emailed you there; hope I didn't land in Spam... :-)`,
@@ -35,4 +35,4 @@ export function notifyViaSMS(first: string, email: string, number: string): void
     '- Anthony Bull',
   ].join('\n\n');
   sendRealSms(normalizePhoneNumber(number), msg);
-}
+};

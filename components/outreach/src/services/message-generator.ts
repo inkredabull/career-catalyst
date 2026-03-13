@@ -17,7 +17,7 @@ export interface GeneratedMessage {
 
 export type FetchFn = (url: string, options: object) => { getContentText(): string };
 
-export function buildOutreachPrompt(ctx: OutreachContext): string {
+export const buildOutreachPrompt = (ctx: OutreachContext): string => {
   return [
     `Write a concise, personalized outreach message to ${ctx.contactName},`,
     `${ctx.contactRole} at ${ctx.company}.`,
@@ -27,19 +27,19 @@ export function buildOutreachPrompt(ctx: OutreachContext): string {
   ]
     .filter(Boolean)
     .join(' ');
-}
+};
 
-export function parseMessageResponse(responseText: string): GeneratedMessage {
+export const parseMessageResponse = (responseText: string): GeneratedMessage => {
   const match = responseText.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('No JSON found in LLM response');
   return JSON.parse(match[0]) as GeneratedMessage;
-}
+};
 
-export function generateOutreachMessage(
+export const generateOutreachMessage = (
   ctx: OutreachContext,
   apiKey: string,
   fetchFn: FetchFn
-): GeneratedMessage {
+): GeneratedMessage => {
   const prompt = buildOutreachPrompt(ctx);
   const response = fetchFn('https://api.anthropic.com/v1/messages', {
     method: 'post',
@@ -59,4 +59,4 @@ export function generateOutreachMessage(
     content: Array<{ text: string }>;
   };
   return parseMessageResponse(data.content[0].text);
-}
+};

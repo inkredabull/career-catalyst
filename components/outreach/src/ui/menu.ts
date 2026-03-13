@@ -1,4 +1,4 @@
-export function onOpen(): void {
+export const onOpen = (): void => {
   SpreadsheetApp.getUi()
     .createMenu('Utils')
     .addItem('Send Emails', 'sendEmails')
