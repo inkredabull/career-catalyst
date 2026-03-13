@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as yaml from 'js-yaml';
+import { createSheetsLogger } from '../integrations/sheets-logger';
 
 export class JobExtractorAgent extends BaseAgent {
   constructor(config: AgentConfig) {
@@ -1574,12 +1575,21 @@ Outreach activities:
 
         console.log(`✅ Job scored: ${score.overallScore}%`);
 
+        // Log to Google Sheets after scoring
+        const sheetsLogger = createSheetsLogger();
+        if (sheetsLogger) {
+          await sheetsLogger.logJobAnalysis(jobId, jobData, score, jobData.url || '', {
+            threshold: workflowConfig.score_threshold,
+            origin: 'CLI',
+          });
+        }
+
         // Step 2: Generate resume if score is above threshold
         if (workflowConfig.steps.resume && score.overallScore >= workflowConfig.score_threshold) {
           console.log(`📄 Step 2: Generating resume (score ${score.overallScore}% >= ${workflowConfig.score_threshold}%)...`);
-          
+
           const resumeResult = await this.generateResume(jobId, workflowConfig);
-          
+
           if (resumeResult) {
             console.log('✅ Resume generated successfully');
             
