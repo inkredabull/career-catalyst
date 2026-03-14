@@ -20,6 +20,7 @@ import * as fs from 'fs/promises';
 import * as fss from 'fs';
 import { execSync } from 'child_process';
 import * as readline from 'readline';
+import { createSheetsLogger } from './integrations/sheets-logger';
 
 // Helper function to find CV file automatically
 async function findCvFile(): Promise<string> {
@@ -471,6 +472,17 @@ program
 
       // Process job description with required terms extraction and index update
       await agent.processJobDescription(jobId, result.data.description);
+
+      // Log to Google Sheets immediately — regardless of whether scoring runs
+      const sheetsLogger = createSheetsLogger();
+      if (sheetsLogger) {
+        await sheetsLogger.logTracked(
+          jobId,
+          result.data.title,
+          result.data.company,
+          result.data.url || ''
+        );
+      }
 
       // Automatically score the job unless --no-score or --skip-post-workflow is specified
       if (options.score !== false && !options.skipPostWorkflow) {

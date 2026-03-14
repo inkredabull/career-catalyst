@@ -75,6 +75,43 @@ export class SheetsLogger {
   }
 
   /**
+   * Log a newly tracked job (no score yet) — called immediately on extraction.
+   */
+  async logTracked(
+    jobId: string,
+    title: string,
+    company: string,
+    jobUrl: string,
+    origin = 'CLI'
+  ): Promise<void> {
+    if (!this.enabled) return;
+
+    try {
+      const jobData: JobRow = {
+        id: jobId,
+        role: title,
+        company,
+        status: 'Tracked',
+        applied: '',
+        updated: formatDate(),
+        notes: '',
+        origin,
+        score: '',
+        threshold: '',
+        analysis: '',
+        jobUrl,
+        resumeUrl: '',
+        jobTitleShorthand: this.generateShorthand(title)
+      };
+
+      await this.client.insertRowAtTop(this.spreadsheetId, this.sheetName, jobData);
+      console.log(`📊 Job tracked in Google Sheets: ${jobId}`);
+    } catch (error) {
+      console.error('⚠️ Failed to log tracked job to Google Sheets:', error);
+    }
+  }
+
+  /**
    * Update job status when application is submitted
    */
   async markAsApplied(
