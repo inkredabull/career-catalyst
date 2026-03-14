@@ -1506,8 +1506,8 @@ Outreach activities:
         });
         console.log(`📋 Creating ${remindersToCreate.length} selected reminder(s): ${selectedReminders.join(', ')}`);
       } else {
-        // Create all reminders if none specified
-        remindersToCreate = [trackingReminder, applyReminder, pingReminder, prepReminder, followUpReminder];
+        // Sheet insertion now handles tracking; create only action reminders by default
+        remindersToCreate = [applyReminder, pingReminder, prepReminder, followUpReminder];
       }
 
       if (remindersToCreate.length === 0) {
