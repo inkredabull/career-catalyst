@@ -46,27 +46,20 @@ export class SheetsLogger {
       const threshold = options?.threshold ?? 75;
       const meetsThreshold = score.overallScore >= threshold;
 
-      const jobData: JobRow = {
-        id: jobId,
-        role: jobListing.title,
-        company: jobListing.company,
+      const updates = {
         status: 'Analyzed',
-        applied: '', // Will be filled when actually applied
         updated: formatDate(),
         notes: `Score: ${score.overallScore}% - ${meetsThreshold ? '✅ Meets threshold' : '❌ Below threshold'}`,
-        origin: options?.origin || 'CLI',
         score: `${score.overallScore}%`,
         threshold: meetsThreshold ? 'Yes' : 'No',
         analysis: this.formatAnalysis(score),
-        jobUrl: jobUrl,
-        resumeUrl: options?.resumeUrl || '',
-        jobTitleShorthand: this.generateShorthand(jobListing.title)
+        ...(options?.resumeUrl ? { resumeUrl: options.resumeUrl } : {})
       };
 
-      // Insert at top (most recent first)
-      await this.client.insertRowAtTop(this.spreadsheetId, this.sheetName, jobData);
+      // Update the existing Tracked row rather than inserting a duplicate
+      await this.client.updateRowById(this.spreadsheetId, this.sheetName, jobId, updates);
 
-      console.log(`📊 Job logged to Google Sheets: ${jobId}`);
+      console.log(`📊 Job analysis logged to Google Sheets: ${jobId}`);
 
     } catch (error) {
       console.error('⚠️ Failed to log to Google Sheets:', error);
