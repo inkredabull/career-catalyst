@@ -1551,12 +1551,12 @@ Instructions: Use the pre-classified domain above. Skip the domain detection ste
       const jobFile = path.join(jobDir, jobFiles[0]);
       const jobData = JSON.parse(fs.readFileSync(jobFile, 'utf-8'));
 
-      // Add or update the resumeUrl field
-      jobData.resumeUrl = resumePath;
+      // Store local PDF path separately; resumeUrl is reserved for the Google Drive URL
+      jobData.resumeLocalPath = resumePath;
 
       // Save the updated job data
       fs.writeFileSync(jobFile, JSON.stringify(jobData, null, 2), 'utf-8');
-      console.log(`📄 Resume URL saved to job JSON: ${resumePath}`);
+      console.log(`📄 Resume local path saved to job JSON: ${resumePath}`);
     } catch (error) {
       console.warn(`⚠️  Failed to update job JSON with resume URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

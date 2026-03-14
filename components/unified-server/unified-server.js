@@ -1397,7 +1397,9 @@ app.get('/check-resume/:jobId', (req, res) => {
       const jobFile = path.join(jobDir, jobFiles.sort().reverse()[0]);
       try {
         const jobData = JSON.parse(fs.readFileSync(jobFile, 'utf-8'));
-        driveUrl = jobData.resumeUrl || null;
+        // resumeUrl holds the Drive URL; fall back to legacy resumeGoogleDriveUrl field
+        const candidate = jobData.resumeUrl || jobData.resumeGoogleDriveUrl || null;
+        driveUrl = (candidate && candidate.includes('drive.google.com')) ? candidate : null;
         console.log(`  -> Drive URL from job JSON: ${driveUrl || 'not set'}`);
       } catch (error) {
         console.log(`  -> Could not read Drive URL from job JSON: ${error.message}`);
@@ -1729,7 +1731,9 @@ app.all('/llm', (req, res) => {
     }
 
     // --- Extract resume URL from job data ---
-    const resumeURL = jobData.resumeUrl || null;
+    // resumeUrl holds the Drive URL; fall back to legacy resumeGoogleDriveUrl field
+    const resumeURLCandidate = jobData.resumeUrl || jobData.resumeGoogleDriveUrl || null;
+    const resumeURL = (resumeURLCandidate && resumeURLCandidate.includes('drive.google.com')) ? resumeURLCandidate : null;
     if (resumeURL) {
       console.log(`  -> Resume URL found: ${resumeURL}`);
     }
