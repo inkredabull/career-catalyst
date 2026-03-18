@@ -88,13 +88,14 @@ const driveFileAsBlob = (driveUrl: string): GoogleAppsScript.Base.Blob => {
 export const sendViaGmail = (
   row: Record<string, string>,
   msgObj: MsgObj,
-  emailTemplate?: { attachments: GoogleAppsScript.Base.Blob[] } | null
+  emailTemplate?: { attachments: GoogleAppsScript.Base.Blob[] } | null,
+  draftSubject?: string
 ): void => {
   const subjectLine = msgObj.subject;
   Logger.log('Sending via Gmail: %s', subjectLine);
 
-  // Get flags for this specific subject line
-  const flags = getFlagsForSubject(subjectLine);
+  // Use the original draft subject (with tokens) for flag lookup so template-based keys match
+  const flags = getFlagsForSubject(draftSubject ?? subjectLine);
 
   const params: SendParams = { htmlBody: msgObj.html };
 
@@ -261,7 +262,7 @@ export const doSendTestEmail = (
 
   row[COLS.RECIPIENT] = testRecipient;
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row);
-  sendViaGmail(row, msgObj, emailTemplate);
+  sendViaGmail(row, msgObj, emailTemplate, subject);
   Logger.log('Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
 };
@@ -302,7 +303,7 @@ export const doSendEmails = (
     if (row[COLS.EMAIL_SENT] === '') {
       try {
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row);
-        sendViaGmail(row, msgObj, emailTemplate);
+        sendViaGmail(row, msgObj, emailTemplate, subject);
         out.push([new Date()]);
         sentCount++;
       } catch (e) {
