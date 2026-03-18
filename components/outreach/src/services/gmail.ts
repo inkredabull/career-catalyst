@@ -8,7 +8,8 @@ import {
   who, why, cmf, ask, connection, intro, followup, personalization,
 } from '../config/messages';
 import { PROFILE } from '../config/profile';
-import { notifyViaSMS } from './sms';
+import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
+import { getLinkedInUrlByName } from './contacts';
 
 interface MsgObj {
   subject: string;
@@ -20,6 +21,53 @@ interface SendParams {
   htmlBody: string;
   attachments?: GoogleAppsScript.Base.Blob[];
 }
+
+// ── LinkedIn DM modal ─────────────────────────────────────────────────────────
+
+const showLinkedInMessageDialog = (linkedInUrl: string, message: string, firstName: string): void => {
+  const urlJson = JSON.stringify(linkedInUrl);
+  const msgJson = JSON.stringify(message);
+  const title = `LinkedIn DM${firstName ? ` — ${firstName}` : ''}`;
+  const html = `<!DOCTYPE html><html><head><base target="_top"><style>
+body{font-family:sans-serif;padding:16px;min-width:380px}
+h3{margin:0 0 10px}
+.profile-link{display:block;margin-bottom:12px;word-break:break-all;font-size:13px}
+.no-url{color:#888;font-size:13px;margin-bottom:12px}
+p{margin:0 0 4px;font-size:13px}
+textarea{width:100%;height:120px;font-size:13px;padding:8px;box-sizing:border-box;resize:vertical}
+.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+button{padding:6px 16px;cursor:pointer}
+</style></head><body>
+<h3>LinkedIn DM</h3>
+<script>
+var url=${urlJson};
+if(url){document.write('<a class="profile-link" href="'+url+'" target="_blank">'+url+'</a>');}
+else{document.write('<p class="no-url">(No LinkedIn URL found — open manually)</p>');}
+</script>
+<p>Message:</p>
+<textarea id="msg" readonly></textarea>
+<div class="btns">
+<button onclick="copyMsg()">Copy Message</button>
+<button onclick="google.script.host.close()">Close</button>
+</div>
+<script>
+var msg=${msgJson};
+document.getElementById('msg').value=msg;
+if(url){window.open(url,'_blank');}
+function copyMsg(){
+  var t=document.getElementById('msg');
+  t.select();
+  document.execCommand('copy');
+  t.blur();
+}
+</script>
+</body></html>`;
+
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(460).setHeight(240),
+    title
+  );
+};
 
 // ── Core send ─────────────────────────────────────────────────────────────────
 
@@ -76,10 +124,22 @@ export const sendViaGmail = (
   GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, params);
 
   if (flags.SEND_SMS) {
-    const phoneKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_PHONE);
-    const number = row[COLS.CELL] || phoneKey || '';
+    const myPhone = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_PHONE) ?? '';
+    const cellValue = (row[COLS.CELL] ?? '').trim();
     const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
-    notifyViaSMS(firstName, row[COLS.RECIPIENT], number);
+
+    const isSelfOrMissing = !cellValue || (() => {
+      try { return myPhone !== '' && normalizePhoneNumber(cellValue) === normalizePhoneNumber(myPhone); }
+      catch { return false; }
+    })();
+
+    if (isSelfOrMissing) {
+      const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
+      const message = buildSmsMessage(firstName, row[COLS.RECIPIENT]);
+      showLinkedInMessageDialog(linkedInUrl, message, firstName);
+    } else {
+      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue);
+    }
   }
 };
 
@@ -167,7 +227,7 @@ const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
   const html = HtmlService.createHtmlOutput(buildSubjectPickerHtml(subjects, actionFn))
     .setWidth(440)
     .setHeight(185);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Mail Merge — Choose Subject');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Choose Subject');
 };
 
 // ── Queue / bulk send ─────────────────────────────────────────────────────────

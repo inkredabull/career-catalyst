@@ -28,6 +28,7 @@ export const COLS = {
   EMAIL_SENT: 'Email Sent',
   SUBJECT: 'Subject',
   JOB_ID: 'JobID',
+  LINKEDIN: 'LinkedIn',
 } as const;
 
 // Sheet names — update to match your spreadsheet
