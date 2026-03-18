@@ -1,5 +1,7 @@
 // Google Contacts / People API helpers.
 
+import { COLS } from '../config/settings';
+
 type PersonResource = GoogleAppsScript.People.Schema.Person;
 
 export interface ContactDetails {
@@ -79,7 +81,7 @@ export const fetchContactToSheet = (): void => {
   const rowIndex = currentCell.getRow();
   const row = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0] as string[];
 
-  const fullName = row[headers.indexOf('Full')];
+  const fullName = row[headers.indexOf(COLS.FULL_NAME)];
   const contact = getContactDetails(fullName);
 
   currentCell.setValue(contact.email);
@@ -98,7 +100,7 @@ export const getLinkedInUrlToSheet = (): void => {
   const rowIndex = currentCell.getRow();
   const row = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0] as string[];
 
-  const fullName = row[headers.indexOf('Full')];
+  const fullName = row[headers.indexOf(COLS.FULL_NAME)];
   currentCell.setValue(getLinkedInUrlByName(fullName));
 };
 
