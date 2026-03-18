@@ -117,13 +117,19 @@ p{margin:0 0 6px}
 select{width:100%;padding:6px;font-size:13px;margin-bottom:14px}
 .btns{display:flex;gap:8px;justify-content:flex-end}
 button{padding:6px 16px;cursor:pointer}
+#loading{display:none;text-align:center;padding:12px 0;color:#555;font-size:14px}
+.spinner{display:inline-block;margin-right:6px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style></head><body>
+<div id="form">
 <p>Select a subject line:</p>
 <select id="s"><option value="">-- Select --</option></select>
 <div class="btns">
-<button onclick="google.script.host.close()">Cancel</button>
-<button onclick="doSubmit()">OK</button>
+<button id="cancel" onclick="google.script.host.close()">Cancel</button>
+<button id="ok" onclick="doSubmit()">OK</button>
 </div>
+</div>
+<div id="loading"><span class="spinner">⏳</span>Sending emails — please wait…</div>
 <script>
 (function(){
 var subjects=${subjectsJson};
@@ -132,9 +138,15 @@ subjects.forEach(function(s){var o=document.createElement('option');o.value=o.te
 window.doSubmit=function(){
 var s=sel.value;
 if(!s){alert('Please select a subject line.');return;}
+document.getElementById('form').style.display='none';
+document.getElementById('loading').style.display='block';
 google.script.run
 .withSuccessHandler(function(){google.script.host.close();})
-.withFailureHandler(function(e){alert(e.message);})
+.withFailureHandler(function(e){
+document.getElementById('loading').style.display='none';
+document.getElementById('form').style.display='block';
+alert(e.message);
+})
 [${fnJson}](s);
 };
 })();
@@ -154,7 +166,7 @@ const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
   const actionFn = action === 'send' ? 'doSendEmails' : 'doSendTestEmail';
   const html = HtmlService.createHtmlOutput(buildSubjectPickerHtml(subjects, actionFn))
     .setWidth(440)
-    .setHeight(170);
+    .setHeight(185);
   SpreadsheetApp.getUi().showModalDialog(html, 'Mail Merge — Choose Subject');
 };
 
@@ -187,6 +199,7 @@ export const doSendTestEmail = (
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row);
   sendViaGmail(row, msgObj, emailTemplate);
   Logger.log('Test email sent to %s', testRecipient);
+  SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
 };
 
 export const sendTestEmail = (subjectLine?: string): void => {
@@ -219,6 +232,7 @@ export const doSendEmails = (
   );
 
   const out: [string | Date][] = [];
+  let sentCount = 0;
 
   for (const row of rows) {
     if (row[COLS.EMAIL_SENT] === '') {
@@ -226,6 +240,7 @@ export const doSendEmails = (
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row);
         sendViaGmail(row, msgObj, emailTemplate);
         out.push([new Date()]);
+        sentCount++;
       } catch (e) {
         out.push([(e as Error).message]);
       }
@@ -235,6 +250,7 @@ export const doSendEmails = (
   }
 
   sheet.getRange(2, emailSentColIdx + 1, out.length).setValues(out);
+  SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
 };
 
 export const sendEmails = (subjectLine?: string): void => {
