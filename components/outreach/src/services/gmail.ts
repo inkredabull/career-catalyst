@@ -1,6 +1,6 @@
 // Gmail-based email sending and mail merge.
 
-import { COLS, FLAGS, SCRIPT_PROPS } from '../config/settings';
+import { COLS, SCRIPT_PROPS, SHEETS, SUBJECT_LINE_COLS, getFlagsForSubject } from '../config/settings';
 import { getJobMetadata } from './job-metadata';
 import { log } from '../utils/logger';
 import {
@@ -47,12 +47,15 @@ export const sendViaGmail = (
   const subjectLine = msgObj.subject;
   Logger.log('Sending via Gmail: %s', subjectLine);
 
+  // Get flags for this specific subject line
+  const flags = getFlagsForSubject(subjectLine);
+
   const params: SendParams = { htmlBody: msgObj.html };
 
   if (emailTemplate) {
     params.attachments = emailTemplate.attachments;
 
-    if (FLAGS.ATTACH_RESUME) {
+    if (flags.ATTACH_RESUME) {
       const jobId = row[COLS.JOB_ID];
       const metaResumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
       const fallbackResumeUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.RESUME_URL);
@@ -72,7 +75,7 @@ export const sendViaGmail = (
 
   GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, params);
 
-  if (FLAGS.SEND_SMS) {
+  if (flags.SEND_SMS) {
     const phoneKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_PHONE);
     const number = row[COLS.CELL] || phoneKey || '';
     const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
@@ -82,20 +85,85 @@ export const sendViaGmail = (
 
 // ── Queue / bulk send ─────────────────────────────────────────────────────────
 
-export const sendTestEmail = (
-  subjectLine?: string,
+// ── Subject line picker ───────────────────────────────────────────────────────
+
+const getSubjectLinesForPicker = (): string[] => {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.SUBJECT_LINES);
+  if (!sheet) {
+    Logger.log('Sheet "%s" not found', SHEETS.SUBJECT_LINES);
+    return [];
+  }
+  const data = sheet.getDataRange().getValues();
+  const heads = data.shift() as string[];
+  const subjectCol = heads.indexOf(SUBJECT_LINE_COLS.SUBJECT);
+  const showCol = heads.indexOf(SUBJECT_LINE_COLS.SHOW);
+  if (subjectCol === -1 || showCol === -1) {
+    Logger.log('Columns "%s" or "%s" not found in sheet "%s"',
+      SUBJECT_LINE_COLS.SUBJECT, SUBJECT_LINE_COLS.SHOW, SHEETS.SUBJECT_LINES);
+    return [];
+  }
+  return data
+    .filter(row => String(row[showCol]).toLowerCase() === 'true')
+    .map(row => String(row[subjectCol]))
+    .filter(s => s.trim() !== '');
+};
+
+const buildSubjectPickerHtml = (subjects: string[], actionFn: string): string => {
+  const subjectsJson = JSON.stringify(subjects);
+  const fnJson = JSON.stringify(actionFn);
+  return `<!DOCTYPE html><html><head><base target="_top"><style>
+body{font-family:sans-serif;padding:16px;min-width:320px}
+p{margin:0 0 6px}
+select{width:100%;padding:6px;font-size:13px;margin-bottom:14px}
+.btns{display:flex;gap:8px;justify-content:flex-end}
+button{padding:6px 16px;cursor:pointer}
+</style></head><body>
+<p>Select a subject line:</p>
+<select id="s"><option value="">-- Select --</option></select>
+<div class="btns">
+<button onclick="google.script.host.close()">Cancel</button>
+<button onclick="doSubmit()">OK</button>
+</div>
+<script>
+(function(){
+var subjects=${subjectsJson};
+var sel=document.getElementById('s');
+subjects.forEach(function(s){var o=document.createElement('option');o.value=o.textContent=s;sel.appendChild(o);});
+window.doSubmit=function(){
+var s=sel.value;
+if(!s){alert('Please select a subject line.');return;}
+google.script.run
+.withSuccessHandler(function(){google.script.host.close();})
+.withFailureHandler(function(e){alert(e.message);})
+[${fnJson}](s);
+};
+})();
+</script></body></html>`;
+};
+
+const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
+  const subjects = getSubjectLinesForPicker();
+  if (subjects.length === 0) {
+    SpreadsheetApp.getUi().alert(
+      `No subject lines found. Ensure the "${SHEETS.SUBJECT_LINES}" sheet exists ` +
+      `with "${SUBJECT_LINE_COLS.SUBJECT}" and "${SUBJECT_LINE_COLS.SHOW}" columns, ` +
+      `and at least one row has Show = TRUE.`
+    );
+    return;
+  }
+  const actionFn = action === 'send' ? 'doSendEmails' : 'doSendTestEmail';
+  const html = HtmlService.createHtmlOutput(buildSubjectPickerHtml(subjects, actionFn))
+    .setWidth(440)
+    .setHeight(170);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Mail Merge — Choose Subject');
+};
+
+// ── Queue / bulk send ─────────────────────────────────────────────────────────
+
+export const doSendTestEmail = (
+  subject: string,
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
-  let subject = subjectLine;
-  if (!subject) {
-    subject = Browser.inputBox(
-      'Mail Merge',
-      'Type or copy/paste the subject line of the Gmail draft you would like to test:',
-      Browser.Buttons.OK_CANCEL
-    );
-    if (subject === 'cancel' || subject === '') return;
-  }
-
   const testRecipient = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.TEST_EMAIL);
   if (!testRecipient) {
     Logger.log('TEST_EMAIL Script Property not set — aborting test send');
@@ -121,6 +189,14 @@ export const sendTestEmail = (
   Logger.log('Test email sent to %s', testRecipient);
 };
 
+export const sendTestEmail = (subjectLine?: string): void => {
+  if (subjectLine) {
+    doSendTestEmail(subjectLine);
+  } else {
+    showSubjectPickerDialog('test');
+  }
+};
+
 export const queueEmails = (
   _subjectLine?: string,
   _sheet = SpreadsheetApp.getActiveSheet()
@@ -128,21 +204,10 @@ export const queueEmails = (
   // Placeholder — queueing logic to be implemented
 };
 
-export const sendEmails = (
-  subjectLine?: string,
+export const doSendEmails = (
+  subject: string,
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
-  let subject = subjectLine;
-
-  if (!subject) {
-    subject = Browser.inputBox(
-      'Mail Merge',
-      'Type or copy/paste the subject line of the Gmail draft message you would like to mail merge with:',
-      Browser.Buttons.OK_CANCEL
-    );
-    if (subject === 'cancel' || subject === '') return;
-  }
-
   Logger.log('Getting draft: %s', subject);
   const emailTemplate = getGmailTemplateFromDrafts(subject);
   const data = sheet.getDataRange().getDisplayValues();
@@ -170,6 +235,14 @@ export const sendEmails = (
   }
 
   sheet.getRange(2, emailSentColIdx + 1, out.length).setValues(out);
+};
+
+export const sendEmails = (subjectLine?: string): void => {
+  if (subjectLine) {
+    doSendEmails(subjectLine);
+  } else {
+    showSubjectPickerDialog('send');
+  }
 };
 
 // ── Template helpers (private) ────────────────────────────────────────────────

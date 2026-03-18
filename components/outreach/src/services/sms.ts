@@ -29,9 +29,7 @@ export const sendRealSms = (to: string, message: string): void => {
 
 export const notifyViaSMS = (first: string, email: string, number: string): void => {
   const msg = [
-    `Hey ${first}, has been a while!`,
-    `Is ${email} still the best to reach you at? Just emailed you there; hope I didn't land in Spam... :-)`,
-    "Hope you've been well!",
+    `Hey ${first}, has been a while! Is ${email} still the best to reach you at? Just emailed you there; hope I didn't land in Spam... :-) Hope you've been well!`,
     '- Anthony Bull',
   ].join('\n\n');
   sendRealSms(normalizePhoneNumber(number), msg);

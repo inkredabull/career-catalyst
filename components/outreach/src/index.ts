@@ -2,7 +2,7 @@
 import { onOpen } from './ui/menu';
 import { PROFILE } from './config/profile';
 import { generateOutreachMessage, OutreachContext } from './services/message-generator';
-import { sendEmails, sendTestEmail, queueEmails, sendViaGmail } from './services/gmail';
+import { sendEmails, sendTestEmail, queueEmails, sendViaGmail, doSendEmails, doSendTestEmail } from './services/gmail';
 import { fetchContactToSheet, getLinkedInUrlToSheet, pickRandomContacts } from './services/contacts';
 import { getJobMetadata, clearJobMetadataCache } from './services/job-metadata';
 import { SCRIPT_PROPS, COLS, requireProp } from './config/settings';
@@ -121,6 +121,8 @@ g['blurb'] = blurb;
 g['sendEmails'] = sendEmails;
 g['sendTestEmail'] = sendTestEmail;
 g['queueEmails'] = queueEmails;
+g['doSendEmails'] = doSendEmails;
+g['doSendTestEmail'] = doSendTestEmail;
 g['fetchContactToSheet'] = fetchContactToSheet;
 g['getLinkedInUrlToSheet'] = getLinkedInUrlToSheet;
 g['sendWarmup'] = sendWarmup;
