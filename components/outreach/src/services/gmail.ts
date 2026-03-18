@@ -31,29 +31,21 @@ const showLinkedInMessageDialog = (linkedInUrl: string, message: string, firstNa
   const html = `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:380px}
 h3{margin:0 0 10px}
-.profile-link{display:block;margin-bottom:12px;word-break:break-all;font-size:13px}
+.open-btn{display:block;width:100%;padding:8px;margin-bottom:12px;font-size:13px;cursor:pointer;background:#0a66c2;color:#fff;border:none;border-radius:4px;text-align:center}
+.open-btn:hover{background:#004182}
 .no-url{color:#888;font-size:13px;margin-bottom:12px}
 p{margin:0 0 4px;font-size:13px}
-textarea{width:100%;height:120px;font-size:13px;padding:8px;box-sizing:border-box;resize:vertical}
+textarea{width:100%;height:110px;font-size:13px;padding:8px;box-sizing:border-box;resize:vertical}
 .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 button{padding:6px 16px;cursor:pointer}
 </style></head><body>
 <h3>LinkedIn DM</h3>
 <script>
 var url=${urlJson};
-if(url){document.write('<a class="profile-link" href="'+url+'" target="_blank">'+url+'</a>');}
-else{document.write('<p class="no-url">(No LinkedIn URL found — open manually)</p>');}
-</script>
-<p>Message:</p>
-<textarea id="msg" readonly></textarea>
-<div class="btns">
-<button onclick="copyMsg()">Copy Message</button>
-<button onclick="google.script.host.close()">Close</button>
-</div>
-<script>
 var msg=${msgJson};
-document.getElementById('msg').value=msg;
-if(url){window.open(url,'_blank');}
+if(url){document.write('<button class="open-btn" onclick="window.open(url,\\'_blank\\')">Open LinkedIn Profile ↗</button>');}
+else{document.write('<p class="no-url">(No LinkedIn URL found — open manually)</p>');}
+document.addEventListener('DOMContentLoaded',function(){document.getElementById('msg').value=msg;});
 function copyMsg(){
   var t=document.getElementById('msg');
   t.select();
@@ -61,6 +53,12 @@ function copyMsg(){
   t.blur();
 }
 </script>
+<p>Message:</p>
+<textarea id="msg" readonly></textarea>
+<div class="btns">
+<button onclick="copyMsg()">Copy Message</button>
+<button onclick="google.script.host.close()">Close</button>
+</div>
 </body></html>`;
 
   SpreadsheetApp.getUi().showModalDialog(
@@ -128,16 +126,22 @@ export const sendViaGmail = (
     const cellValue = (row[COLS.CELL] ?? '').trim();
     const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
 
+    Logger.log('SMS Logic - myPhone: "%s", cellValue: "%s", firstName: "%s"', myPhone, cellValue, firstName);
+
     const isSelfOrMissing = !cellValue || (() => {
       try { return myPhone !== '' && normalizePhoneNumber(cellValue) === normalizePhoneNumber(myPhone); }
       catch { return false; }
     })();
 
+    Logger.log('SMS Logic - isSelfOrMissing: %s', isSelfOrMissing);
+
     if (isSelfOrMissing) {
       const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
       const message = buildSmsMessage(firstName, row[COLS.RECIPIENT]);
+      Logger.log('Opening LinkedIn dialog - URL: "%s", Message length: %s', linkedInUrl, message.length);
       showLinkedInMessageDialog(linkedInUrl, message, firstName);
     } else {
+      Logger.log('Sending SMS to: %s', cellValue);
       notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue);
     }
   }
