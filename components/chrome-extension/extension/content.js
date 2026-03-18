@@ -328,10 +328,6 @@ function createGutter() {
           <label>Create Reminders:</label>
           <div class="reminder-checkboxes">
             <label class="reminder-checkbox-label">
-              <input type="checkbox" id="reminder-track" class="reminder-checkbox" checked>
-              <span>📋 Track Application</span>
-            </label>
-            <label class="reminder-checkbox-label">
               <input type="checkbox" id="reminder-apply" class="reminder-checkbox" checked>
               <span>✍️ Apply</span>
             </label>
@@ -1623,7 +1619,6 @@ async function handleTrackFromForm() {
 
     // Get selected reminders
     const selectedReminders = [];
-    if (document.getElementById('reminder-track')?.checked) selectedReminders.push('track');
     if (document.getElementById('reminder-apply')?.checked) selectedReminders.push('apply');
     if (document.getElementById('reminder-ping')?.checked) selectedReminders.push('ping');
     if (document.getElementById('reminder-prep')?.checked) selectedReminders.push('prep');
