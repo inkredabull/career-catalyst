@@ -90,6 +90,24 @@ export class ResumeCreatorAgent {
         }
       }
       
+      // If a tailored file already exists (not first generation), load it and iterate
+      // with the PDF judge instead of regenerating from scratch.
+      const existingContent = !isFirstGeneration ? this.loadMostRecentTailoredContent(jobId) : null;
+      if (existingContent) {
+        console.log(`📋 Found existing tailored content for job ${jobId} — skipping generation, running PDF judge...`);
+        let pdfPath = await this.generatePDF(existingContent, jobData, outputPath, jobId);
+        if (!skipJudge) {
+          const judgeResult = await this.runPDFJudgeLoop(jobId, cvFilePath, pdfPath, existingContent, jobData, outputPath);
+          pdfPath = judgeResult.pdfPath;
+        }
+        return {
+          success: true,
+          pdfPath,
+          tailoringChanges: existingContent.changes,
+          totalCost: this.totalCost
+        };
+      }
+
       if (critique && (isFirstGeneration || source === 'cli') && !regenerate) {
         // Run the critique-and-improve workflow when:
         // 1. It's the first generation and critique is enabled, OR
@@ -260,6 +278,69 @@ export class ResumeCreatorAgent {
     };
   }
 
+  private async runPDFJudgeLoop(
+    jobId: string,
+    cvFilePath: string,
+    pdfPath: string,
+    tailoredContent: { markdownContent: string; changes: string[] },
+    job: JobListing,
+    outputPath: string | undefined
+  ): Promise<{ pdfPath: string; tailoredContent: { markdownContent: string; changes: string[] } }> {
+    const jobDir = resolveFromProjectRoot('logs', jobId);
+    const maxAttempts = getPDFJudgeMaxAttempts();
+
+    const guidance: PDFValidationGuidance = {
+      maxPages: this.experienceFormat === 'split' ? 2 : 1,
+      requiredSections: this.experienceFormat === 'split'
+        ? ['Summary', 'Relevant Experience', 'Related Experience', 'Skills']
+        : ['Summary', 'Experience', 'Skills', 'Technologies']
+    };
+
+    const judge = new ResumePDFJudgeAgent(jobDir);
+    let previousSuggestions: string[] = [];
+    let currentPdfPath = pdfPath;
+    let currentContent = tailoredContent;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`\n⚖️  Running PDF judge validation (attempt ${attempt}/${maxAttempts})...`);
+
+      const judgeResult = await judge.validatePDF(currentPdfPath, guidance, attempt, previousSuggestions);
+
+      if (!judgeResult.success) {
+        console.warn(`⚠️  Judge validation failed: ${judgeResult.error}`);
+        break;
+      }
+
+      if (judgeResult.passes) {
+        console.log(`✅ PDF validation passed! (${judgeResult.pageCount} page${judgeResult.pageCount === 1 ? '' : 's'}, confidence: ${judgeResult.confidence}/10)`);
+        break;
+      }
+
+      if (attempt === maxAttempts) {
+        console.warn(`⚠️  PDF validation failed after ${maxAttempts} attempts. Returning best attempt.`);
+        console.warn(`   Violations: ${judgeResult.violations.join(', ')}`);
+        console.warn(`   Manual editing may be required (HITL).`);
+        break;
+      }
+
+      console.log(`❌ PDF validation failed (${judgeResult.pageCount} pages):`);
+      judgeResult.violations.forEach(v => console.log(`   - ${v}`));
+      console.log(`\n💡 Applying ${judgeResult.suggestions.length} suggestions and regenerating...`);
+      judgeResult.suggestions.forEach(s => console.log(`   - ${s}`));
+
+      this.cleanupTailoredFiles(jobId);
+      previousSuggestions = judgeResult.suggestions;
+
+      const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
+      const scopedCvContent = this.scopeCVContent(cvContent);
+      currentContent = await this.generateTailoredContent(job, scopedCvContent, jobId, judgeResult.suggestions);
+      this.saveTailoredContent(jobId, cvFilePath, currentContent);
+      currentPdfPath = await this.generatePDF(currentContent, job, outputPath, jobId);
+    }
+
+    return { pdfPath: currentPdfPath, tailoredContent: currentContent };
+  }
+
   private async generateImprovedResume(
     jobId: string,
     cvFilePath: string,
@@ -268,7 +349,6 @@ export class ResumeCreatorAgent {
     skipJudge: boolean = false
   ): Promise<ResumeResult> {
     const job = jobData || this.loadJobData(jobId);
-    const jobDir = resolveFromProjectRoot('logs', jobId);
 
     console.log(`🔄 Generating improved resume for job ${jobId} with critique recommendations`);
     const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
@@ -288,68 +368,10 @@ export class ResumeCreatorAgent {
     // Create PDF
     let pdfPath = await this.generatePDF(tailoredContent, job, outputPath, jobId);
 
-    // Run PDF judge validation (unless skipped)
     if (!skipJudge) {
-      const maxAttempts = getPDFJudgeMaxAttempts();
-
-      // Set guidance based on experience format (now correctly updated from roleSelection)
-      const guidance: PDFValidationGuidance = {
-        maxPages: this.experienceFormat === 'split' ? 2 : 1,
-        requiredSections: this.experienceFormat === 'split'
-          ? ['Summary', 'Relevant Experience', 'Related Experience', 'Skills']
-          : ['Summary', 'Experience', 'Skills', 'Technologies']
-      };
-
-      const judge = new ResumePDFJudgeAgent(jobDir);
-      let previousSuggestions: string[] = [];
-
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        console.log(`\n⚖️  Running PDF judge validation (attempt ${attempt}/${maxAttempts})...`);
-
-        const judgeResult = await judge.validatePDF(pdfPath, guidance, attempt, previousSuggestions);
-
-        if (!judgeResult.success) {
-          console.warn(`⚠️  Judge validation failed: ${judgeResult.error}`);
-          break;
-        }
-
-        if (judgeResult.passes) {
-          console.log(`✅ PDF validation passed! (${judgeResult.pageCount} page${judgeResult.pageCount === 1 ? '' : 's'}, confidence: ${judgeResult.confidence}/10)`);
-          break;
-        }
-
-        // If this is the last attempt, warn but return the PDF anyway
-        if (attempt === maxAttempts) {
-          console.warn(`⚠️  PDF validation failed after ${maxAttempts} attempts. Returning best attempt.`);
-          console.warn(`   Violations: ${judgeResult.violations.join(', ')}`);
-          console.warn(`   Manual editing may be required (HITL).`);
-          break;
-        }
-
-        // Otherwise, regenerate with judge suggestions
-        console.log(`❌ PDF validation failed (${judgeResult.pageCount} pages):`);
-        judgeResult.violations.forEach(v => console.log(`   - ${v}`));
-        console.log(`\n💡 Applying ${judgeResult.suggestions.length} suggestions and regenerating...`);
-        judgeResult.suggestions.forEach(s => console.log(`   - ${s}`));
-
-        // Delete previous tailored files before regenerating
-        this.cleanupTailoredFiles(jobId);
-
-        // Regenerate with condensation suggestions
-        previousSuggestions = judgeResult.suggestions;
-        tailoredContent = await this.generateTailoredContent(
-          job,
-          scopedCvContent,
-          jobId,
-          judgeResult.suggestions
-        );
-
-        // Cache the new tailored content
-        this.saveTailoredContent(jobId, cvFilePath, tailoredContent);
-
-        // Generate new PDF
-        pdfPath = await this.generatePDF(tailoredContent, job, outputPath, jobId);
-      }
+      const result = await this.runPDFJudgeLoop(jobId, cvFilePath, pdfPath, tailoredContent, job, outputPath);
+      pdfPath = result.pdfPath;
+      tailoredContent = result.tailoredContent;
     }
 
     return {
