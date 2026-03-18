@@ -72,8 +72,8 @@ export function getAutoResumeConfig(): { threshold: number; cvPath: string | nul
   };
 }
 
-export function getPDFJudgeMaxAttempts(): number {
-  return process.env.PDF_JUDGE_MAX_ATTEMPTS ? parseInt(process.env.PDF_JUDGE_MAX_ATTEMPTS) : 2;
+export function getCritiqueAndJudgeMaxAttempts(): number {
+  return process.env.CRITIQUE_AND_JUDGE_MAX_ATTEMPTS ? parseInt(process.env.CRITIQUE_AND_JUDGE_MAX_ATTEMPTS) : 2;
 }
 
 export function getResumeOutputDir(): string {

@@ -1,6 +1,6 @@
 import { JobListing, ResumeResult, PDFValidationGuidance, ClassificationResult } from '../types';
 import { resolveFromProjectRoot } from '../utils/project-root';
-import { getPDFJudgeMaxAttempts } from '../config';
+import { getCritiqueAndJudgeMaxAttempts } from '../config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -90,38 +90,19 @@ export class ResumeCreatorAgent {
         }
       }
       
-      // If a tailored file already exists (not first generation), load it and iterate
-      // with the PDF judge instead of regenerating from scratch.
-      const existingContent = !isFirstGeneration ? this.loadMostRecentTailoredContent(jobId) : null;
-      if (existingContent) {
-        console.log(`📋 Found existing tailored content for job ${jobId} — skipping generation, running PDF judge...`);
-        let pdfPath = await this.generatePDF(existingContent, jobData, outputPath, jobId);
-        if (!skipJudge) {
-          const judgeResult = await this.runPDFJudgeLoop(jobId, cvFilePath, pdfPath, existingContent, jobData, outputPath);
-          pdfPath = judgeResult.pdfPath;
-        }
-        return {
-          success: true,
-          pdfPath,
-          tailoringChanges: existingContent.changes,
-          totalCost: this.totalCost
-        };
-      }
-
       if (critique && (isFirstGeneration || source === 'cli') && !regenerate) {
-        // Run the critique-and-improve workflow when:
-        // 1. It's the first generation and critique is enabled, OR
-        // 2. Called from CLI with critique enabled (default behavior for CLI)
-        // BUT NOT when --regen is used (regenerate = true), which should just re-render to PDF
+        // Run the critique-and-improve workflow:
+        // - First generation: generate fresh content
+        // - Subsequent runs: load existing tailored file and critique it (no fresh generation)
+        // In both cases: critique → incorporate recommendations → PDF judge loop
         let workflowReason = 'unknown';
         if (isFirstGeneration) workflowReason = 'first-time generation';
-        else if (source === 'cli') workflowReason = 'CLI invocation with critique enabled';
+        else workflowReason = 'existing tailored content found — critiquing and iterating';
 
         console.log(`🎯 Running critique-and-improve workflow for ${workflowReason}...`);
 
-        // Generate initial resume
-        // Force regeneration when called from CLI (not first generation) to apply updated prompts
-        const forceRegenerate = source === 'cli' && !isFirstGeneration;
+        // Use existing tailored content when available; only generate fresh on first run
+        const forceRegenerate = false;
         const initialResult = await this.generateInitialResume(jobId, cvFilePath, outputPath, jobData, forceRegenerate);
         if (!initialResult.success) {
           return initialResult;
@@ -287,7 +268,7 @@ export class ResumeCreatorAgent {
     outputPath: string | undefined
   ): Promise<{ pdfPath: string; tailoredContent: { markdownContent: string; changes: string[] } }> {
     const jobDir = resolveFromProjectRoot('logs', jobId);
-    const maxAttempts = getPDFJudgeMaxAttempts();
+    const maxAttempts = getCritiqueAndJudgeMaxAttempts();
 
     const guidance: PDFValidationGuidance = {
       maxPages: this.experienceFormat === 'split' ? 2 : 1,
