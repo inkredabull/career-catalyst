@@ -39,25 +39,22 @@ export const SHEETS = {
   SUBJECT_LINES: 'Subject Lines : Raw',
 } as const;
 
-// Column names in the Subject Lines sheet
-export const SUBJECT_LINE_COLS = {
-  SUBJECT: 'Subject Line',
-  SHOW: 'Show',
-} as const;
+// Subject lines shown in the send/test dropdown picker
+export const SUBJECT_LINES = [
+  'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
+  'Q1 2026 latest-and-greatest',
+];
 
 // Feature flags - can be overridden per subject line
 export const FLAGS = {
   SEND_SMS: false,
   ATTACH_RESUME: false,
-} as const;
+};
 
 // Per-subject-line flag overrides
 // Keys can be exact subject matches or regex patterns
 export const SUBJECT_LINE_FLAGS: Record<string, Partial<typeof FLAGS>> = {
-  // Examples:
-  // 'Exact Subject Match': { SEND_SMS: true, ATTACH_RESUME: true },
-  // '/.*Application.*/': { SEND_SMS: false },
-  // '/.*Interview.*/': { ATTACH_RESUME: true },
+  'Get your help for role as {{JobTitleShorthand}} at {{Company}}?': { SEND_SMS: true, ATTACH_RESUME: false },
 } as const;
 
 // Helper function to get flags for a specific subject line

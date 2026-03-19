@@ -1,6 +1,6 @@
 // Gmail-based email sending and mail merge.
 
-import { COLS, SCRIPT_PROPS, SHEETS, SUBJECT_LINE_COLS, getFlagsForSubject } from '../config/settings';
+import { COLS, SCRIPT_PROPS, SUBJECT_LINES, getFlagsForSubject } from '../config/settings';
 import { getJobMetadata } from './job-metadata';
 import { log } from '../utils/logger';
 import {
@@ -152,26 +152,7 @@ export const sendViaGmail = (
 
 // ── Subject line picker ───────────────────────────────────────────────────────
 
-const getSubjectLinesForPicker = (): string[] => {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.SUBJECT_LINES);
-  if (!sheet) {
-    Logger.log('Sheet "%s" not found', SHEETS.SUBJECT_LINES);
-    return [];
-  }
-  const data = sheet.getDataRange().getValues();
-  const heads = data.shift() as string[];
-  const subjectCol = heads.indexOf(SUBJECT_LINE_COLS.SUBJECT);
-  const showCol = heads.indexOf(SUBJECT_LINE_COLS.SHOW);
-  if (subjectCol === -1 || showCol === -1) {
-    Logger.log('Columns "%s" or "%s" not found in sheet "%s"',
-      SUBJECT_LINE_COLS.SUBJECT, SUBJECT_LINE_COLS.SHOW, SHEETS.SUBJECT_LINES);
-    return [];
-  }
-  return data
-    .filter(row => String(row[showCol]).toLowerCase() === 'true')
-    .map(row => String(row[subjectCol]))
-    .filter(s => s.trim() !== '');
-};
+const getSubjectLinesForPicker = (): string[] => SUBJECT_LINES;
 
 const buildSubjectPickerHtml = (subjects: string[], actionFn: string): string => {
   const subjectsJson = JSON.stringify(subjects);
@@ -221,11 +202,7 @@ alert(e.message);
 const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
   const subjects = getSubjectLinesForPicker();
   if (subjects.length === 0) {
-    SpreadsheetApp.getUi().alert(
-      `No subject lines found. Ensure the "${SHEETS.SUBJECT_LINES}" sheet exists ` +
-      `with "${SUBJECT_LINE_COLS.SUBJECT}" and "${SUBJECT_LINE_COLS.SHOW}" columns, ` +
-      `and at least one row has Show = TRUE.`
-    );
+    SpreadsheetApp.getUi().alert('No subject lines configured. Add entries to SUBJECT_LINES in settings.ts.');
     return;
   }
   const actionFn = action === 'send' ? 'doSendEmails' : 'doSendTestEmail';
