@@ -261,8 +261,9 @@ Prefer active verbs and concrete metrics over abstract descriptions.
 
 **CRITICAL: Use the intelligent role selection process described above to determine:**
 1. How many roles to include (typically 3-5, but flexible based on relevance)
-2. Whether to use standard "EXPERIENCE" or split "RELEVANT EXPERIENCE" + "RELATED EXPERIENCE" format
-3. Which specific roles from the CV to include
+2. Which specific roles from the CV to include
+
+The experience format (standard vs. split) is pre-decided by the classifier — see MANDATORY FORMAT above. Do not re-decide it here.
 
 The {{maxRoles}} value is a soft suggestion (~{{maxRoles}} roles), but you should prioritize relevance over recency.
 
@@ -273,7 +274,11 @@ The {{maxRoles}} value is a soft suggestion (~{{maxRoles}} roles), but you shoul
 
 {{rolesSpecificInstructions}}
 
-For each role, always include dates on the same line as title and company name.
+**MANDATORY role header format (use exactly this pattern):**
+```
+**{Title}** @ {Company} ({Start Mon/YYYY} - {End Mon/YYYY or Present})
+```
+Bold the title, use ` @ ` as separator, put dates in parentheses on the same line. No other format is acceptable.
 
 After the role title/dates line, add a blank line.
 
