@@ -42,6 +42,7 @@ export const SHEETS = {
 // Subject lines shown in the send/test dropdown picker
 export const SUBJECT_LINES = [
   'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
+  'Need some fractional help?',
   'Q1 2026 latest-and-greatest',
 ];
 
@@ -55,6 +56,8 @@ export const FLAGS = {
 // Keys can be exact subject matches or regex patterns
 export const SUBJECT_LINE_FLAGS: Record<string, Partial<typeof FLAGS>> = {
   'Get your help for role as {{JobTitleShorthand}} at {{Company}}?': { SEND_SMS: true, ATTACH_RESUME: false },
+  'Need some fractional help?': { SEND_SMS: false, ATTACH_RESUME: false },
+  'Q1 2026 latest-and-greatest': { SEND_SMS: true, ATTACH_RESUME: false },
 } as const;
 
 // Helper function to get flags for a specific subject line
