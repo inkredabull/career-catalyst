@@ -337,10 +337,15 @@ Format as a simple paragraph without bullet points.
 
 ## Misc
 
-Do not include a cover letter. 
+Do not include a cover letter.
 Do not make use of the • character.
 Return output as Markdown in the format of a reverse chronological resume.
-Final output should print to no more than two pages as a PDF. 
+Final output should print to no more than two pages as a PDF.
+
+**MANDATORY heading levels — use these exactly, no exceptions:**
+- Candidate name: `#` (h1), e.g. `# Anthony Bull`
+- Every section heading: `##` (h2), ALL CAPS — e.g. `## SUMMARY`, `## SKILLS`, `## EXPERIENCE`, `## RELEVANT EXPERIENCE`, `## RELATED EXPERIENCE`, `## EDUCATION`, `## BEYOND WORK`
+- Never use `###`, `####`, bold text, or any other pattern as a section heading
 
 {{enforcementSection}}
 

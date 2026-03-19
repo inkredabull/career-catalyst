@@ -509,8 +509,7 @@ header-includes: |
         stdio: 'inherit'
       });
 
-      // Remove markdown source now that PDF exists
-      fs.unlinkSync(mdPath);
+      // Keep markdown source alongside PDF for diffing/debugging
 
       return pdfPath;
     } catch (error) {
