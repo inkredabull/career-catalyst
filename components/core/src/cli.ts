@@ -923,7 +923,7 @@ program
   .option('--company-url <url>', 'Company URL to use for generating job description context')
   .option('--no-critique', 'Skip the automatic critique and improvement of the resume')
   .option('--skip-judge', 'Skip the PDF judge validation (one-page enforcement)')
-  .option('--dry-run', 'Show the stages the command would go through without executing them')
+  .option('--preview', 'Show the stages this command would go through without executing them. NOTE: use -- separator with npm: npm run dev -- resume <jobId> --preview')
   .action(async (jobId: string, options) => {
     try {
       const startTime = Date.now();
@@ -987,7 +987,7 @@ program
 
       // Auto-detect mode if not explicitly provided
       if (!options.mode) {
-        if (!options.dryRun) {
+        if (!options.preview) {
           try {
             console.log('🔍 Analyzing job description to determine optimal resume mode...');
             const jobData = await loadJobData(jobId);
@@ -1068,8 +1068,8 @@ program
       const critiqueFlag = options.regen ? false : !options.noCritique;
       const skipJudgeFlag = options.regen ? true : !!options.skipJudge;
 
-      // Dry-run: print pipeline stages and exit without executing
-      if (options.dryRun) {
+      // Preview: print pipeline stages and exit without executing
+      if (options.preview) {
         const logsDir = path.join(process.cwd(), 'logs');
         const jobDir = path.join(logsDir, jobId);
 
@@ -1080,7 +1080,7 @@ program
         const maxJudgeAttempts = getCritiqueAndJudgeMaxAttempts();
 
         console.log('');
-        console.log('[DRY RUN] Resume Generation Pipeline');
+        console.log('[PREVIEW] Resume Generation Pipeline');
         console.log('='.repeat(50));
         console.log(`Job ID     : ${jobId}`);
         console.log(`CV File    : ${cvFile}`);
@@ -1140,7 +1140,7 @@ program
         console.log('Pipeline Stages:');
         stages.forEach(s => console.log(`  ${s}`));
         console.log('');
-        console.log('No LLM calls made. Run without --dry-run to execute.');
+        console.log('No LLM calls made. To execute: npm run dev -- resume ' + jobId);
         return;
       }
 
