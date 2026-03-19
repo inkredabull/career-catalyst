@@ -164,7 +164,8 @@ const getSubjectOptionsForPicker = (): SubjectOption[] =>
     const flags = getFlagsForSubject(subject);
     const sms = flags.SEND_SMS ? '🟢' : '🔴';
     const resume = flags.ATTACH_RESUME ? '🟢' : '🔴';
-    return { value: subject, label: `${sms}📱 ${resume}📎  ${subject}` };
+    const photo = flags.ATTACH_PHOTO ? '🟢' : '🔴';
+    return { value: subject, label: `${sms}📱 ${resume}📎 ${photo}🖼️  ${subject}` };
   });
 
 const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
