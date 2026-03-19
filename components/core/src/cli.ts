@@ -12,7 +12,7 @@ import { ApplicationAgent } from './agents/application-agent';
 import { WhoGotHiredAgent } from './agents/whogothired-agent';
 import { ModeDetectorAgent } from './agents/mode-detector-agent';
 import { StatementType, AboutMeSection } from './types';
-import { getConfig, getAnthropicConfig, getResumeGenerationConfig } from './config';
+import { getConfig, getAnthropicConfig, getResumeGenerationConfig, getCritiqueAndJudgeMaxAttempts } from './config';
 import { LLMProviderConfig } from './providers/llm-provider';
 import * as crypto from 'crypto';
 import * as path from 'path';
@@ -923,6 +923,7 @@ program
   .option('--company-url <url>', 'Company URL to use for generating job description context')
   .option('--no-critique', 'Skip the automatic critique and improvement of the resume')
   .option('--skip-judge', 'Skip the PDF judge validation (one-page enforcement)')
+  .option('--dry-run', 'Show the stages the command would go through without executing them')
   .action(async (jobId: string, options) => {
     try {
       const startTime = Date.now();
@@ -986,24 +987,30 @@ program
 
       // Auto-detect mode if not explicitly provided
       if (!options.mode) {
-        try {
-          console.log('🔍 Analyzing job description to determine optimal resume mode...');
-          const jobData = await loadJobData(jobId);
-          // ModeDetectorAgent still uses old API - get Anthropic config for now
-          const anthropicConfig = getAnthropicConfig();
-          const modeDetector = new ModeDetectorAgent(anthropicConfig.anthropicApiKey);
-          const detection = await modeDetector.detectMode(jobData);
+        if (!options.dryRun) {
+          try {
+            console.log('🔍 Analyzing job description to determine optimal resume mode...');
+            const jobData = await loadJobData(jobId);
+            // ModeDetectorAgent still uses old API - get Anthropic config for now
+            const anthropicConfig = getAnthropicConfig();
+            const modeDetector = new ModeDetectorAgent(anthropicConfig.anthropicApiKey);
+            const detection = await modeDetector.detectMode(jobData);
 
-          mode = detection.mode;
+            mode = detection.mode;
+            modeSource = 'auto';
+
+            console.log(`✨ Auto-detected mode: ${mode} (confidence: ${detection.confidence}%)`);
+            console.log(`📝 Reasoning: ${detection.reasoning}`);
+            console.log('');
+          } catch (error) {
+            console.warn('⚠️  Mode detection failed, defaulting to leader mode');
+            console.warn(`   Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            mode = 'leader';
+          }
+        } else {
+          // In dry-run, skip the LLM call — mode detection would happen at runtime
+          mode = 'leader'; // placeholder; actual mode determined at runtime
           modeSource = 'auto';
-
-          console.log(`✨ Auto-detected mode: ${mode} (confidence: ${detection.confidence}%)`);
-          console.log(`📝 Reasoning: ${detection.reasoning}`);
-          console.log('');
-        } catch (error) {
-          console.warn('⚠️  Mode detection failed, defaulting to leader mode');
-          console.warn(`   Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          mode = 'leader';
         }
       } else {
         mode = options.mode as 'leader' | 'builder';
@@ -1060,6 +1067,82 @@ program
       // Also skip judge validation when regenerating from existing markdown
       const critiqueFlag = options.regen ? false : !options.noCritique;
       const skipJudgeFlag = options.regen ? true : !!options.skipJudge;
+
+      // Dry-run: print pipeline stages and exit without executing
+      if (options.dryRun) {
+        const logsDir = path.join(process.cwd(), 'logs');
+        const jobDir = path.join(logsDir, jobId);
+
+        const hasTailoredContent = fss.existsSync(jobDir) &&
+          fss.readdirSync(jobDir).some(f => f.startsWith('tailored-') && f.endsWith('.json'));
+        const hasCritique = fss.existsSync(jobDir) &&
+          fss.readdirSync(jobDir).some(f => f.startsWith('critique-') && f.endsWith('.json'));
+        const maxJudgeAttempts = getCritiqueAndJudgeMaxAttempts();
+
+        console.log('');
+        console.log('[DRY RUN] Resume Generation Pipeline');
+        console.log('='.repeat(50));
+        console.log(`Job ID     : ${jobId}`);
+        console.log(`CV File    : ${cvFile}`);
+        console.log('');
+        console.log('Configuration:');
+        console.log(`  Resume LLM        : ${config.resumeProvider} / ${config.resumeModel}`);
+        console.log(`  Critique LLM      : ${config.critiqueProvider} / ${config.critiqueModel}`);
+        console.log(`  Mode              : ${modeSource === 'auto' ? '(auto-detected at runtime)' : mode}`);
+        console.log(`  Experience Format : ${experienceFormat}`);
+        console.log(`  Critique          : ${critiqueFlag ? 'enabled' : 'disabled (--no-critique)'}`);
+        console.log(`  PDF Judge         : ${skipJudgeFlag ? 'disabled (--skip-judge or --regen)' : `enabled (up to ${maxJudgeAttempts} attempts)`}`);
+        console.log('');
+
+        const stages: string[] = [];
+        let stageNum = 1;
+
+        if (!options.mode) {
+          stages.push(`[${stageNum++}] Mode Detection (LLM) — ModeDetectorAgent infers leader/builder from job description`);
+        }
+
+        if (options.regen) {
+          if (hasTailoredContent) {
+            stages.push(`[${stageNum++}] PDF Rebuild — load cached tailored markdown, run pandoc (no LLM call)`);
+          } else {
+            stages.push(`[${stageNum++}] PDF Rebuild — WOULD FAIL: no cached tailored content found for job ${jobId}`);
+          }
+        } else {
+          if (options.generate) {
+            stages.push(`[${stageNum++}] Job Description Generation (LLM) — fetch company info + synthesize description`);
+          }
+
+          if (hasTailoredContent) {
+            stages.push(`[${stageNum++}] Load Cached Tailored Content — reuse existing markdown (no LLM call)`);
+          } else {
+            stages.push(`[${stageNum++}] Initial Resume Generation (LLM) — generate tailored markdown from job + CV`);
+          }
+
+          stages.push(`[${stageNum++}] PDF Generation — run pandoc to convert markdown to PDF`);
+
+          if (critiqueFlag) {
+            stages.push(`[${stageNum++}] Critique (LLM) — ResumeCriticAgent scores resume and generates recommendations`);
+
+            if (hasCritique && hasTailoredContent) {
+              stages.push(`[${stageNum++}] Resume Improvement (LLM) — regenerate incorporating critique recommendations`);
+            } else {
+              stages.push(`[${stageNum++}] Resume Improvement (LLM) — regenerate incorporating critique recommendations (if any)`);
+            }
+
+            stages.push(`[${stageNum++}] PDF Generation (post-critique) — convert improved markdown to PDF`);
+
+            if (!skipJudgeFlag) {
+              stages.push(`[${stageNum++}] PDF Judge Loop (up to ${maxJudgeAttempts} iterations) — validate page count/format, regenerate with condensation hints if needed`);
+            }
+          }
+        }
+
+        console.log('Pipeline Stages:');
+        stages.forEach(s => console.log(`  ${s}`));
+        console.log('');
+        console.log('No LLM calls made. Run without --dry-run to execute.');
+        return;
+      }
 
       const result = await creator.createResume(
         jobId,
