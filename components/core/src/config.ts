@@ -94,12 +94,12 @@ export function getResumeOutputDir(): string {
 
 export interface ResumeGenerationConfig {
   // Resume generation provider
-  resumeProvider: 'anthropic' | 'openai';
+  resumeProvider: 'anthropic' | 'openai' | 'openrouter';
   resumeModel: string;
   resumeApiKey: string;
 
   // Critique provider
-  critiqueProvider: 'anthropic' | 'openai';
+  critiqueProvider: 'anthropic' | 'openai' | 'openrouter';
   critiqueModel: string;
   critiqueApiKey: string;
 
@@ -111,18 +111,18 @@ export interface ResumeGenerationConfig {
 
 export function getResumeGenerationConfig(): ResumeGenerationConfig {
   // Resume provider - REQUIRED (no default)
-  const resumeProvider = process.env.RESUME_LLM_PROVIDER as 'anthropic' | 'openai' | undefined;
+  const resumeProvider = process.env.RESUME_LLM_PROVIDER as 'anthropic' | 'openai' | 'openrouter' | undefined;
   if (!resumeProvider) {
     throw new Error(
       'RESUME_LLM_PROVIDER environment variable is required.\n' +
-      'Set to "anthropic" or "openai" in your .env file.'
+      'Set to "anthropic", "openai", or "openrouter" in your .env file.'
     );
   }
 
-  if (!['anthropic', 'openai'].includes(resumeProvider)) {
+  if (!['anthropic', 'openai', 'openrouter'].includes(resumeProvider)) {
     throw new Error(
       `Invalid RESUME_LLM_PROVIDER: "${resumeProvider}"\n` +
-      'Must be "anthropic" or "openai"'
+      'Must be "anthropic", "openai", or "openrouter"'
     );
   }
 
@@ -140,26 +140,30 @@ export function getResumeGenerationConfig(): ResumeGenerationConfig {
   // Resume API key
   const resumeApiKey = resumeProvider === 'anthropic'
     ? process.env.ANTHROPIC_API_KEY
-    : process.env.OPENAI_API_KEY;
+    : resumeProvider === 'openrouter'
+      ? process.env.OPENROUTER_API_KEY
+      : process.env.OPENAI_API_KEY;
 
   if (!resumeApiKey) {
-    const keyName = resumeProvider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+    const keyName = resumeProvider === 'anthropic' ? 'ANTHROPIC_API_KEY'
+      : resumeProvider === 'openrouter' ? 'OPENROUTER_API_KEY'
+      : 'OPENAI_API_KEY';
     throw new Error(`${keyName} environment variable is required for resume generation`);
   }
 
   // Critique provider - REQUIRED (no default)
-  const critiqueProvider = process.env.CRITIQUE_LLM_PROVIDER as 'anthropic' | 'openai' | undefined;
+  const critiqueProvider = process.env.CRITIQUE_LLM_PROVIDER as 'anthropic' | 'openai' | 'openrouter' | undefined;
   if (!critiqueProvider) {
     throw new Error(
       'CRITIQUE_LLM_PROVIDER environment variable is required.\n' +
-      'Set to "anthropic" or "openai" in your .env file.'
+      'Set to "anthropic", "openai", or "openrouter" in your .env file.'
     );
   }
 
-  if (!['anthropic', 'openai'].includes(critiqueProvider)) {
+  if (!['anthropic', 'openai', 'openrouter'].includes(critiqueProvider)) {
     throw new Error(
       `Invalid CRITIQUE_LLM_PROVIDER: "${critiqueProvider}"\n` +
-      'Must be "anthropic" or "openai"'
+      'Must be "anthropic", "openai", or "openrouter"'
     );
   }
 
@@ -177,10 +181,14 @@ export function getResumeGenerationConfig(): ResumeGenerationConfig {
   // Critique API key
   const critiqueApiKey = critiqueProvider === 'anthropic'
     ? process.env.ANTHROPIC_API_KEY
-    : process.env.OPENAI_API_KEY;
+    : critiqueProvider === 'openrouter'
+      ? process.env.OPENROUTER_API_KEY
+      : process.env.OPENAI_API_KEY;
 
   if (!critiqueApiKey) {
-    const keyName = critiqueProvider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+    const keyName = critiqueProvider === 'anthropic' ? 'ANTHROPIC_API_KEY'
+      : critiqueProvider === 'openrouter' ? 'OPENROUTER_API_KEY'
+      : 'OPENAI_API_KEY';
     throw new Error(`${keyName} environment variable is required for critique`);
   }
 

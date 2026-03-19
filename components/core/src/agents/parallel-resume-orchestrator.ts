@@ -11,7 +11,7 @@ import readline from 'readline';
 export interface ParallelConfig {
   models: Array<{
     label: string;
-    provider: 'anthropic' | 'openai';
+    provider: 'anthropic' | 'openai' | 'openrouter';
     model: string;
     maxTokens: number;
   }>;
@@ -407,7 +407,9 @@ export class ParallelResumeOrchestrator {
         provider: modelConfig.provider,
         apiKey: modelConfig.provider === 'anthropic'
           ? process.env.ANTHROPIC_API_KEY || ''
-          : process.env.OPENAI_API_KEY || '',
+          : modelConfig.provider === 'openrouter'
+            ? process.env.OPENROUTER_API_KEY || ''
+            : process.env.OPENAI_API_KEY || '',
         model: modelConfig.model,
         maxTokens: modelConfig.maxTokens,
         temperature: this.config.sharedSettings.temperature

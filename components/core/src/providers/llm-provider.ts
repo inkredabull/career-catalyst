@@ -1,4 +1,4 @@
-export type LLMProvider = 'anthropic' | 'openai';
+export type LLMProvider = 'anthropic' | 'openai' | 'openrouter';
 export type ModelTier = 'fast' | 'quality';
 
 export interface LLMProviderConfig {
