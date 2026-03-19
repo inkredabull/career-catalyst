@@ -1099,13 +1099,7 @@ export class ResumeCreatorAgent {
   private addHeaderToMarkdown(markdownContent: string): string {
     const header = `---
 header-includes: |
-  \\usepackage{fancyhdr}
-  \\usepackage{geometry}
-  \\geometry{bottom=0.4in, footskip=0.25in}
-  \\pagestyle{fancy}
-  \\fancyhf{}
-  \\fancyfoot[C]{\\footnotesize \\textit{Customized by \\href{https://github.com/inkredabull/career-catalyst}{career-catalyst}}}
-  \\renewcommand{\\headrulewidth}{0pt}
+  \\pagestyle{empty}
 ---
 `;
 
