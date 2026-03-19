@@ -398,7 +398,8 @@ export class ParallelResumeOrchestrator {
     job: JobListing,
     cvContent: string
   ): Promise<Array<PromiseSettledResult<{ success: boolean; result?: GeneratorResult; error?: string }>>> {
-    const { mode, experienceFormat, maxRoles } = this.config.sharedSettings;
+    const { mode, maxRoles } = this.config.sharedSettings;
+    const experienceFormat = classification.format as 'standard' | 'split';
 
     // Create generator instances
     const generators = models.map(modelConfig => {

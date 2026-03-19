@@ -164,7 +164,7 @@ If the job description is for AI agents, LLM, GenAI, or machine learning roles:
 
 ## Intelligent Role Selection & Format Decision
 
-**CRITICAL: You must intelligently decide both HOW MANY roles to include and WHETHER to use split format.**
+**CRITICAL: The experience format has been pre-determined by the classifier and is specified above as MANDATORY. Do NOT change it. You must decide HOW MANY roles to include using the guidance below.**
 
 ### Step 1: Analyze All Roles for Relevance
 
@@ -184,19 +184,9 @@ For each role in the CV, assess:
    - Demonstrates key capabilities
    - Provides important context
 
-### Step 2: Decide on Experience Format
+### Step 2: Experience Format (pre-decided)
 
-**DEFAULT: Use SPLIT FORMAT ("RELEVANT EXPERIENCE" + "RELATED EXPERIENCE")** when:
-- 4 or more roles will be included (default for most resumes)
-- Clear separation between highly relevant roles (3-5) and supporting roles (2-3)
-- Target position requires specific recent experience AND earlier foundational work
-- Different career phases need distinct framing (e.g., recent leadership + earlier IC work)
-- Total of 5-8 roles needed to tell complete story
-
-**Use STANDARD FORMAT ("EXPERIENCE")** only when:
-- Only 2-3 highly relevant roles are needed to tell the complete story
-- All selected roles are equally relevant (no clear tier separation)
-- Minimal career history or very focused application
+The format is fixed by the classifier (see MANDATORY FORMAT above). Use it exactly. Do not re-evaluate.
 
 ### Step 3: Determine Role Count
 
