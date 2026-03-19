@@ -115,9 +115,11 @@ export const sendViaGmail = (
     }
   }
 
-  const photoUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.PHOTO_URL);
-  if (photoUrl && photoUrl.includes('drive.google.com')) {
-    params.attachments = [...(params.attachments ?? []), driveFileAsBlob(photoUrl)];
+  if (flags.ATTACH_PHOTO) {
+    const photoUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.PHOTO_URL);
+    if (photoUrl && photoUrl.includes('drive.google.com')) {
+      params.attachments = [...(params.attachments ?? []), driveFileAsBlob(photoUrl)];
+    }
   }
 
   GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, params);
