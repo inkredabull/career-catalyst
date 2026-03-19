@@ -276,7 +276,7 @@ export class ParallelResumeOrchestrator {
             pdfPath
           });
 
-          console.log(`✅ ${modelConfig.label}: $${genResult.cost.toFixed(4)} (${genResult.duration.toFixed(1)}s)`);
+          console.log(`✅ ${modelConfig.label}: PDF saved`);
         } catch (error) {
           modelResults.push({
             model: modelConfig.label,
@@ -316,11 +316,7 @@ export class ParallelResumeOrchestrator {
     const metadataPath = path.join(comparisonFolder, 'comparison-metadata.json');
     fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
 
-    console.log('\n✅ Parallel Resume Generation Complete');
-    console.log('════════════════════════════════════════');
-    console.log(`💰 Total cost: $${totalCost.toFixed(4)}`);
-    console.log(`📊 Success rate: ${successCount}/${modelsToUse.length} models`);
-    console.log(`📂 Output: ${comparisonFolder}`);
+    this.printResultsTable(modelResults, totalCost, comparisonFolder);
 
     if (failureCount > 0) {
       console.log(`\n⚠️  ${failureCount} model(s) failed - see metadata for details`);
@@ -436,6 +432,43 @@ export class ParallelResumeOrchestrator {
     });
 
     return Promise.allSettled(promises);
+  }
+
+  private printResultsTable(modelResults: ModelResult[], totalCost: number, comparisonFolder: string): void {
+    const COL_STATUS = 6; // '✅' or '❌' + padding
+    const COL_COST   = 9; // '$0.0000'
+    const COL_DUR    = 9; // '000.0s'
+    const modelWidth = Math.max(
+      'Model'.length,
+      ...modelResults.map(r => r.model.length)
+    );
+
+    const hr = (left: string, mid: string, right: string, fill: string) =>
+      left + fill.repeat(modelWidth + 2) + mid + fill.repeat(COL_STATUS + 2) + mid +
+      fill.repeat(COL_COST + 2) + mid + fill.repeat(COL_DUR + 2) + right;
+
+    const row = (model: string, status: string, cost: string, dur: string) =>
+      `│ ${model.padEnd(modelWidth)} │ ${status.padStart(COL_STATUS)} │ ${cost.padStart(COL_COST)} │ ${dur.padStart(COL_DUR)} │`;
+
+    console.log('\n✅ Parallel Resume Generation Complete');
+    console.log(hr('┌', '┬', '┐', '─'));
+    console.log(row('Model', 'Status', 'Cost', 'Duration'));
+    console.log(hr('├', '┼', '┤', '─'));
+
+    for (const r of modelResults) {
+      if (r.success) {
+        const cost = `$${(r.cost ?? 0).toFixed(4)}`;
+        const dur  = `${(r.duration ?? 0).toFixed(1)}s`;
+        console.log(row(r.model, '✅', cost, dur));
+      } else {
+        console.log(row(r.model, '❌', '—', '—'));
+      }
+    }
+
+    console.log(hr('├', '┼', '┤', '─'));
+    console.log(row('TOTAL', `${modelResults.filter(r => r.success).length}/${modelResults.length}`, `$${totalCost.toFixed(4)}`, ''));
+    console.log(hr('└', '┴', '┘', '─'));
+    console.log(`📂 ${comparisonFolder}`);
   }
 
   private createComparisonFolder(jobId: string, company: string): string {
