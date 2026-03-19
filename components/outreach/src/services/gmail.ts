@@ -152,10 +152,21 @@ export const sendViaGmail = (
 
 // ── Subject line picker ───────────────────────────────────────────────────────
 
-const getSubjectLinesForPicker = (): string[] => SUBJECT_LINES;
+interface SubjectOption {
+  value: string;
+  label: string;
+}
 
-const buildSubjectPickerHtml = (subjects: string[], actionFn: string): string => {
-  const subjectsJson = JSON.stringify(subjects);
+const getSubjectOptionsForPicker = (): SubjectOption[] =>
+  SUBJECT_LINES.map(subject => {
+    const flags = getFlagsForSubject(subject);
+    const sms = flags.SEND_SMS ? '🟢' : '🔴';
+    const resume = flags.ATTACH_RESUME ? '🟢' : '🔴';
+    return { value: subject, label: `${sms}📱 ${resume}📎  ${subject}` };
+  });
+
+const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
+  const optionsJson = JSON.stringify(options);
   const fnJson = JSON.stringify(actionFn);
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -178,9 +189,9 @@ button{padding:6px 16px;cursor:pointer}
 <div id="loading"><span class="spinner">⏳</span>Sending emails — please wait…</div>
 <script>
 (function(){
-var subjects=${subjectsJson};
+var options=${optionsJson};
 var sel=document.getElementById('s');
-subjects.forEach(function(s){var o=document.createElement('option');o.value=o.textContent=s;sel.appendChild(o);});
+options.forEach(function(o){var el=document.createElement('option');el.value=o.value;el.textContent=o.label;sel.appendChild(el);});
 window.doSubmit=function(){
 var s=sel.value;
 if(!s){alert('Please select a subject line.');return;}
@@ -200,14 +211,14 @@ alert(e.message);
 };
 
 const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
-  const subjects = getSubjectLinesForPicker();
-  if (subjects.length === 0) {
+  const options = getSubjectOptionsForPicker();
+  if (options.length === 0) {
     SpreadsheetApp.getUi().alert('No subject lines configured. Add entries to SUBJECT_LINES in settings.ts.');
     return;
   }
   const actionFn = action === 'send' ? 'doSendEmails' : 'doSendTestEmail';
-  const html = HtmlService.createHtmlOutput(buildSubjectPickerHtml(subjects, actionFn))
-    .setWidth(440)
+  const html = HtmlService.createHtmlOutput(buildSubjectPickerHtml(options, actionFn))
+    .setWidth(500)
     .setHeight(185);
   SpreadsheetApp.getUi().showModalDialog(html, 'Choose Subject');
 };
