@@ -910,311 +910,26 @@ async function loadJobData(jobId: string) {
 program
   .command('resume')
   .description('Generate a tailored resume PDF for a specific job')
-  .argument('<jobId>', 'Job ID to tailor resume for (from the log filename)')
-  .option('-o, --output <file>', 'Output path for the generated PDF')
-  .option('--regen', 'Quick PDF rebuild from cached markdown (fast, no new content). Without this flag, generates fresh content using current prompts.')
-  .option('-m, --mode <mode>', 'Resume generation mode: "leader" (emphasizes management/strategy) or "builder" (emphasizes technical work). If not specified, mode will be auto-detected from job description.')
-  .option('--split', 'Use split experience format with Relevant and Related sections (default is standard single section)')
-  .option('--provider <provider>', 'Override RESUME_LLM_PROVIDER for this run (anthropic or openai)')
-  .option('--critique-provider <provider>', 'Override CRITIQUE_LLM_PROVIDER for this run (anthropic or openai)')
-  .option('--model <model>', 'Override RESUME_LLM_MODEL for this run')
-  .option('--critique-model <model>', 'Override CRITIQUE_LLM_MODEL for this run')
-  .option('--generate', 'Generate a detailed job description if missing or generic')
-  .option('--company-url <url>', 'Company URL to use for generating job description context')
-  .option('--no-critique', 'Skip the automatic critique and improvement of the resume')
-  .option('--skip-judge', 'Skip the PDF judge validation (one-page enforcement)')
-  .option('--preview', 'Show the stages this command would go through without executing them. NOTE: use -- separator with npm: npm run dev -- resume <jobId> --preview')
-  .action(async (jobId: string, options) => {
-    try {
-      const startTime = Date.now();
-
-      console.log('📄 Generating tailored resume...');
-      console.log(`📊 Job ID: ${jobId}`);
-
-      // Automatically find CV file
-      const cvFile = await findCvFile();
-      console.log(`📋 CV File: ${cvFile}`);
-      console.log('');
-
-      // Load configuration
-      let config;
-      try {
-        config = getResumeGenerationConfig();
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('environment variable is required')) {
-          console.error('\n❌ Configuration Error:\n');
-          console.error(error.message);
-          console.error('\nAdd these to your .env file:');
-          console.error('  RESUME_LLM_PROVIDER=anthropic  # or "openai"');
-          console.error('  RESUME_LLM_MODEL=claude-sonnet-4-5-20250929  # or "gpt-5.2-2025-12-11"');
-          console.error('  CRITIQUE_LLM_PROVIDER=anthropic  # or "openai"');
-          console.error('  CRITIQUE_LLM_MODEL=claude-sonnet-4-5-20250929  # or "gpt-5.2-2025-12-11"');
-          console.error('  ANTHROPIC_API_KEY=your_key  # if using Anthropic');
-          console.error('  OPENAI_API_KEY=your_key  # if using OpenAI\n');
-          process.exit(1);
-        }
-        throw error;
-      }
-
-      // Apply CLI option overrides
-      if (options.provider) {
-        config.resumeProvider = options.provider as 'anthropic' | 'openai';
-      }
-      if (options.critiqueProvider) {
-        config.critiqueProvider = options.critiqueProvider as 'anthropic' | 'openai';
-      }
-      if (options.model) {
-        config.resumeModel = options.model;
-      }
-      if (options.critiqueModel) {
-        config.critiqueModel = options.critiqueModel;
-      }
-
-      // Display configuration
-      console.log('🔧 LLM Configuration:');
-      console.log(`  Resume: ${config.resumeProvider} / ${config.resumeModel}`);
-      console.log(`  Critique: ${config.critiqueProvider} / ${config.critiqueModel}`);
-      console.log('');
-
-      // Validate mode option
-      if (options.mode && !['leader', 'builder'].includes(options.mode)) {
-        console.error('❌ Error: Mode must be either "leader" or "builder"');
-        process.exit(1);
-      }
-
-      let mode: 'leader' | 'builder';
-      let modeSource: 'manual' | 'auto' = 'manual';
-
-      // Auto-detect mode if not explicitly provided
-      if (!options.mode) {
-        if (!options.preview) {
-          try {
-            console.log('🔍 Analyzing job description to determine optimal resume mode...');
-            const jobData = await loadJobData(jobId);
-            // ModeDetectorAgent still uses old API - get Anthropic config for now
-            const anthropicConfig = getAnthropicConfig();
-            const modeDetector = new ModeDetectorAgent(anthropicConfig.anthropicApiKey);
-            const detection = await modeDetector.detectMode(jobData);
-
-            mode = detection.mode;
-            modeSource = 'auto';
-
-            console.log(`✨ Auto-detected mode: ${mode} (confidence: ${detection.confidence}%)`);
-            console.log(`📝 Reasoning: ${detection.reasoning}`);
-            console.log('');
-          } catch (error) {
-            console.warn('⚠️  Mode detection failed, defaulting to leader mode');
-            console.warn(`   Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            mode = 'leader';
-          }
-        } else {
-          // In dry-run, skip the LLM call — mode detection would happen at runtime
-          mode = 'leader'; // placeholder; actual mode determined at runtime
-          modeSource = 'auto';
-        }
-      } else {
-        mode = options.mode as 'leader' | 'builder';
-      }
-
-      const experienceFormat = options.split ? 'split' : 'standard';
-
-      // Split format needs more roles (3-5 relevant + 2-3 related = 5-8 total)
-      // Standard format typically uses 3-4 roles
-      const maxRoles = options.split ? 7 : config.maxRoles;
-
-      const modeLabel = modeSource === 'auto' ? '🤖 Auto-detected' : '👤 Manual';
-      console.log(`🎯 Resume Mode: ${mode} (${modeLabel}) - ${mode === 'leader' ? 'emphasizes management/strategy' : 'emphasizes technical work'}`);
-      if (options.split) {
-        console.log(`📊 Experience Format: split (Relevant vs Related sections, using ${maxRoles} roles)`);
-      }
-
-      // Create provider configurations
-      const resumeProviderConfig: LLMProviderConfig = {
-        provider: config.resumeProvider,
-        apiKey: config.resumeApiKey,
-        model: config.resumeModel,
-        maxTokens: config.maxTokens,
-        temperature: config.temperature
-      };
-
-      const critiqueProviderConfig: LLMProviderConfig = {
-        provider: config.critiqueProvider,
-        apiKey: config.critiqueApiKey,
-        model: config.critiqueModel,
-        maxTokens: config.maxTokens,
-        temperature: config.temperature
-      };
-
-      const creator = new ResumeCreatorAgent(
-        resumeProviderConfig,
-        critiqueProviderConfig,
-        maxRoles,
-        mode,
-        experienceFormat
-      );
-
-      // Show generate mode if enabled
-      if (options.generate) {
-        console.log('🤖 Job description generation enabled');
-        if (options.companyUrl) {
-          console.log(`🌐 Using company URL: ${options.companyUrl}`);
-        }
-      }
-
-      const generateParam = options.generate ? (options.companyUrl || true) : false;
-
-      // When --regen is used, force critique to false since we're just rebuilding PDF
-      // Also skip judge validation when regenerating from existing markdown
-      const critiqueFlag = options.regen ? false : !options.noCritique;
-      const skipJudgeFlag = options.regen ? true : !!options.skipJudge;
-
-      // Preview: print pipeline stages and exit without executing
-      if (options.preview) {
-        const logsDir = path.join(process.cwd(), 'logs');
-        const jobDir = path.join(logsDir, jobId);
-
-        const hasTailoredContent = fss.existsSync(jobDir) &&
-          fss.readdirSync(jobDir).some(f => f.startsWith('tailored-') && f.endsWith('.json'));
-        const hasCritique = fss.existsSync(jobDir) &&
-          fss.readdirSync(jobDir).some(f => f.startsWith('critique-') && f.endsWith('.json'));
-        const maxJudgeAttempts = getCritiqueAndJudgeMaxAttempts();
-
-        console.log('');
-        console.log('[PREVIEW] Resume Generation Pipeline');
-        console.log('='.repeat(50));
-        console.log(`Job ID     : ${jobId}`);
-        console.log(`CV File    : ${cvFile}`);
-        console.log('');
-        console.log('Configuration:');
-        console.log(`  Resume LLM        : ${config.resumeProvider} / ${config.resumeModel}`);
-        console.log(`  Critique LLM      : ${config.critiqueProvider} / ${config.critiqueModel}`);
-        console.log(`  Mode              : ${modeSource === 'auto' ? '(auto-detected at runtime)' : mode}`);
-        console.log(`  Experience Format : ${experienceFormat}`);
-        console.log(`  Critique          : ${critiqueFlag ? 'enabled' : 'disabled (--no-critique)'}`);
-        console.log(`  PDF Judge         : ${skipJudgeFlag ? 'disabled (--skip-judge or --regen)' : `enabled (up to ${maxJudgeAttempts} attempts)`}`);
-        console.log('');
-
-        const stages: string[] = [];
-        let stageNum = 1;
-
-        if (!options.mode) {
-          stages.push(`[${stageNum++}] Mode Detection (LLM) — ModeDetectorAgent infers leader/builder from job description`);
-        }
-
-        if (options.regen) {
-          if (hasTailoredContent) {
-            stages.push(`[${stageNum++}] PDF Rebuild — load cached tailored markdown, run pandoc (no LLM call)`);
-          } else {
-            stages.push(`[${stageNum++}] PDF Rebuild — WOULD FAIL: no cached tailored content found for job ${jobId}`);
-          }
-        } else {
-          if (options.generate) {
-            stages.push(`[${stageNum++}] Job Description Generation (LLM) — fetch company info + synthesize description`);
-          }
-
-          if (hasTailoredContent) {
-            stages.push(`[${stageNum++}] Load Cached Tailored Content — reuse existing markdown (no LLM call)`);
-          } else {
-            stages.push(`[${stageNum++}] Initial Resume Generation (LLM) — generate tailored markdown from job + CV`);
-          }
-
-          stages.push(`[${stageNum++}] PDF Generation — run pandoc to convert markdown to PDF`);
-
-          if (critiqueFlag) {
-            stages.push(`[${stageNum++}] Critique (LLM) — ResumeCriticAgent scores resume and generates recommendations`);
-
-            if (hasCritique && hasTailoredContent) {
-              stages.push(`[${stageNum++}] Resume Improvement (LLM) — regenerate incorporating critique recommendations`);
-            } else {
-              stages.push(`[${stageNum++}] Resume Improvement (LLM) — regenerate incorporating critique recommendations (if any)`);
-            }
-
-            stages.push(`[${stageNum++}] PDF Generation (post-critique) — convert improved markdown to PDF`);
-
-            if (!skipJudgeFlag) {
-              stages.push(`[${stageNum++}] PDF Judge Loop (up to ${maxJudgeAttempts} iterations) — validate page count/format, regenerate with condensation hints if needed`);
-            }
-          }
-        }
-
-        console.log('Pipeline Stages:');
-        stages.forEach(s => console.log(`  ${s}`));
-        console.log('');
-        console.log('No LLM calls made. To execute: npm run dev -- resume ' + jobId);
-        return;
-      }
-
-      const result = await creator.createResume(
-        jobId,
-        cvFile,
-        options.output,
-        !!options.regen,
-        generateParam,
-        critiqueFlag,
-        'cli',  // Indicate this is called from CLI
-        skipJudgeFlag
-      );
-
-      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-
-      if (result.success) {
-        console.log('✅ Resume Generation Complete');
-        console.log('=' .repeat(50));
-        console.log(`📄 PDF Generated: ${result.pdfPath}`);
-        console.log(`⏱️  Total Duration: ${duration}s`);
-        if (result.totalCost !== undefined) {
-          console.log(`💰 Total Cost: $${result.totalCost.toFixed(4)}`);
-        }
-
-        if (result.improvedWithCritique) {
-          console.log('🎯 Resume automatically improved with critique feedback');
-          if (result.critiqueRating) {
-            console.log(`⭐ Initial Rating: ${result.critiqueRating}/10`);
-          }
-        }
-
-        // Only show tailoring changes if not using --regen (since regen just uses cached content)
-        if (!options.regen && result.tailoringChanges && result.tailoringChanges.length > 0) {
-          console.log('');
-          console.log('🔧 Tailoring Changes Made:');
-          result.tailoringChanges.forEach((change, index) => {
-            console.log(`  ${index + 1}. ${change}`);
-          });
-        }
-      } else {
-        console.error('❌ Resume generation failed:', result.error);
-        process.exit(1);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error:', error instanceof Error ? error.message : 'Unknown error');
-      process.exit(1);
-    }
-  });
-
-program
-  .command('parallel-resume')
-  .description('Generate resumes with multiple LLMs for side-by-side comparison')
-  .argument('<jobId>', 'Job ID to tailor resumes for')
-  .argument('[cvFile]', 'Path to CV file (auto-detected if not provided)')
-  .option('-c, --config <file>', 'Config file path', 'parallel-config.json')
-  .option('-n, --num-models <n>', 'Use first N models from config (default: all)', parseInt)
+  .argument('<jobId>', 'Job ID to tailor resume for')
+  .option('-n, --num-models <n>', 'Number of models to use from config (default: 1)', parseInt)
+  .option('-c, --config <file>', 'Config file path (default: parallel-config.json)')
   .option('--no-critique', 'Skip critique workflow (faster)')
   .option('--skip-judge', 'Skip PDF judge validation')
   .option('--output <dir>', 'Output directory (default: RESUME_OUTPUT_DIR from .env)')
-  .action(async (jobId: string, cvFile: string | undefined, options) => {
+  .option('--regen', 'Rebuild PDFs from saved markdown without re-generating content')
+  .option('--preview', 'Show pipeline stages without executing. Use: npm run dev -- resume <jobId> --preview')
+  .action(async (jobId: string, options) => {
     try {
-      console.log('🔄 Parallel Resume Generation');
-      console.log('════════════════════════════════\n');
-
-      // Import orchestrator
       const { ParallelResumeOrchestrator } = await import('./agents/parallel-resume-orchestrator');
 
-      // Find CV file if not provided
-      if (!cvFile) {
-        cvFile = await findCvFile();
+      const cvFile = await findCvFile();
+      const configPath = options.config ? path.resolve(options.config) : undefined;
+      const orchestrator = new ParallelResumeOrchestrator(configPath);
+
+      if (options.regen) {
+        await orchestrator.regenParallelResumes(jobId);
+        return;
       }
-      console.log(`📋 CV File: ${cvFile}\n`);
 
       // Load job data
       const logsDir = path.join(process.cwd(), 'logs');
@@ -1224,9 +939,8 @@ program
         throw new Error(`Job directory not found: ${jobDir}`);
       }
 
-      // Find job JSON file
       const files = fss.readdirSync(jobDir);
-      const jobFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
+      const jobFile = files.find((f: string) => f.startsWith('job-') && f.endsWith('.json'));
 
       if (!jobFile) {
         throw new Error(`No job file found in ${jobDir}`);
@@ -1234,28 +948,20 @@ program
 
       const jobData = JSON.parse(fss.readFileSync(path.join(jobDir, jobFile), 'utf-8'));
 
-      // Create orchestrator
-      const configPath = options.config ? path.resolve(options.config) : undefined;
-      const orchestrator = new ParallelResumeOrchestrator(configPath);
-
-      // Run parallel generation
       const result = await orchestrator.generateParallelResumes(
         jobId,
         cvFile,
         jobData,
         {
-          numModels: options.numModels,
+          numModels: options.numModels ?? 1,
           skipCritique: !options.critique,
           skipJudge: options.skipJudge,
-          outputDir: options.output
+          outputDir: options.output,
+          preview: !!options.preview,
         }
       );
 
-      // Success message
-      console.log('\n✅ Done! Open the comparison folder to view PDFs side-by-side');
-
-      if (process.platform === 'darwin') {
-        // Open folder on macOS
+      if (!options.preview && process.platform === 'darwin') {
         execSync(`open "${result.comparisonFolder}"`);
       }
 

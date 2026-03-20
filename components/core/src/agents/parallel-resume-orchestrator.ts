@@ -28,6 +28,7 @@ export interface ParallelResumeOptions {
   skipCritique?: boolean;
   skipJudge?: boolean;
   outputDir?: string;
+  preview?: boolean;
 }
 
 export interface ModelResult {
@@ -186,6 +187,34 @@ export class ParallelResumeOrchestrator {
 
     console.log(`📋 Job: ${job.title} at ${job.company}`);
     console.log(`📊 Models: ${modelsToUse.length} (${modelsToUse.map(m => m.label).join(', ')})\n`);
+
+    // Preview: print pipeline plan and return early without any LLM calls or file I/O
+    if (options.preview) {
+      const classificationCachePath = path.resolve('logs', jobId, 'classification.json');
+      const classifyStep = fs.existsSync(classificationCachePath)
+        ? '🔍 Step 1:  Classify (Haiku 4.5) — load from cache'
+        : '🔍 Step 1:  Classify (Haiku 4.5) — fresh classification';
+      const outputDir = this.getOutputDirectory();
+      const date = new Date().toISOString().split('T')[0];
+      const folderName = `${jobId}-${job.company.replace(/[^a-z0-9]/gi, '')}-${date}`;
+
+      console.log('📋 Preview Mode — no LLM calls or files will be created');
+      console.log('══════════════════════════════════════════════════════');
+      console.log(`📄 CV:      ${cvFilePath}`);
+      console.log(`📁 Config:  ${path.basename(path.resolve(options.outputDir || 'parallel-config.json'))}`);
+      console.log(classifyStep);
+      console.log(`📝 Step 2:  Generate with ${modelsToUse.length} model${modelsToUse.length === 1 ? '' : 's'}:`);
+      modelsToUse.forEach((m, i) => {
+        console.log(`               ${i + 1}. ${m.label.padEnd(22)} (${m.provider})`);
+      });
+      console.log('🎨 Step 3:  Convert each to PDF via pandoc');
+      if (!options.skipCritique) {
+        console.log('📊 Step 4:  Critique each resume');
+      }
+      console.log(`📂 Output:  ${path.join(outputDir, 'Comparisons', folderName)}/`);
+      console.log('\nTo execute: npm run dev -- resume ' + jobId + (numModels !== this.config.models.length ? ` -n ${numModels}` : ''));
+      return { jobId, company: job.company, role: job.title, timestamp: new Date().toISOString(), comparisonFolder: '', results: [], totalCost: 0, classificationCost: 0, successCount: 0, failureCount: 0 };
+    }
 
     // Step 1: Classification (shared across all models, cached per job)
     console.log('📍 Step 1: Classification (shared)');
@@ -471,6 +500,62 @@ export class ParallelResumeOrchestrator {
     console.log(`📂 ${comparisonFolder}`);
   }
 
+  private runPandoc(mdPath: string, pdfPath: string): void {
+    execSync(`pandoc "${mdPath}" -o "${pdfPath}" -V geometry:margin=0.5in`, { stdio: 'inherit' });
+  }
+
+  async regenParallelResumes(jobId: string): Promise<void> {
+    const comparisonsDir = path.join(this.getOutputDirectory(), 'Comparisons');
+
+    if (!fs.existsSync(comparisonsDir)) {
+      throw new Error(`No Comparisons folder found at ${comparisonsDir}`);
+    }
+
+    // Find most recent comparison folder for this jobId
+    const match = fs.readdirSync(comparisonsDir)
+      .filter(f => f.startsWith(jobId))
+      .map(f => ({ name: f, mtime: fs.statSync(path.join(comparisonsDir, f)).mtime }))
+      .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())[0];
+
+    if (!match) {
+      throw new Error(`No comparison folder found for job ${jobId}. Run without --regen first.`);
+    }
+
+    const folder = path.join(comparisonsDir, match.name);
+    const mdFiles = fs.readdirSync(folder).filter(f => f.endsWith('.md'));
+
+    if (mdFiles.length === 0) {
+      throw new Error(`No .md source files in ${folder}. Run without --regen first to generate content.`);
+    }
+
+    console.log(`🔄 Regen: rebuilding ${mdFiles.length} PDF${mdFiles.length === 1 ? '' : 's'} from markdown\n`);
+
+    const modelResults: ModelResult[] = [];
+
+    for (const mdFile of mdFiles) {
+      const mdPath = path.join(folder, mdFile);
+      const pdfPath = mdPath.replace(/\.md$/, '.pdf');
+      const labelMatch = mdFile.match(/^\[([^\]]+)\]/);
+      const label = labelMatch ? labelMatch[1] : mdFile.replace(/\.md$/, '');
+
+      const start = Date.now();
+      try {
+        this.runPandoc(mdPath, pdfPath);
+        modelResults.push({ model: label, success: true, cost: 0, duration: (Date.now() - start) / 1000 });
+        console.log(`✅ ${label}: PDF rebuilt`);
+      } catch (error) {
+        modelResults.push({ model: label, success: false, error: error instanceof Error ? error.message : 'pandoc failed' });
+        console.log(`❌ ${label}: pandoc failed`);
+      }
+    }
+
+    this.printResultsTable(modelResults, 0, folder);
+
+    if (process.platform === 'darwin') {
+      execSync(`open "${folder}"`);
+    }
+  }
+
   private createComparisonFolder(jobId: string, company: string): string {
     // Get output directory
     const baseDir = this.getOutputDirectory();
@@ -539,13 +624,7 @@ header-includes: |
     const pdfPath = path.join(outputDir, `${baseName}.pdf`);
 
     try {
-      // Convert to PDF using pandoc
-      execSync(`pandoc "${mdPath}" -o "${pdfPath}" -V geometry:margin=0.5in`, {
-        stdio: 'inherit'
-      });
-
-      // Keep markdown source alongside PDF for diffing/debugging
-
+      this.runPandoc(mdPath, pdfPath);
       return pdfPath;
     } catch (error) {
       // Leave mdPath in place — caller can retry pandoc manually
