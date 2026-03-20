@@ -252,7 +252,7 @@ export const doSendTestEmail = (
   }
 
   row[COLS.RECIPIENT] = testRecipient;
-  const msgObj = fillInTemplateFromObject(emailTemplate.message, row);
+  const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
   sendViaGmail(row, msgObj, emailTemplate, subject);
   Logger.log('Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
@@ -293,7 +293,7 @@ export const doSendEmails = (
   for (const row of rows) {
     if (row[COLS.EMAIL_SENT] === '') {
       try {
-        const msgObj = fillInTemplateFromObject(emailTemplate.message, row);
+        const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
         sendViaGmail(row, msgObj, emailTemplate, subject);
         out.push([new Date()]);
         sentCount++;
@@ -344,7 +344,7 @@ const escapeData = (str: string): string =>
     .replace(/[\r]/g, '\\r')
     .replace(/[\t]/g, '\\t');
 
-export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, string>): MsgObj => {
+export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, string>, subjectLine?: string): MsgObj => {
   let s = JSON.stringify(template);
 
   // Stage 0: Fetch job metadata first so {{Blurb}} and {{Intro}} can use it below
@@ -364,7 +364,7 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
 
   // Stage 1: Named token substitutions (Blurb falls back to PROFILE if no job blurb)
   const subs: Record<string, string> = {
-    '{{Valediction}}': valediction(),
+    '{{Valediction}}': valediction(subjectLine),
     '{{Ideal}}': ideal(),
     '{{Accomplishment1}}': accomplishments(1),
     '{{Accomplishment2}}': accomplishments(2),
