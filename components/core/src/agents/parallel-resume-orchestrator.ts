@@ -555,7 +555,7 @@ export class ParallelResumeOrchestrator {
       provider: critiqueProvider,
       apiKey,
       model: critiqueModel,
-      maxTokens: 2000,
+      maxTokens: 4000,
       temperature: 0.1
     };
 
@@ -565,6 +565,10 @@ export class ParallelResumeOrchestrator {
       const critic = new ResumeCriticAgent(provider);
       try {
         const critique = await critic.critiqueContent(markdown, job, jobId);
+        if (!critique.success || critique.recommendations.length === 0) {
+          console.log(`⚠️  ${label}: critique parse failed — ${critique.error ?? 'empty recommendations'}`);
+          return { label, rating: 0, recommendations: [] as string[] };
+        }
         console.log(`📊 ${label}: rating ${critique.overallRating}/10 (${critique.recommendations.length} recommendations)`);
         return { label, rating: critique.overallRating, recommendations: critique.recommendations };
       } catch (error) {
