@@ -600,13 +600,10 @@ export class ParallelResumeOrchestrator {
     modelLabel: string,
     outputDir: string
   ): Promise<string> {
-    // Add YAML front matter for pandoc
+    // Add YAML front matter for pandoc — pagestyle{empty} suppresses all headers/footers
     const yamlHeader = `---
 header-includes: |
-  \\usepackage{fancyhdr}
-  \\pagestyle{fancy}
-  \\fancyfoot[C]{Customized by career-catalyst}
-  \\fancyfoot[R]{\\thepage}
+  \\pagestyle{empty}
 ---
 
 `;
