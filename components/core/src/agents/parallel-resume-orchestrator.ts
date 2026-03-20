@@ -1,5 +1,7 @@
 import { ResumeClassifierAgent } from './classifier';
 import { ResumeGeneratorAgent, GeneratorResult } from './generator';
+import { ResumeCriticAgent } from './resume-critic-agent';
+import { ProviderFactory } from '../providers/provider-factory';
 import { JobListing } from '../types';
 import { LLMProviderConfig } from '../providers/llm-provider';
 import * as fs from 'fs';
@@ -20,6 +22,8 @@ export interface ParallelConfig {
     temperature: number;
     mode: 'builder' | 'leader';
     experienceFormat: 'standard' | 'split';
+    critiqueProvider?: 'anthropic' | 'openai' | 'openrouter';
+    critiqueModel?: string;
   };
 }
 
@@ -37,6 +41,7 @@ export interface ModelResult {
   cost?: number;
   duration?: number;
   pdfPath?: string;
+  critiqueRating?: number;
   error?: string;
 }
 
@@ -140,7 +145,9 @@ export class ParallelResumeOrchestrator {
         maxRoles: 4,
         temperature: 0.3,
         mode: 'leader',
-        experienceFormat: 'standard'
+        experienceFormat: 'standard',
+        critiqueProvider: 'anthropic',
+        critiqueModel: 'claude-haiku-4-5-20251001'
       }
     };
   }
@@ -210,6 +217,8 @@ export class ParallelResumeOrchestrator {
       console.log('🎨 Step 3:  Convert each to PDF via pandoc');
       if (!options.skipCritique) {
         console.log('📊 Step 4:  Critique each resume');
+        console.log('📝 Step 5:  Regenerate with recommendations');
+        console.log('🎨 Step 6:  Re-convert each to PDF via pandoc');
       }
       console.log(`📂 Output:  ${path.join(outputDir, 'Comparisons', folderName)}/`);
       console.log('\nTo execute: npm run dev -- resume ' + jobId + (numModels !== this.config.models.length ? ` -n ${numModels}` : ''));
@@ -255,9 +264,15 @@ export class ParallelResumeOrchestrator {
     console.log('📝 Step 2: Parallel Generation');
     console.log('──────────────────────────────────');
 
-    // Estimate total cost and confirm
-    const estimatedTotalCost = classificationCost + (modelsToUse.length * 0.10); // rough estimate
-    const confirmed = await this.confirmCost(modelsToUse, estimatedTotalCost);
+    // Estimate total cost and confirm (generation + optional critique + regen)
+    const perModelGenCost = 0.10;
+    const perModelCritiqueCost = 0.01; // Haiku is cheap
+    const estimatedTotalCost = classificationCost + modelsToUse.length * (
+      options.skipCritique
+        ? perModelGenCost
+        : perModelGenCost + perModelCritiqueCost + perModelGenCost
+    );
+    const confirmed = await this.confirmCost(modelsToUse, estimatedTotalCost, !options.skipCritique);
     if (!confirmed) {
       throw new Error('Parallel generation cancelled by user');
     }
@@ -276,8 +291,9 @@ export class ParallelResumeOrchestrator {
     const comparisonFolder = this.createComparisonFolder(jobId, job.company);
     console.log(`📂 Comparison folder: ${comparisonFolder}\n`);
 
-    // Generate PDFs for successful results
+    // Generate PDFs for successful results; track markdown for critique phase
     const modelResults: ModelResult[] = [];
+    const markdownByModel = new Map<string, string>();
     let totalGenerationCost = 0;
 
     for (let i = 0; i < generatorResults.length; i++) {
@@ -289,7 +305,6 @@ export class ParallelResumeOrchestrator {
         totalGenerationCost += genResult.cost;
 
         try {
-          // Generate PDF
           const pdfPath = await this.generatePDF(
             genResult.markdownContent,
             job,
@@ -305,6 +320,7 @@ export class ParallelResumeOrchestrator {
             pdfPath
           });
 
+          markdownByModel.set(modelConfig.label, genResult.markdownContent);
           console.log(`✅ ${modelConfig.label}: PDF saved`);
         } catch (error) {
           modelResults.push({
@@ -325,6 +341,56 @@ export class ParallelResumeOrchestrator {
           error: error instanceof Error ? error.message : String(error)
         });
         console.log(`❌ ${modelConfig.label}: ${error}`);
+      }
+    }
+
+    // Phase 4–6: Critique + Regenerate (skipped if --no-critique or nothing succeeded)
+    if (!options.skipCritique && markdownByModel.size > 0) {
+      console.log('\n📊 Step 4: Parallel Critique');
+      console.log('──────────────────────────────────');
+
+      const critiqueMap = await this.runParallelCritique(markdownByModel, job, jobId);
+
+      if (critiqueMap.size > 0) {
+        // Stamp ratings onto modelResults before table
+        for (const [label, data] of critiqueMap) {
+          const r = modelResults.find(m => m.model === label);
+          if (r) r.critiqueRating = data.rating;
+        }
+
+        console.log('\n📝 Step 5: Parallel Regeneration with Recommendations');
+        console.log('──────────────────────────────────');
+
+        const improvedResults = await this.runParallelGeneration(
+          modelsToUse, classification, job, cvContent, critiqueMap
+        );
+
+        console.log('\n🎨 Step 6: PDF Re-generation');
+        console.log('──────────────────────────────────');
+
+        for (let i = 0; i < modelsToUse.length; i++) {
+          const modelConfig = modelsToUse[i];
+          const result = improvedResults[i];
+          const existing = modelResults.find(r => r.model === modelConfig.label);
+
+          if (!existing?.success) continue; // skip models that already failed
+
+          if (result.status === 'fulfilled' && result.value.success && result.value.result) {
+            const genResult = result.value.result;
+            totalGenerationCost += genResult.cost;
+
+            try {
+              const pdfPath = await this.generatePDF(
+                genResult.markdownContent, job, modelConfig.label, comparisonFolder
+              );
+              existing.cost = (existing.cost ?? 0) + genResult.cost;
+              existing.pdfPath = pdfPath;
+              console.log(`✅ ${modelConfig.label}: improved PDF saved`);
+            } catch (error) {
+              console.log(`❌ ${modelConfig.label}: improved PDF generation failed`);
+            }
+          }
+        }
       }
     }
 
@@ -382,8 +448,7 @@ export class ParallelResumeOrchestrator {
     }
   }
 
-  private async confirmCost(models: ParallelConfig['models'], estimatedCost: number): Promise<boolean> {
-    // Check if auto-confirm is enabled
+  private async confirmCost(models: ParallelConfig['models'], estimatedCost: number, withCritique: boolean): Promise<boolean> {
     if (process.env.LLM_AUTO_CONFIRM === 'true') {
       console.log(`💰 Auto-confirmed: ~$${estimatedCost.toFixed(4)}\n`);
       return true;
@@ -393,11 +458,16 @@ export class ParallelResumeOrchestrator {
     console.log('═══════════════════════════════════════════');
 
     for (const model of models) {
-      // Rough estimates based on typical usage
       const estimate = model.provider === 'anthropic'
         ? (model.model.includes('haiku') ? 0.03 : 0.11)
         : 0.08;
-      console.log(`   ${model.label}: ~$${estimate.toFixed(4)}`);
+      const label = withCritique ? `${model.label} (gen + regen)` : model.label;
+      console.log(`   ${label}: ~$${estimate.toFixed(4)}`);
+    }
+
+    if (withCritique) {
+      const { critiqueModel = 'claude-haiku-4-5-20251001' } = this.config.sharedSettings;
+      console.log(`   Critique (${critiqueModel} × ${models.length}): ~$${(0.01 * models.length).toFixed(4)}`);
     }
 
     console.log('───────────────────────────────────────────');
@@ -421,12 +491,12 @@ export class ParallelResumeOrchestrator {
     models: ParallelConfig['models'],
     classification: any,
     job: JobListing,
-    cvContent: string
+    cvContent: string,
+    critiqueMap?: Map<string, { recommendations: string[]; rating: number }>
   ): Promise<Array<PromiseSettledResult<{ success: boolean; result?: GeneratorResult; error?: string }>>> {
     const { mode, maxRoles } = this.config.sharedSettings;
     const experienceFormat = classification.format as 'standard' | 'split';
 
-    // Create generator instances
     const generators = models.map(modelConfig => {
       const providerConfig: LLMProviderConfig = {
         provider: modelConfig.provider,
@@ -443,13 +513,15 @@ export class ParallelResumeOrchestrator {
       return new ResumeGeneratorAgent(providerConfig, mode, experienceFormat, maxRoles);
     });
 
-    // Run all generators in parallel
-    const promises = generators.map(async (generator) => {
+    const promises = generators.map(async (generator, i) => {
+      const modelConfig = models[i]!;
+      const recommendations = critiqueMap?.get(modelConfig.label)?.recommendations;
       try {
         const result = await generator.generate({
           classification,
           job,
-          cvContent
+          cvContent,
+          recommendations
         });
         return { success: true, result };
       } catch (error) {
@@ -463,39 +535,99 @@ export class ParallelResumeOrchestrator {
     return Promise.allSettled(promises);
   }
 
+  private async runParallelCritique(
+    markdownByModel: Map<string, string>,
+    job: JobListing,
+    jobId: string
+  ): Promise<Map<string, { recommendations: string[]; rating: number }>> {
+    const {
+      critiqueProvider = 'anthropic',
+      critiqueModel = 'claude-haiku-4-5-20251001'
+    } = this.config.sharedSettings;
+
+    const apiKey = critiqueProvider === 'anthropic'
+      ? process.env.ANTHROPIC_API_KEY || ''
+      : critiqueProvider === 'openrouter'
+        ? process.env.OPENROUTER_API_KEY || ''
+        : process.env.OPENAI_API_KEY || '';
+
+    const critiqueProviderConfig: LLMProviderConfig = {
+      provider: critiqueProvider,
+      apiKey,
+      model: critiqueModel,
+      maxTokens: 2000,
+      temperature: 0.1
+    };
+
+    const entries = [...markdownByModel.entries()];
+    const promises = entries.map(async ([label, markdown]) => {
+      const provider = ProviderFactory.create(critiqueProviderConfig);
+      const critic = new ResumeCriticAgent(provider);
+      try {
+        const critique = await critic.critiqueContent(markdown, job, jobId);
+        console.log(`📊 ${label}: rating ${critique.overallRating}/10 (${critique.recommendations.length} recommendations)`);
+        return { label, rating: critique.overallRating, recommendations: critique.recommendations };
+      } catch (error) {
+        console.log(`⚠️  ${label}: critique failed — ${error instanceof Error ? error.message : 'unknown error'}`);
+        return { label, rating: 0, recommendations: [] as string[] };
+      }
+    });
+
+    const settled = await Promise.allSettled(promises);
+    const map = new Map<string, { recommendations: string[]; rating: number }>();
+
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && r.value.recommendations.length > 0) {
+        map.set(r.value.label, {
+          recommendations: r.value.recommendations,
+          rating: r.value.rating
+        });
+      }
+    }
+
+    return map;
+  }
+
   private printResultsTable(modelResults: ModelResult[], totalCost: number, comparisonFolder: string): void {
-    const COL_STATUS = 6; // '✅' or '❌' + padding
-    const COL_COST   = 9; // '$0.0000'
-    const COL_DUR    = 9; // '000.0s'
-    const modelWidth = Math.max(
-      'Model'.length,
-      ...modelResults.map(r => r.model.length)
-    );
+    const COL_STATUS = 6;  // '✅' or '❌'
+    const COL_RATING = 6;  // '10/10'
+    const COL_COST   = 9;  // '$0.0000'
+    const COL_DUR    = 9;  // '000.0s'
+    const modelWidth = Math.max('Model'.length, ...modelResults.map(r => r.model.length));
+    const withRatings = modelResults.some(r => r.critiqueRating !== undefined);
 
-    const hr = (left: string, mid: string, right: string, fill: string) =>
-      left + fill.repeat(modelWidth + 2) + mid + fill.repeat(COL_STATUS + 2) + mid +
-      fill.repeat(COL_COST + 2) + mid + fill.repeat(COL_DUR + 2) + right;
+    const hr = (left: string, mid: string, right: string, fill: string) => {
+      let s = left + fill.repeat(modelWidth + 2) + mid + fill.repeat(COL_STATUS + 2);
+      if (withRatings) s += mid + fill.repeat(COL_RATING + 2);
+      s += mid + fill.repeat(COL_COST + 2) + mid + fill.repeat(COL_DUR + 2) + right;
+      return s;
+    };
 
-    const row = (model: string, status: string, cost: string, dur: string) =>
-      `│ ${model.padEnd(modelWidth)} │ ${status.padStart(COL_STATUS)} │ ${cost.padStart(COL_COST)} │ ${dur.padStart(COL_DUR)} │`;
+    const row = (model: string, status: string, rating: string | null, cost: string, dur: string) => {
+      let s = `│ ${model.padEnd(modelWidth)} │ ${status.padStart(COL_STATUS)} │`;
+      if (withRatings) s += ` ${(rating ?? '').padStart(COL_RATING)} │`;
+      s += ` ${cost.padStart(COL_COST)} │ ${dur.padStart(COL_DUR)} │`;
+      return s;
+    };
 
     console.log('\n✅ Parallel Resume Generation Complete');
     console.log(hr('┌', '┬', '┐', '─'));
-    console.log(row('Model', 'Status', 'Cost', 'Duration'));
+    console.log(row('Model', 'Status', withRatings ? 'Rating' : null, 'Cost', 'Duration'));
     console.log(hr('├', '┼', '┤', '─'));
 
     for (const r of modelResults) {
       if (r.success) {
-        const cost = `$${(r.cost ?? 0).toFixed(4)}`;
-        const dur  = `${(r.duration ?? 0).toFixed(1)}s`;
-        console.log(row(r.model, '✅', cost, dur));
+        const cost   = `$${(r.cost ?? 0).toFixed(4)}`;
+        const dur    = `${(r.duration ?? 0).toFixed(1)}s`;
+        const rating = r.critiqueRating !== undefined ? `${r.critiqueRating}/10` : null;
+        console.log(row(r.model, '✅', rating, cost, dur));
       } else {
-        console.log(row(r.model, '❌', '—', '—'));
+        console.log(row(r.model, '❌', withRatings ? '—' : null, '—', '—'));
       }
     }
 
     console.log(hr('├', '┼', '┤', '─'));
-    console.log(row('TOTAL', `${modelResults.filter(r => r.success).length}/${modelResults.length}`, `$${totalCost.toFixed(4)}`, ''));
+    console.log(row('TOTAL', `${modelResults.filter(r => r.success).length}/${modelResults.length}`, null, `$${totalCost.toFixed(4)}`, ''));
     console.log(hr('└', '┴', '┘', '─'));
     console.log(`📂 ${comparisonFolder}`);
   }

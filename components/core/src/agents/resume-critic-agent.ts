@@ -445,6 +445,37 @@ export class ResumeCriticAgent {
     }
   }
 
+  /**
+   * Critique resume content directly (markdown text) without needing a PDF on disk.
+   * Designed for the parallel orchestrator — cost is confirmed upfront, so per-critique
+   * confirmation is skipped.
+   */
+  async critiqueContent(
+    resumeText: string,
+    job: JobListing,
+    jobId: string
+  ): Promise<ResumeCritique> {
+    try {
+      const themes = this.loadThemes(jobId);
+      const companyValues = this.loadCompanyValues(jobId);
+      const domainContext = this.detectDomain(job.description);
+      const critique = await this.generateCritique(
+        job, resumeText, '', jobId, themes, null, companyValues, domainContext,
+        true /* skipConfirmation */
+      );
+      this.logCritique(critique);
+      return critique;
+    } catch (error) {
+      return {
+        success: false, jobId, resumePath: '',
+        overallRating: 0, strengths: [], weaknesses: [], recommendations: [],
+        detailedAnalysis: '',
+        timestamp: new Date().toISOString(),
+        error: `Critique failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
   private async generateCritique(
     job: JobListing,
     resumeContent: string,
@@ -453,7 +484,8 @@ export class ResumeCriticAgent {
     themes: string | null,
     recommendations: string | null,
     companyValues: string | null,
-    domainContext: { domain: string; signals: string[]; expectedVocabulary: string[]; toneExpectations: string[] }
+    domainContext: { domain: string; signals: string[]; expectedVocabulary: string[]; toneExpectations: string[] },
+    skipConfirmation = false
   ): Promise<ResumeCritique> {
     // Build the "More Context" section
     let moreContextSection = '';
@@ -618,17 +650,11 @@ REMEMBER: Response must be valid JSON only. No markdown, no code blocks, no addi
     console.log(`📦 Provider: ${this.provider.getProviderName()}`);
     console.log(`🤖 Model: ${this.provider.getModelName()}`);
 
-    // Cost confirmation
     const request = { prompt };
 
-    const confirmed = await confirmCostEstimate(
-      this.provider,
-      request,
-      'Resume Critique'
-    );
-
-    if (!confirmed) {
-      throw new Error('Critique cancelled by user');
+    if (!skipConfirmation) {
+      const confirmed = await confirmCostEstimate(this.provider, request, 'Resume Critique');
+      if (!confirmed) throw new Error('Critique cancelled by user');
     }
 
     // Start timing after confirmation
