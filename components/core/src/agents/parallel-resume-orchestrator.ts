@@ -500,8 +500,23 @@ export class ParallelResumeOrchestrator {
     console.log(`📂 ${comparisonFolder}`);
   }
 
+  private static readonly YAML_HEADER = `---
+header-includes: |
+  \\pagestyle{empty}
+---
+
+`;
+
   private runPandoc(mdPath: string, pdfPath: string): void {
     execSync(`pandoc "${mdPath}" -o "${pdfPath}" -V geometry:margin=0.5in`, { stdio: 'inherit' });
+  }
+
+  /** Strip any existing YAML front matter and apply the current header. */
+  private normalizeYamlHeader(mdContent: string): string {
+    const stripped = mdContent.startsWith('---')
+      ? mdContent.replace(/^---[\s\S]*?---\n+/, '')
+      : mdContent;
+    return ParallelResumeOrchestrator.YAML_HEADER + stripped;
   }
 
   async regenParallelResumes(jobId: string): Promise<void> {
@@ -537,6 +552,10 @@ export class ParallelResumeOrchestrator {
       const pdfPath = mdPath.replace(/\.md$/, '.pdf');
       const labelMatch = mdFile.match(/^\[([^\]]+)\]/);
       const label = labelMatch ? labelMatch[1] : mdFile.replace(/\.md$/, '');
+
+      // Refresh YAML header in case the file was written by an older code version
+      const raw = fs.readFileSync(mdPath, 'utf-8');
+      fs.writeFileSync(mdPath, this.normalizeYamlHeader(raw));
 
       const start = Date.now();
       try {
@@ -600,14 +619,7 @@ export class ParallelResumeOrchestrator {
     modelLabel: string,
     outputDir: string
   ): Promise<string> {
-    // Add YAML front matter for pandoc — pagestyle{empty} suppresses all headers/footers
-    const yamlHeader = `---
-header-includes: |
-  \\pagestyle{empty}
----
-
-`;
-    const fullMarkdown = yamlHeader + markdownContent;
+    const fullMarkdown = ParallelResumeOrchestrator.YAML_HEADER + markdownContent;
 
     // Generate filename base (shared between .md source and .pdf output)
     const candidateName = this.extractCandidateName(markdownContent);
