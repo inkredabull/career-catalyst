@@ -550,8 +550,8 @@ export class ParallelResumeOrchestrator {
     jobId: string
   ): Promise<Map<string, { recommendations: string[]; rating: number }>> {
     const {
-      critiqueProvider = 'anthropic',
-      critiqueModel = 'claude-haiku-4-5-20251001'
+      critiqueProvider = (process.env.CRITIQUE_LLM_PROVIDER as 'anthropic' | 'openai' | 'openrouter' | undefined) ?? 'anthropic',
+      critiqueModel = process.env.CRITIQUE_LLM_MODEL ?? 'claude-haiku-4-5-20251001'
     } = this.config.sharedSettings;
 
     const apiKey = critiqueProvider === 'anthropic'
