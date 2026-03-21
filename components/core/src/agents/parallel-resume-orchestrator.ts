@@ -4,6 +4,7 @@ import { ResumeCriticAgent } from './resume-critic-agent';
 import { ProviderFactory } from '../providers/provider-factory';
 import { JobListing } from '../types';
 import { LLMProviderConfig } from '../providers/llm-provider';
+import { getCritiqueAndJudgeMaxAttempts } from '../config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -344,28 +345,34 @@ export class ParallelResumeOrchestrator {
       }
     }
 
-    // Phase 4–6: Critique + Regenerate (skipped if --no-critique or nothing succeeded)
+    // Phase 4–6: Critique + Regenerate loop (skipped if --no-critique or nothing succeeded)
     if (!options.skipCritique && markdownByModel.size > 0) {
-      console.log('\n📊 Step 4: Parallel Critique');
-      console.log('──────────────────────────────────');
+      const maxAttempts = getCritiqueAndJudgeMaxAttempts();
 
-      const critiqueMap = await this.runParallelCritique(markdownByModel, job, jobId);
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const attemptLabel = maxAttempts > 1 ? ` (pass ${attempt}/${maxAttempts})` : '';
 
-      if (critiqueMap.size > 0) {
-        // Stamp ratings onto modelResults before table
+        console.log(`\n📊 Step 4: Parallel Critique${attemptLabel}`);
+        console.log('──────────────────────────────────');
+
+        const critiqueMap = await this.runParallelCritique(markdownByModel, job, jobId);
+
+        if (critiqueMap.size === 0) break;
+
+        // Stamp ratings onto modelResults
         for (const [label, data] of critiqueMap) {
           const r = modelResults.find(m => m.model === label);
           if (r) r.critiqueRating = data.rating;
         }
 
-        console.log('\n📝 Step 5: Parallel Regeneration with Recommendations');
+        console.log(`\n📝 Step 5: Parallel Regeneration with Recommendations${attemptLabel}`);
         console.log('──────────────────────────────────');
 
         const improvedResults = await this.runParallelGeneration(
           modelsToUse, classification, job, cvContent, critiqueMap
         );
 
-        console.log('\n🎨 Step 6: PDF Re-generation');
+        console.log(`\n🎨 Step 6: PDF Re-generation${attemptLabel}`);
         console.log('──────────────────────────────────');
 
         for (let i = 0; i < modelsToUse.length; i++) {
@@ -373,7 +380,7 @@ export class ParallelResumeOrchestrator {
           const result = improvedResults[i];
           const existing = modelResults.find(r => r.model === modelConfig.label);
 
-          if (!existing?.success) continue; // skip models that already failed
+          if (!existing?.success) continue;
 
           if (result.status === 'fulfilled' && result.value.success && result.value.result) {
             const genResult = result.value.result;
@@ -385,6 +392,8 @@ export class ParallelResumeOrchestrator {
               );
               existing.cost = (existing.cost ?? 0) + genResult.cost;
               existing.pdfPath = pdfPath;
+              // Update markdownByModel so next loop iteration critiques the improved version
+              markdownByModel.set(modelConfig.label, genResult.markdownContent);
               console.log(`✅ ${modelConfig.label}: improved PDF saved`);
             } catch (error) {
               console.log(`❌ ${modelConfig.label}: improved PDF generation failed`);
@@ -655,8 +664,11 @@ header-includes: |
     return ParallelResumeOrchestrator.YAML_HEADER + stripped;
   }
 
-  async regenParallelResumes(jobId: string): Promise<void> {
-    const comparisonsDir = path.join(this.getOutputDirectory(), 'Comparisons');
+  async regenParallelResumes(jobId: string, outputDir?: string): Promise<void> {
+    const baseDir = outputDir
+      ? (outputDir.startsWith('~/') ? path.join(os.homedir(), outputDir.slice(2)) : outputDir)
+      : this.getOutputDirectory();
+    const comparisonsDir = path.join(baseDir, 'Comparisons');
 
     if (!fs.existsSync(comparisonsDir)) {
       throw new Error(`No Comparisons folder found at ${comparisonsDir}`);

@@ -927,7 +927,7 @@ program
       const orchestrator = new ParallelResumeOrchestrator(configPath);
 
       if (options.regen) {
-        await orchestrator.regenParallelResumes(jobId);
+        await orchestrator.regenParallelResumes(jobId, options.output);
         return;
       }
 
