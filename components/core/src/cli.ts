@@ -8,7 +8,6 @@ import { ResumeCriticAgent } from './agents/resume-critic-agent';
 import { InterviewPrepAgent } from './agents/interview-prep-agent';
 import { OutreachAgent } from './agents/outreach-agent';
 import { MetricsAgent } from './agents/metrics-agent';
-import { ApplicationAgent } from './agents/application-agent';
 import { WhoGotHiredAgent } from './agents/whogothired-agent';
 import { ModeDetectorAgent } from './agents/mode-detector-agent';
 import { StatementType, AboutMeSection } from './types';
@@ -1514,61 +1513,6 @@ program
         console.log(`📄 Results saved to logs/${jobId}/metrics-*.json`);
       } else {
         console.error(`❌ Metrics extraction failed: ${result.error}`);
-        process.exit(1);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error:', error instanceof Error ? error.message : 'Unknown error');
-      process.exit(1);
-    }
-  });
-
-program
-  .command('apply')
-  .description('Fill out job application form using resume and interview prep data')
-  .argument('<jobId>', 'Job ID to use for resume and interview prep data')
-  .argument('<applicationUrl>', 'URL of the job application form')
-  .option('--dry-run', 'Open the form to inspect requirements without generating statements')
-  .option('--skip', 'Skip automatic interview prep statement generation if missing')
-  .action(async (jobId: string, applicationUrl: string, options: { dryRun?: boolean; skip?: boolean }) => {
-    try {
-      console.log('🎯 Starting job application process...');
-      console.log(`📋 Application URL: ${applicationUrl}`);
-      console.log(`📊 Job ID: ${jobId}`);
-      console.log('');
-
-      const openaiConfig = getConfig();
-      const anthropicConfig = getAnthropicConfig();
-      const applicationAgent = new ApplicationAgent(openaiConfig, anthropicConfig.anthropicApiKey, anthropicConfig.maxRoles);
-      
-      // Display mode information
-      if (options.dryRun) {
-        console.log('🔍 DRY RUN MODE: Will open form to inspect requirements without generating statements');
-        console.log('');
-      } else if (options.skip) {
-        console.log('⏭️  SKIP MODE: Will bypass automatic interview prep statement generation');
-        console.log('');
-      }
-
-      const result = await applicationAgent.fillApplication(applicationUrl, jobId, {
-        dryRun: options.dryRun || false,
-        skipGeneration: options.skip || false
-      });
-      
-      if (result.success) {
-        console.log('\n✅ Application Form Analysis Complete');
-        console.log('=' .repeat(80));
-        console.log('🔍 Form has been parsed and fields have been filled');
-        console.log('⚠️  IMPORTANT: Review all generated content before submitting!');
-        console.log('');
-        if (result.instructions) {
-          console.log('📋 Next Steps:');
-          console.log(result.instructions);
-        }
-        console.log('');
-        console.log(`📄 Session logged to: logs/${jobId}/application-*.json`);
-      } else {
-        console.error(`❌ Application filling failed: ${result.error}`);
         process.exit(1);
       }
       

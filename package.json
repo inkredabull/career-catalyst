@@ -22,7 +22,8 @@
     "setup:gdrive": "node scripts/setup-gdrive-symlinks.js",
     "archive:jobs": "node scripts/archive-jobs.js",
     "sheets:test": "ts-node scripts/test-sheets-integration.ts",
-    "sheets:add": "ts-node scripts/add-job-to-sheet.ts"
+    "sheets:add": "ts-node scripts/add-job-to-sheet.ts",
+    "apply": "ts-node components/apply/src/cli.ts"
   },
   "keywords": [
     "monorepo",

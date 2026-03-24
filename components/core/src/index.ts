@@ -1,5 +1,10 @@
 export { BaseAgent } from './agents/base-agent';
 export { JobExtractorAgent } from './agents/job-extractor-agent';
+export { ResumeCreatorAgent } from './agents/resume-creator-agent';
+export { InterviewPrepAgent } from './agents/interview-prep-agent';
+export { OutreachAgent } from './agents/outreach-agent';
 export { WebScraper } from './utils/web-scraper';
+export { resolveFromProjectRoot } from './utils/project-root';
 export * from './types';
-export { getConfig } from './config';
+export { getConfig, getAnthropicConfig } from './config';
+export type { LLMProvider, LLMProviderConfig, LLMRequest, LLMResponse, CostEstimate } from './providers/llm-provider';
