@@ -74,10 +74,17 @@ export class ParallelResumeOrchestrator {
   private classifierApiKey: string;
 
   constructor(configPath?: string) {
-    const resolvedPath = configPath || path.join(process.cwd(), 'parallel-config.json');
+    // Search order: explicit path → CWD → project root (handles workspace npm invocation)
+    const candidates = configPath
+      ? [configPath]
+      : [
+          path.join(process.cwd(), 'parallel-config.json'),
+          resolveFromProjectRoot('parallel-config.json')
+        ];
+    const resolvedPath = candidates.find(p => fs.existsSync(p)) ?? null;
 
     // Try to load config file, fall back to .env if not found
-    if (fs.existsSync(resolvedPath)) {
+    if (resolvedPath) {
       console.log(`📋 Loading config from: ${path.basename(resolvedPath)}`);
       const configContent = fs.readFileSync(resolvedPath, 'utf-8');
       this.config = JSON.parse(configContent);
