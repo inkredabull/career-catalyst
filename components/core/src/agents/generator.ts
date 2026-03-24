@@ -131,8 +131,12 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       console.log(`   Format: ${result.roleSelection.format}, Roles: ${result.roleSelection.rolesIncluded}`);
       console.log(`   Cost: $${response.cost.totalCost.toFixed(4)}`);
 
-      if (this.provider.supportsPromptCaching() && response.usage.cachedTokens && response.usage.cachedTokens > 0) {
-        console.log(`   Cache hit: ${response.usage.cachedTokens} tokens (savings: $${response.cost.cachingSavings.toFixed(4)})`);
+      if (this.provider.supportsPromptCaching()) {
+        if (response.usage.cachedTokens && response.usage.cachedTokens > 0) {
+          console.log(`   Cache hit: ${response.usage.cachedTokens} tokens (savings: $${response.cost.cachingSavings.toFixed(4)})`);
+        } else if (response.usage.cacheWriteTokens && response.usage.cacheWriteTokens > 0) {
+          console.log(`   Cache write: ${response.usage.cacheWriteTokens} tokens`);
+        }
       }
 
       return {

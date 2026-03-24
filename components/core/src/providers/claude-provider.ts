@@ -57,13 +57,16 @@ export class ClaudeProvider extends BaseLLMProvider {
       const usage = {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
-        cachedTokens: (response.usage as any).cache_read_input_tokens || 0
+        cachedTokens: (response.usage as any).cache_read_input_tokens || 0,
+        cacheWriteTokens: (response.usage as any).cache_creation_input_tokens || 0
       };
 
       // Log usage info
       const cacheInfo = usage.cachedTokens > 0
         ? ` (${usage.cachedTokens.toLocaleString()} from cache)`
-        : '';
+        : usage.cacheWriteTokens > 0
+          ? ` (${usage.cacheWriteTokens.toLocaleString()} written to cache)`
+          : '';
       console.log(`✅ Response received (${usage.inputTokens.toLocaleString()} input tokens, ${usage.outputTokens.toLocaleString()} output tokens${cacheInfo})`);
 
       return {
@@ -80,7 +83,7 @@ export class ClaudeProvider extends BaseLLMProvider {
     }
   }
 
-  calculateActualCost(usage: { inputTokens: number; outputTokens: number; cachedTokens?: number }): {
+  calculateActualCost(usage: { inputTokens: number; outputTokens: number; cachedTokens?: number; cacheWriteTokens?: number }): {
     inputCost: number;
     outputCost: number;
     cachingSavings: number;
@@ -89,26 +92,26 @@ export class ClaudeProvider extends BaseLLMProvider {
     // Claude Sonnet pricing: $3/MTok input, $15/MTok output
     // Claude Haiku pricing: $0.25/MTok input, $1.25/MTok output
     // Cache reads: 10% of input cost (90% savings)
+    // Cache writes: 125% of input cost
     const inputPricePerMTok = this.config.model.includes('haiku') ? 0.25 : 3;
     const outputPricePerMTok = this.config.model.includes('haiku') ? 1.25 : 15;
     const cacheReadPricePerMTok = inputPricePerMTok * 0.1;
+    const cacheWritePricePerMTok = inputPricePerMTok * 1.25;
 
-    const regularInputTokens = usage.inputTokens - (usage.cachedTokens || 0);
-    const cachedInputTokens = usage.cachedTokens || 0;
-
-    const regularInputCost = (regularInputTokens / 1_000_000) * inputPricePerMTok;
-    const cachedInputCost = (cachedInputTokens / 1_000_000) * cacheReadPricePerMTok;
+    // inputTokens = non-cached dynamic tokens (separate from cached/write tokens)
+    const regularInputCost = (usage.inputTokens / 1_000_000) * inputPricePerMTok;
+    const cacheReadCost = ((usage.cachedTokens || 0) / 1_000_000) * cacheReadPricePerMTok;
+    const cacheWriteCost = ((usage.cacheWriteTokens || 0) / 1_000_000) * cacheWritePricePerMTok;
     const outputCost = (usage.outputTokens / 1_000_000) * outputPricePerMTok;
 
-    // Calculate what we would have paid without caching
-    const fullInputCost = (usage.inputTokens / 1_000_000) * inputPricePerMTok;
-    const cachingSavings = fullInputCost - regularInputCost - cachedInputCost;
+    // Savings = what cache-read tokens would have cost at full rate vs discounted rate
+    const cachingSavings = ((usage.cachedTokens || 0) / 1_000_000) * (inputPricePerMTok - cacheReadPricePerMTok);
 
     return {
-      inputCost: regularInputCost + cachedInputCost,
+      inputCost: regularInputCost + cacheReadCost + cacheWriteCost,
       outputCost,
       cachingSavings,
-      totalCost: regularInputCost + cachedInputCost + outputCost
+      totalCost: regularInputCost + cacheReadCost + cacheWriteCost + outputCost
     };
   }
 

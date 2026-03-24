@@ -20,7 +20,8 @@ export interface LLMResponse {
   usage: {
     inputTokens: number;
     outputTokens: number;
-    cachedTokens?: number; // Only populated if caching was used
+    cachedTokens?: number;      // Cache READ tokens (billed at 10% of input rate)
+    cacheWriteTokens?: number;  // Cache WRITE tokens (billed at 125% of input rate)
   };
   cost: {
     inputCost: number;
@@ -47,7 +48,7 @@ export abstract class BaseLLMProvider {
   abstract makeRequest(request: LLMRequest): Promise<LLMResponse>;
   abstract supportsPromptCaching(): boolean;
   abstract estimateCost(request: LLMRequest): CostEstimate;
-  abstract calculateActualCost(usage: { inputTokens: number; outputTokens: number; cachedTokens?: number }): {
+  abstract calculateActualCost(usage: { inputTokens: number; outputTokens: number; cachedTokens?: number; cacheWriteTokens?: number }): {
     inputCost: number;
     outputCost: number;
     cachingSavings: number;

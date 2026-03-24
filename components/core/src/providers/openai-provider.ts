@@ -88,7 +88,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     }
   }
 
-  calculateActualCost(usage: { inputTokens: number; outputTokens: number; cachedTokens?: number }): {
+  calculateActualCost(usage: { inputTokens: number; outputTokens: number; cachedTokens?: number; cacheWriteTokens?: number }): {
     inputCost: number;
     outputCost: number;
     cachingSavings: number;
