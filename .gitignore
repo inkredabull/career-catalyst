@@ -1,3 +1,6 @@
+# Local resume staging output (generated artifacts, not committed)
+output/
+
 # Dependencies
 node_modules/
 npm-debug.log*

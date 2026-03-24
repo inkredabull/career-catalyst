@@ -5,6 +5,7 @@ import { ProviderFactory } from '../providers/provider-factory';
 import { JobListing } from '../types';
 import { LLMProviderConfig } from '../providers/llm-provider';
 import { getCritiqueAndJudgeMaxAttempts } from '../config';
+import { resolveFromProjectRoot } from '../utils/project-root';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -420,10 +421,26 @@ export class ParallelResumeOrchestrator {
     const metadataPath = path.join(comparisonFolder, 'comparison-metadata.json');
     fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
 
-    this.printResultsTable(modelResults, totalCost, comparisonFolder);
+    // Copy final PDFs to output dir (e.g. Google Drive) if different from staging
+    let openFolder = comparisonFolder;
+    if (this.getOutputDirectory() !== this.getStagingDirectory()) {
+      try {
+        const destFolder = this.copyPDFsToOutputDir(comparisonFolder);
+        console.log(`\n📤 PDFs copied to: ${destFolder}`);
+        openFolder = destFolder;
+      } catch (err) {
+        console.warn(`\n⚠️  Could not copy PDFs to output dir: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    this.printResultsTable(modelResults, totalCost, openFolder);
 
     if (failureCount > 0) {
       console.log(`\n⚠️  ${failureCount} model(s) failed - see metadata for details`);
+    }
+
+    if (process.platform === 'darwin') {
+      execSync(`open "${openFolder}"`);
     }
 
     return {
@@ -665,26 +682,31 @@ header-includes: |
   }
 
   async regenParallelResumes(jobId: string, outputDir?: string): Promise<void> {
-    const baseDir = outputDir
-      ? (outputDir.startsWith('~/') ? path.join(os.homedir(), outputDir.slice(2)) : outputDir)
-      : this.getOutputDirectory();
-    const comparisonsDir = path.join(baseDir, 'Comparisons');
+    // Search staging first (where .md files live), then fall back to output dir (Google Drive)
+    const stagingComparisons = path.join(this.getStagingDirectory(), 'Comparisons');
+    const outputComparisons = outputDir
+      ? path.join(outputDir.startsWith('~/') ? path.join(os.homedir(), outputDir.slice(2)) : outputDir, 'Comparisons')
+      : path.join(this.getOutputDirectory(), 'Comparisons');
 
-    if (!fs.existsSync(comparisonsDir)) {
-      throw new Error(`No Comparisons folder found at ${comparisonsDir}`);
+    const searchDirs = [stagingComparisons];
+    if (outputComparisons !== stagingComparisons) searchDirs.push(outputComparisons);
+
+    let folder: string | null = null;
+    for (const dir of searchDirs) {
+      if (!fs.existsSync(dir)) continue;
+      const match = fs.readdirSync(dir)
+        .filter(f => f.startsWith(jobId))
+        .map(f => ({ name: f, mtime: fs.statSync(path.join(dir, f)).mtime }))
+        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())[0];
+      if (match) {
+        folder = path.join(dir, match.name);
+        break;
+      }
     }
 
-    // Find most recent comparison folder for this jobId
-    const match = fs.readdirSync(comparisonsDir)
-      .filter(f => f.startsWith(jobId))
-      .map(f => ({ name: f, mtime: fs.statSync(path.join(comparisonsDir, f)).mtime }))
-      .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())[0];
-
-    if (!match) {
+    if (!folder) {
       throw new Error(`No comparison folder found for job ${jobId}. Run without --regen first.`);
     }
-
-    const folder = path.join(comparisonsDir, match.name);
     const mdFiles = fs.readdirSync(folder).filter(f => f.endsWith('.md'));
 
     if (mdFiles.length === 0) {
@@ -716,16 +738,37 @@ header-includes: |
       }
     }
 
-    this.printResultsTable(modelResults, 0, folder);
+    // Copy rebuilt PDFs to output dir (e.g. Google Drive) if different from staging
+    let openFolder = folder;
+    if (this.getOutputDirectory() !== this.getStagingDirectory()) {
+      try {
+        openFolder = this.copyPDFsToOutputDir(folder);
+        console.log(`\n📤 PDFs copied to: ${openFolder}`);
+      } catch (err) {
+        console.warn(`\n⚠️  Could not copy PDFs to output dir: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    this.printResultsTable(modelResults, 0, openFolder);
 
     if (process.platform === 'darwin') {
-      execSync(`open "${folder}"`);
+      execSync(`open "${openFolder}"`);
     }
   }
 
+  private getStagingDirectory(): string {
+    const envStaging = process.env.RESUME_STAGING_DIR;
+    if (envStaging) {
+      return envStaging.startsWith('~/')
+        ? path.join(os.homedir(), envStaging.slice(2))
+        : envStaging;
+    }
+    return resolveFromProjectRoot('output');
+  }
+
   private createComparisonFolder(jobId: string, company: string): string {
-    // Get output directory
-    const baseDir = this.getOutputDirectory();
+    // Generate to local staging dir — avoids FUSE/sync issues with Google Drive
+    const baseDir = this.getStagingDirectory();
 
     // Create Comparisons subdirectory
     const comparisonsDir = path.join(baseDir, 'Comparisons');
@@ -743,6 +786,21 @@ header-includes: |
     }
 
     return comparisonFolder;
+  }
+
+  /** Copy all PDFs from a staging comparison folder to the final output dir. Returns dest folder. */
+  private copyPDFsToOutputDir(stagingFolder: string): string {
+    const outputBase = this.getOutputDirectory();
+    const folderName = path.basename(stagingFolder);
+    const destFolder = path.join(outputBase, 'Comparisons', folderName);
+    fs.mkdirSync(destFolder, { recursive: true });
+
+    for (const file of fs.readdirSync(stagingFolder)) {
+      if (file.endsWith('.pdf')) {
+        fs.copyFileSync(path.join(stagingFolder, file), path.join(destFolder, file));
+      }
+    }
+    return destFolder;
   }
 
   private getOutputDirectory(): string {
