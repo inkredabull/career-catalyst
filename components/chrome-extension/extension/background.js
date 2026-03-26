@@ -1514,8 +1514,10 @@ async function handleLookupLinkedInCompany(request, sendResponse) {
 
     // Try to extract company ID from the search results
     // LinkedIn company URLs look like: /company/<company-id>/
+    // Filter out asset paths (e.g. /company/large-on-dark.svg/) — valid slugs never contain dots
     const companyIdRegex = /\/company\/([^\/\?"]+)\//g;
-    const matches = [...html.matchAll(companyIdRegex)];
+    const allMatches = [...html.matchAll(companyIdRegex)];
+    const matches = allMatches.filter(m => !m[1].includes('.'));
 
     console.log('  → Found', matches.length, 'potential company IDs');
 
@@ -1589,8 +1591,9 @@ async function handleGetCompanyStage(request, sendResponse) {
     const searchHtml = await searchResponse.text();
 
     // Extract company ID from search results
+    // Filter out asset paths (e.g. /company/large-on-dark.svg/) — valid slugs never contain dots
     const companyIdRegex = /\/company\/([^\/\?"]+)\//g;
-    const matches = [...searchHtml.matchAll(companyIdRegex)];
+    const matches = [...searchHtml.matchAll(companyIdRegex)].filter(m => !m[1].includes('.'));
 
     if (matches.length === 0) {
       console.log('  → No company found in search results');
