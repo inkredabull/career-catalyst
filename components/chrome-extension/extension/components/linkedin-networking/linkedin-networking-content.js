@@ -552,6 +552,61 @@ function outputAccumulatedResults() {
   paginationState.currentPage = 1;
 }
 
+// Custom overlay prompt — replaces confirm() which LinkedIn SPA navigation dismisses automatically
+function showExtractionPrompt(profileName, onConfirm, onCancel) {
+  // Remove any existing prompt
+  var existing = document.getElementById('cc-extraction-prompt');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'cc-extraction-prompt';
+  overlay.style.cssText = [
+    'position:fixed', 'top:0', 'left:0', 'width:100%', 'height:100%',
+    'background:rgba(0,0,0,0.55)', 'z-index:99999999',
+    'display:flex', 'align-items:center', 'justify-content:center',
+    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif'
+  ].join(';');
+
+  var box = document.createElement('div');
+  box.style.cssText = [
+    'background:#fff', 'border-radius:12px', 'padding:28px 32px',
+    'max-width:420px', 'width:90%', 'box-shadow:0 8px 32px rgba(0,0,0,0.25)',
+    'text-align:center'
+  ].join(';');
+
+  box.innerHTML = `
+    <div style="font-size:22px;margin-bottom:8px;">🔗</div>
+    <div style="font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:10px;">
+      Extract mutual connections for<br><span style="color:#0a66c2">${profileName}</span>?
+    </div>
+    <div style="font-size:13px;color:#555;margin-bottom:22px;line-height:1.5;">
+      This will navigate to the mutual connections page and extract the list of shared connections.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button id="cc-cancel-btn" style="padding:10px 24px;border-radius:20px;border:1px solid #ccc;background:#fff;color:#444;font-size:14px;cursor:pointer;">Skip</button>
+      <button id="cc-confirm-btn" style="padding:10px 24px;border-radius:20px;border:none;background:#0a66c2;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Extract</button>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  function cleanup() { overlay.remove(); }
+
+  document.getElementById('cc-confirm-btn').addEventListener('click', function() {
+    cleanup();
+    onConfirm();
+  });
+  document.getElementById('cc-cancel-btn').addEventListener('click', function() {
+    cleanup();
+    onCancel();
+  });
+  // Clicking the backdrop also cancels
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) { cleanup(); onCancel(); }
+  });
+}
+
 // Auto-detect LinkedIn profile pages and find mutual connections
 function checkForLinkedInProfile() {
   if (!linkedInNetworkingEnabled) {
@@ -583,23 +638,12 @@ function checkForLinkedInProfile() {
     setTimeout(() => {
       // Mark this profile as prompted to avoid duplicate dialogs
       promptedProfiles.add(profileUrl);
-
-      // Show confirmation dialog
-      const shouldExtract = confirm(
-        `Would you like to extract mutual connections for ${profileName}?\n\n` +
-        `This will:\n` +
-        `1. Navigate to the mutual connections page\n` +
-        `2. Extract the list of shared connections\n` +
-        `3. Display the results in the console\n\n` +
-        `Click OK to proceed or Cancel to skip.`
-      );
-
-      if (shouldExtract) {
+      showExtractionPrompt(profileName, () => {
         console.log('User confirmed - proceeding with mutual connections extraction');
         findAndClickMutualConnections();
-      } else {
+      }, () => {
         console.log('User cancelled mutual connections extraction');
-      }
+      });
     }, 3000);
   } else if (isSearchPage) {
     // Check if we're awaiting mutual connections extraction
