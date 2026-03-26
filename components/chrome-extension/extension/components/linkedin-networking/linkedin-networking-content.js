@@ -320,15 +320,22 @@ async function extractMutualConnectionNames() {
 
     // Strategy 1: Try to find mutual connection links in search results
     var selectors = [
-      // 2025+ LinkedIn with obfuscated classes - use stable data attributes
+      // 2026 LinkedIn - app-aware-link pattern (current most common structure)
+      'a.app-aware-link[href*="/in/"] span[aria-hidden="true"]',
+      // 2026 LinkedIn - artdeco entity lockup
+      '.artdeco-entity-lockup__title a span[aria-hidden="true"]',
+      '.artdeco-entity-lockup__title a',
+      // 2025/2026 data attribute patterns
+      '[data-chameleon-result-urn] a[href*="/in/"] span[aria-hidden="true"]',
+      '[data-chameleon-result-urn] a[href*="/in/"]',
+      // 2025+ stable data attributes
       'a[data-view-name="search-result-lockup-title"]',
       '[data-view-name="people-search-result"] a[href*="/in/"]',
-      // Modern LinkedIn search results (2024+)
+      // 2024 class-based patterns
       'li.reusable-search__result-container .entity-result__title-text a span[aria-hidden="true"]',
       '.search-results-container .entity-result__title-text a span[aria-hidden="true"]',
       '[data-chameleon-result-urn] .entity-result__title-text a span[aria-hidden="true"]',
       '.entity-result__item .entity-result__title-text a span[aria-hidden="true"]',
-      // Try without the nested span
       '.entity-result__title-text a[href*="/in/"]',
       // Older patterns
       '.t-16 a span>span:not(.visually-hidden)',
@@ -340,22 +347,40 @@ async function extractMutualConnectionNames() {
       console.log(`Trying selector "${selector}": found ${elements.length} elements`);
 
       if (elements.length > 0) {
-        // For link elements, get the text content
-        if (selector.includes('a[href')) {
-          nameElements = elements.map(el => ({
-            innerText: el.textContent || el.innerText || ''
-          }));
-        } else {
-          nameElements = elements;
+        var candidates = elements.map(el => ({
+          innerText: (el.textContent || el.innerText || '').trim()
+        })).filter(el => el.innerText.length > 0);
+        if (candidates.length > 0) {
+          nameElements = candidates;
+          console.log(`✓ Using selector: ${selector} (${nameElements.length} matches)`);
+          break;
         }
-        console.log(`✓ Using selector: ${selector} (${nameElements.length} matches)`);
-        break;
       }
+    }
+
+    // Fallback: collect all profile links from the main content area and deduplicate
+    if (nameElements.length === 0) {
+      console.log('Known selectors failed — trying profile-link fallback...');
+      var scope = document.querySelector('main, [role="main"], .scaffold-layout__main, .search-results-container') || document;
+      var seen = new Set();
+      nameElements = Array.from(scope.querySelectorAll('a[href*="/in/"]'))
+        .filter(function(a) {
+          var href = a.href || '';
+          if (seen.has(href)) return false;
+          seen.add(href);
+          var text = (a.textContent || a.innerText || '').trim();
+          return text.length >= 2 &&
+            !text.includes('linkedin.com') &&
+            !text.toLowerCase().includes('connect') &&
+            !text.toLowerCase().includes('message') &&
+            !text.toLowerCase().includes('follow');
+        })
+        .map(function(a) { return { innerText: (a.textContent || a.innerText || '').trim() }; });
+      console.log('Profile-link fallback found ' + nameElements.length + ' candidates');
     }
 
     if (nameElements.length === 0) {
       console.log('Could not find mutual connections with any known selector');
-      // Output accumulated results if any
       outputAccumulatedResults();
       return;
     }
