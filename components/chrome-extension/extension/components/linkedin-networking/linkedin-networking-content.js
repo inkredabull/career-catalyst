@@ -312,20 +312,31 @@ async function extractMutualConnectionNames() {
       paginationState.targetFirstName = targetFirstName;
     }
 
-    // Poll for results to appear — LinkedIn's React render can take several seconds
-    console.log('Waiting for LinkedIn search results to render (up to 8s)...');
-    var resultsReady = false;
-    for (var waitMs = 0; waitMs < 8000; waitMs += 500) {
-      if (document.querySelector('[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]')) {
-        console.log(`Results appeared after ~${waitMs}ms`);
-        resultsReady = true;
-        break;
+    // Wait for LinkedIn's React render using MutationObserver (more reliable than polling)
+    console.log('Waiting for LinkedIn search results to render (up to 20s)...');
+    var resultsReady = await new Promise(function(resolve) {
+      var RESULT_SELECTOR = '[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]';
+      // Check if already present
+      if (document.querySelector(RESULT_SELECTOR)) {
+        console.log('Results already present in DOM');
+        resolve(true);
+        return;
       }
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    if (!resultsReady) {
-      console.log('Results did not appear within 8s — attempting extraction anyway');
-    }
+      var timer = setTimeout(function() {
+        observer.disconnect();
+        console.log('Results did not appear within 20s — attempting extraction anyway');
+        resolve(false);
+      }, 20000);
+      var observer = new MutationObserver(function() {
+        if (document.querySelector(RESULT_SELECTOR)) {
+          clearTimeout(timer);
+          observer.disconnect();
+          console.log('Results detected via MutationObserver');
+          resolve(true);
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
 
     // Extract connections from current page
     var nameElements = [];
@@ -668,11 +679,11 @@ function checkForLinkedInProfile() {
       // Mark this URL as processed
       processedSearchPageUrl = url;
 
-      // Wait for LinkedIn's dynamic content to load before extraction
-      console.log('Waiting 2 seconds for content to load before extracting...');
+      // Kick off extraction — MutationObserver inside will wait for results
+      console.log('Triggering extraction (MutationObserver will wait for results)...');
       setTimeout(() => {
         extractMutualConnectionNames();
-      }, 2000);
+      }, 500);
     } else {
       console.log('No awaiting extraction flag found - user may have navigated here manually');
     }
@@ -936,7 +947,7 @@ function checkUrlChange() {
 
     // If we're awaiting mutual connections extraction and just landed on the search page, run immediately
     const awaitingExtraction = localStorage.getItem('linkedin_awaiting_mutual_connections');
-    const isMutualConnectionsPage = newUrl.includes('/search/results/') && newUrl.includes('facetConnectionOf');
+    const isMutualConnectionsPage = newUrl.includes('/search/results/') && (newUrl.includes('connectionOf') || newUrl.includes('facetConnectionOf'));
 
     if (awaitingExtraction === 'true' && isMutualConnectionsPage) {
       console.log('Detected navigation to mutual connections page - triggering checks immediately');

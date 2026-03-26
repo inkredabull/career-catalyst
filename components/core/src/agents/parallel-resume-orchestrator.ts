@@ -303,6 +303,9 @@ export class ParallelResumeOrchestrator {
     // Generate PDFs for successful results; track markdown for critique phase
     const modelResults: ModelResult[] = [];
     const markdownByModel = new Map<string, string>();
+    // Cache candidate name per model from first generation; reused on regen passes
+    // to prevent filename drift when the model returns a placeholder like [Last Name]
+    const candidateNameByModel = new Map<string, string>();
     let totalGenerationCost = 0;
 
     for (let i = 0; i < generatorResults.length; i++) {
@@ -318,7 +321,8 @@ export class ParallelResumeOrchestrator {
             genResult.markdownContent,
             job,
             modelConfig.label,
-            comparisonFolder
+            comparisonFolder,
+            candidateNameByModel
           );
 
           modelResults.push({
@@ -396,7 +400,7 @@ export class ParallelResumeOrchestrator {
 
             try {
               const pdfPath = await this.generatePDF(
-                genResult.markdownContent, job, modelConfig.label, comparisonFolder
+                genResult.markdownContent, job, modelConfig.label, comparisonFolder, candidateNameByModel
               );
               existing.cost = (existing.cost ?? 0) + genResult.cost;
               existing.pdfPath = pdfPath;
@@ -830,13 +834,18 @@ header-includes: |
     markdownContent: string,
     job: JobListing,
     modelLabel: string,
-    outputDir: string
+    outputDir: string,
+    candidateNameByModel?: Map<string, string>
   ): Promise<string> {
     const fullMarkdown = ParallelResumeOrchestrator.YAML_HEADER + markdownContent;
 
-    // Generate filename base (shared between .md source and .pdf output)
-    const candidateName = this.extractCandidateName(markdownContent);
+    // Use cached name for regen passes to prevent filename drift when model returns a placeholder
     const sanitize = (s: string) => s.replace(/[|<>:"/\\?*\x00-\x1f]/g, '').replace(/\s+/g, ' ').trim();
+    let candidateName = candidateNameByModel?.get(modelLabel);
+    if (!candidateName) {
+      candidateName = this.extractCandidateName(markdownContent);
+      candidateNameByModel?.set(modelLabel, candidateName);
+    }
     const baseName = `[${sanitize(modelLabel)}] ${sanitize(candidateName)} for ${sanitize(job.title)} at ${sanitize(job.company)}`;
 
     // Persist markdown source before pandoc — survives PDF generation failures
