@@ -20,6 +20,7 @@ import * as fss from 'fs';
 import { execSync } from 'child_process';
 import * as readline from 'readline';
 import { createSheetsLogger } from './integrations/sheets-logger';
+import { resolveFromProjectRoot } from './utils/project-root';
 
 // Helper function to find CV file automatically
 async function findCvFile(): Promise<string> {
@@ -458,7 +459,7 @@ program
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       
       // Create job-specific subdirectory
-      const jobDir = path.join('logs', jobId);
+      const jobDir = resolveFromProjectRoot('logs', jobId);
       await fs.mkdir(jobDir, { recursive: true });
       
       const logFileName = `job-${timestamp}.json`;
@@ -489,7 +490,7 @@ program
         
         // Check if job already has a score >= 65
         try {
-          const jobDir = path.resolve('logs', jobId);
+          const jobDir = resolveFromProjectRoot('logs', jobId);
           if (fss.existsSync(jobDir)) {
             const files = fss.readdirSync(jobDir);
             const scoreFiles = files.filter(f => f.startsWith('score-') && f.endsWith('.json'));
@@ -617,8 +618,8 @@ program
       console.log(`📊 Job ID: ${jobId}`);
       console.log('');
 
-      const jobDir = path.join('logs', jobId);
-      
+      const jobDir = resolveFromProjectRoot('logs', jobId);
+
       // Check if job directory exists
       try {
         await fs.access(jobDir);
@@ -670,8 +671,8 @@ program
   .option('-v, --verbose', 'Show additional details for each job')
   .action(async (options) => {
     try {
-      const logsDir = path.join(process.cwd(), 'logs');
-      
+      const logsDir = resolveFromProjectRoot('logs');
+
       // Check if logs directory exists
       try {
         await fs.access(logsDir);
@@ -880,7 +881,7 @@ program
 
 // Helper function to load job data from logs
 async function loadJobData(jobId: string) {
-  const logsDir = path.join(process.cwd(), 'logs');
+  const logsDir = resolveFromProjectRoot('logs');
   const jobDir = path.join(logsDir, jobId);
 
   // Try to find job file in subdirectory first
@@ -931,7 +932,7 @@ program
       }
 
       // Load job data
-      const logsDir = path.join(process.cwd(), 'logs');
+      const logsDir = resolveFromProjectRoot('logs');
       const jobDir = path.join(logsDir, jobId);
 
       if (!fss.existsSync(jobDir)) {
