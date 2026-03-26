@@ -306,6 +306,7 @@ async function extractMutualConnectionNames() {
     if (!paginationState.isExtracting) {
       paginationState.isExtracting = true;
       paginationState.allResults = [];
+      paginationState.seenNames = new Set();
       paginationState.currentPage = 1;
       paginationState.targetProfileUrl = targetProfileUrl;
       paginationState.targetFirstName = targetFirstName;
@@ -358,25 +359,30 @@ async function extractMutualConnectionNames() {
       }
     }
 
-    // Fallback: collect all profile links from the main content area and deduplicate
+    // Fallback: target the search results list items directly to avoid picking up sidebar/profile cards
     if (nameElements.length === 0) {
-      console.log('Known selectors failed — trying profile-link fallback...');
-      var scope = document.querySelector('main, [role="main"], .scaffold-layout__main, .search-results-container') || document;
-      var seen = new Set();
-      nameElements = Array.from(scope.querySelectorAll('a[href*="/in/"]'))
-        .filter(function(a) {
-          var href = a.href || '';
-          if (seen.has(href)) return false;
-          seen.add(href);
-          var text = (a.textContent || a.innerText || '').trim();
-          return text.length >= 2 &&
-            !text.includes('linkedin.com') &&
-            !text.toLowerCase().includes('connect') &&
-            !text.toLowerCase().includes('message') &&
-            !text.toLowerCase().includes('follow');
-        })
-        .map(function(a) { return { innerText: (a.textContent || a.innerText || '').trim() }; });
-      console.log('Profile-link fallback found ' + nameElements.length + ' candidates');
+      console.log('Known selectors failed — trying list-item fallback...');
+      // Find the UL that contains the search result items (not aside/sidebar panels)
+      var resultsList = document.querySelector(
+        '.reusable-search__entity-result-list, ' +
+        '.search-results-container ul, ' +
+        'main ul[class*="list"]'
+      );
+      if (resultsList) {
+        var seenHrefs = new Set();
+        resultsList.querySelectorAll('li').forEach(function(li) {
+          var profileLink = li.querySelector('a[href*="/in/"]');
+          if (!profileLink) return;
+          var href = profileLink.href || '';
+          if (seenHrefs.has(href)) return;
+          seenHrefs.add(href);
+          // Prefer the aria-hidden name span (just the name, not headline+degree)
+          var nameSpan = profileLink.querySelector('span[aria-hidden="true"]');
+          var text = ((nameSpan || profileLink).textContent || '').trim();
+          if (text.length >= 2) nameElements.push({ innerText: text });
+        });
+        console.log('List-item fallback found ' + nameElements.length + ' candidates');
+      }
     }
 
     if (nameElements.length === 0) {
@@ -385,11 +391,13 @@ async function extractMutualConnectionNames() {
       return;
     }
 
-    // Add current page results to accumulated results
+    // Add current page results to accumulated results (deduplicated)
+    if (!paginationState.seenNames) paginationState.seenNames = new Set();
     console.log(`Page ${paginationState.currentPage}: Found ${nameElements.length} connections`);
     nameElements.forEach((element) => {
       var mutualConnectionName = element.innerText.trim();
-      if (mutualConnectionName && mutualConnectionName.length > 0) {
+      if (mutualConnectionName && mutualConnectionName.length > 0 && !paginationState.seenNames.has(mutualConnectionName)) {
+        paginationState.seenNames.add(mutualConnectionName);
         paginationState.allResults.push(mutualConnectionName);
       }
     });
@@ -444,13 +452,13 @@ function findNextPageButton() {
     }
   }
 
-  // Also try finding by text content
-  var allButtons = document.querySelectorAll('button');
-  for (var button of allButtons) {
-    var buttonText = button.innerText || button.textContent || '';
-    if (buttonText.toLowerCase().includes('next') && !button.disabled) {
-      console.log('Found next button by text content');
-      return button;
+  // Scope to the pagination container only to avoid false matches
+  var paginationContainer = document.querySelector('.artdeco-pagination, [data-test-pagination]');
+  if (paginationContainer) {
+    var btn = paginationContainer.querySelector('button[aria-label="Next"], button[aria-label="next"]');
+    if (btn && !btn.disabled && !btn.classList.contains('artdeco-button--disabled')) {
+      console.log('Found next button inside pagination container');
+      return btn;
     }
   }
 
@@ -535,6 +543,7 @@ function outputAccumulatedResults() {
   // Reset pagination state
   paginationState.isExtracting = false;
   paginationState.allResults = [];
+  paginationState.seenNames = new Set();
   paginationState.currentPage = 1;
 }
 
