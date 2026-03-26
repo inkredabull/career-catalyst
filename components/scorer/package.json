@@ -1,0 +1,27 @@
+{
+  "name": "@inkredabull/career-catalyst-scorer",
+  "version": "1.0.0",
+  "description": "Score job descriptions against Anthony Bull's VP Eng / CTO profile",
+  "main": "dist/index.js",
+  "bin": {
+    "career-catalyst-scorer": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/cli.ts",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.55.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
