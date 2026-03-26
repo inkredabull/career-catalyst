@@ -56,7 +56,7 @@ export const FLAGS = {
 // Per-subject-line flag overrides
 // Keys can be exact subject matches or regex patterns
 export const SUBJECT_LINE_FLAGS: Record<string, Partial<typeof FLAGS>> = {
-  'Get your help for role as {{JobTitleShorthand}} at {{Company}}?': { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
+  'Get your help for role as {{JobTitleShorthand}} at {{Company}}?': { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
   'Need some fractional ENG help?': { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
   'Q1 2026 latest-and-greatest': { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
 } as const;
