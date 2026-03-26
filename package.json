@@ -24,7 +24,7 @@
     "sheets:test": "ts-node scripts/test-sheets-integration.ts",
     "sheets:add": "ts-node scripts/add-job-to-sheet.ts",
     "apply": "ts-node components/apply/src/cli.ts",
-    "score": "ts-node components/scorer/src/cli.ts"
+    "assess": "ts-node components/scorer/src/cli.ts"
   },
   "keywords": [
     "monorepo",
