@@ -312,76 +312,81 @@ async function extractMutualConnectionNames() {
       paginationState.targetFirstName = targetFirstName;
     }
 
-    // Wait for LinkedIn's dynamic content to load
-    console.log('Waiting 1 second for LinkedIn content to load...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Poll for results to appear — LinkedIn's React render can take several seconds
+    console.log('Waiting for LinkedIn search results to render (up to 8s)...');
+    var resultsReady = false;
+    for (var waitMs = 0; waitMs < 8000; waitMs += 500) {
+      if (document.querySelector('[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]')) {
+        console.log(`Results appeared after ~${waitMs}ms`);
+        resultsReady = true;
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    if (!resultsReady) {
+      console.log('Results did not appear within 8s — attempting extraction anyway');
+    }
 
     // Extract connections from current page
     var nameElements = [];
 
-    // Strategy 1: Try to find mutual connection links in search results
-    var selectors = [
-      // 2026 LinkedIn - app-aware-link pattern (current most common structure)
-      'a.app-aware-link[href*="/in/"] span[aria-hidden="true"]',
-      // 2026 LinkedIn - artdeco entity lockup
-      '.artdeco-entity-lockup__title a span[aria-hidden="true"]',
-      '.artdeco-entity-lockup__title a',
-      // 2025/2026 data attribute patterns
-      '[data-chameleon-result-urn] a[href*="/in/"] span[aria-hidden="true"]',
-      '[data-chameleon-result-urn] a[href*="/in/"]',
-      // 2025+ stable data attributes
-      'a[data-view-name="search-result-lockup-title"]',
-      '[data-view-name="people-search-result"] a[href*="/in/"]',
-      // 2024 class-based patterns
-      'li.reusable-search__result-container .entity-result__title-text a span[aria-hidden="true"]',
-      '.search-results-container .entity-result__title-text a span[aria-hidden="true"]',
-      '[data-chameleon-result-urn] .entity-result__title-text a span[aria-hidden="true"]',
-      '.entity-result__item .entity-result__title-text a span[aria-hidden="true"]',
-      '.entity-result__title-text a[href*="/in/"]',
-      // Older patterns
-      '.t-16 a span>span:not(.visually-hidden)',
-      'div.mb1 a span>span:not(.visually-hidden)'
-    ];
+    // Primary: target each result item by stable data attribute, extract name from the
+    // name link's span[dir="ltr"] > span[aria-hidden="true"] (observed in 2026 DOM)
+    var resultItems = Array.from(document.querySelectorAll(
+      '[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]'
+    ));
+    console.log(`Found ${resultItems.length} result items via data attribute`);
 
-    for (var selector of selectors) {
-      var elements = Array.from(document.querySelectorAll(selector));
-      console.log(`Trying selector "${selector}": found ${elements.length} elements`);
-
-      if (elements.length > 0) {
-        var candidates = elements.map(el => ({
-          innerText: (el.textContent || el.innerText || '').trim()
-        })).filter(el => el.innerText.length > 0);
-        if (candidates.length > 0) {
-          nameElements = candidates;
-          console.log(`✓ Using selector: ${selector} (${nameElements.length} matches)`);
-          break;
+    if (resultItems.length > 0) {
+      var seenHrefs = new Set();
+      resultItems.forEach(function(item) {
+        // Find all profile links in this result item
+        var links = Array.from(item.querySelectorAll('a[data-test-app-aware-link][href*="/in/"], a[href*="/in/"]'));
+        for (var link of links) {
+          var href = link.href || '';
+          if (seenHrefs.has(href)) continue;
+          // Look for span[dir="ltr"] > span[aria-hidden="true"] which holds just the name
+          var nameSpan = link.querySelector('span[dir="ltr"] span[aria-hidden="true"]') ||
+                         link.querySelector('span[aria-hidden="true"]');
+          if (!nameSpan) continue;
+          var text = (nameSpan.textContent || '').replace(/<!---->/g, '').trim();
+          // Skip degree badges ("• 1st", "• 2nd"), empty strings, and UI labels
+          if (!text || text.startsWith('•') || text.toLowerCase().includes('view ')) continue;
+          seenHrefs.add(href);
+          nameElements.push({ innerText: text });
+          break; // one name per result item
         }
+      });
+      if (nameElements.length > 0) {
+        console.log(`✓ Extracted ${nameElements.length} names via data-attribute item approach`);
       }
     }
 
-    // Fallback: target the search results list items directly to avoid picking up sidebar/profile cards
+    // Fallback: try legacy class-based selectors
     if (nameElements.length === 0) {
-      console.log('Known selectors failed — trying list-item fallback...');
-      // Find the UL that contains the search result items (not aside/sidebar panels)
-      var resultsList = document.querySelector(
-        '.reusable-search__entity-result-list, ' +
-        '.search-results-container ul, ' +
-        'main ul[class*="list"]'
-      );
-      if (resultsList) {
-        var seenHrefs = new Set();
-        resultsList.querySelectorAll('li').forEach(function(li) {
-          var profileLink = li.querySelector('a[href*="/in/"]');
-          if (!profileLink) return;
-          var href = profileLink.href || '';
-          if (seenHrefs.has(href)) return;
-          seenHrefs.add(href);
-          // Prefer the aria-hidden name span (just the name, not headline+degree)
-          var nameSpan = profileLink.querySelector('span[aria-hidden="true"]');
-          var text = ((nameSpan || profileLink).textContent || '').trim();
-          if (text.length >= 2) nameElements.push({ innerText: text });
-        });
-        console.log('List-item fallback found ' + nameElements.length + ' candidates');
+      var legacySelectors = [
+        '.artdeco-entity-lockup__title a span[aria-hidden="true"]',
+        'a[data-view-name="search-result-lockup-title"]',
+        '[data-view-name="people-search-result"] a[href*="/in/"]',
+        'li.reusable-search__result-container .entity-result__title-text a span[aria-hidden="true"]',
+        '.search-results-container .entity-result__title-text a span[aria-hidden="true"]',
+        '.entity-result__title-text a[href*="/in/"]',
+        '.t-16 a span>span:not(.visually-hidden)',
+        'div.mb1 a span>span:not(.visually-hidden)'
+      ];
+      for (var selector of legacySelectors) {
+        var elements = Array.from(document.querySelectorAll(selector));
+        console.log(`Trying selector "${selector}": found ${elements.length} elements`);
+        if (elements.length > 0) {
+          var candidates = elements.map(function(el) {
+            return { innerText: (el.textContent || el.innerText || '').replace(/<!---->/g, '').trim() };
+          }).filter(function(el) { return el.innerText.length > 0; });
+          if (candidates.length > 0) {
+            nameElements = candidates;
+            console.log(`✓ Using legacy selector: ${selector} (${nameElements.length} matches)`);
+            break;
+          }
+        }
       }
     }
 
