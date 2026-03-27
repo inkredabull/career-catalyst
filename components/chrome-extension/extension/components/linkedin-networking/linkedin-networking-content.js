@@ -462,39 +462,33 @@ async function extractMutualConnectionNames() {
 
 function findNextPageButton(searchDoc) {
   var doc = searchDoc || document;
-  // Try multiple selectors for LinkedIn's next page button
-  var nextButtonSelectors = [
+  var nextPageNum = paginationState.currentPage + 1;
+
+  // Primary: LinkedIn uses numbered page buttons (aria-label="Page N")
+  var numbered = doc.querySelector(`button[aria-label="Page ${nextPageNum}"]`);
+  if (numbered && !numbered.disabled) {
+    console.log(`Found page ${nextPageNum} button via aria-label`);
+    return numbered;
+  }
+
+  // Fallbacks for other LinkedIn pagination styles
+  var fallbackSelectors = [
     'button[aria-label="Next"]',
     'button[aria-label="next"]',
     '.artdeco-pagination__button--next',
-    'button.artdeco-pagination__button.artdeco-pagination__button--next',
-    '[data-test-pagination-page-btn="next"]',
-    'button:has(> li-icon[type="chevron-right-icon"])'
+    '[data-test-pagination-page-btn="next"]'
   ];
-
-  for (var selector of nextButtonSelectors) {
+  for (var selector of fallbackSelectors) {
     try {
       var button = doc.querySelector(selector);
       if (button && !button.disabled && !button.classList.contains('artdeco-button--disabled')) {
-        console.log(`Found next button with selector: ${selector}`);
+        console.log(`Found next button via fallback selector: ${selector}`);
         return button;
       }
-    } catch (e) {
-      continue;
-    }
+    } catch (e) { continue; }
   }
 
-  // Scope to the pagination container only to avoid false matches
-  var paginationContainer = doc.querySelector('.artdeco-pagination, [data-test-pagination]');
-  if (paginationContainer) {
-    var btn = paginationContainer.querySelector('button[aria-label="Next"], button[aria-label="next"]');
-    if (btn && !btn.disabled && !btn.classList.contains('artdeco-button--disabled')) {
-      console.log('Found next button inside pagination container');
-      return btn;
-    }
-  }
-
-  console.log('No next page button found');
+  console.log(`No button found for page ${nextPageNum}`);
   return null;
 }
 
