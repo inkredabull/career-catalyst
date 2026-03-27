@@ -432,7 +432,9 @@ async function extractMutualConnectionNames() {
     });
 
     // Check if there's a next page button
+    console.log('Checking for next page button...');
     var nextPageButton = await findNextPageButton(searchDoc);
+    console.log('findNextPageButton resolved:', nextPageButton ? 'found' : 'null');
 
     if (nextPageButton) {
       console.log(`Found next page button, navigating to page ${paginationState.currentPage + 1}...`);
@@ -464,6 +466,7 @@ async function extractMutualConnectionNames() {
 async function findNextPageButton(searchDoc) {
   var doc = searchDoc || document;
   var nextPageNum = paginationState.currentPage + 1;
+  console.log('findNextPageButton entered, looking for page', nextPageNum, 'doc is iframe:', doc !== document);
 
   // Pagination renders after results — poll up to 5s for it to appear
   var deadline = Date.now() + 5000;
