@@ -464,35 +464,40 @@ async function extractMutualConnectionNames() {
 }
 
 async function findNextPageButton(searchDoc) {
-  var doc = searchDoc || document;
   var nextPageNum = paginationState.currentPage + 1;
-  console.log('findNextPageButton entered, looking for page', nextPageNum, 'doc is iframe:', doc !== document);
+  // Results are in the iframe; pagination controls are in the top-level document.
+  // Check both, top-level first.
+  var docsToSearch = [document];
+  if (searchDoc && searchDoc !== document) docsToSearch.push(searchDoc);
 
-  // Pagination renders after results — poll up to 5s for it to appear
+  console.log('findNextPageButton: looking for page', nextPageNum);
+
   var deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
-    // Primary: <li data-test-pagination-page-btn="N"> → button
-    var li = doc.querySelector(`[data-test-pagination-page-btn="${nextPageNum}"]`);
-    if (li) {
-      var btn = li.querySelector('button');
-      if (btn && !btn.disabled) {
-        console.log(`Found page ${nextPageNum} button via data-test-pagination-page-btn`);
-        return btn;
+    for (var d of docsToSearch) {
+      var li = d.querySelector(`[data-test-pagination-page-btn="${nextPageNum}"]`);
+      if (li) {
+        var btn = li.querySelector('button');
+        if (btn && !btn.disabled) {
+          console.log(`Found page ${nextPageNum} button in ${d === document ? 'top-level' : 'iframe'} doc`);
+          return btn;
+        }
       }
-    }
-    // Secondary: aria-label
-    var numbered = doc.querySelector(`button[aria-label="Page ${nextPageNum}"]`);
-    if (numbered && !numbered.disabled) {
-      console.log(`Found page ${nextPageNum} button via aria-label`);
-      return numbered;
+      var numbered = d.querySelector(`button[aria-label="Page ${nextPageNum}"]`);
+      if (numbered && !numbered.disabled) {
+        console.log(`Found page ${nextPageNum} button (aria-label) in ${d === document ? 'top-level' : 'iframe'} doc`);
+        return numbered;
+      }
     }
     await new Promise(r => setTimeout(r, 300));
   }
 
-  // Log what's actually present to aid future debugging
-  var allPageBtns = doc.querySelectorAll('[data-test-pagination-page-btn]');
-  console.log(`No page ${nextPageNum} button after 5s. Pagination li count: ${allPageBtns.length}`,
-    Array.from(allPageBtns).map(el => el.getAttribute('data-test-pagination-page-btn')));
+  // Diagnostic: show what pagination is visible in each doc
+  docsToSearch.forEach(function(d) {
+    var btns = d.querySelectorAll('[data-test-pagination-page-btn]');
+    console.log(`${d === document ? 'top-level' : 'iframe'} pagination li count: ${btns.length}`,
+      Array.from(btns).map(el => el.getAttribute('data-test-pagination-page-btn')));
+  });
   return null;
 }
 
