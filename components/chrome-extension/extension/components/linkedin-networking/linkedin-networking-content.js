@@ -361,21 +361,17 @@ async function extractMutualConnectionNames() {
       if (iframe) {
         try {
           var iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-          if (iDoc) { console.log('Timeout — using interop-iframe document anyway'); return iDoc; }
+          if (iDoc) return iDoc;
         } catch(e) {}
       }
-      console.log('Timeout — falling back to top-level document');
       return document;
     }
 
     var searchDoc;
     if (paginationState.searchDoc) {
       searchDoc = paginationState.searchDoc;
-      console.log('Using cached searchDoc');
     } else {
-      console.log('Waiting for search results (up to 10s, checks top-level + interop-iframe)...');
       searchDoc = await findSearchDocument(10000);
-      console.log(`searchDoc resolved: ${searchDoc === document ? 'top-level document' : 'iframe document'}`);
       paginationState.searchDoc = searchDoc;
     }
 
@@ -385,7 +381,6 @@ async function extractMutualConnectionNames() {
     // Primary: target each result item by stable data attribute, extract name from the
     // name link's span[dir="ltr"] > span[aria-hidden="true"] (observed in 2026 DOM)
     var resultItems = Array.from(searchDoc.querySelectorAll(RESULT_SELECTOR));
-    console.log(`Found ${resultItems.length} result items via data attribute`);
 
     if (resultItems.length > 0) {
       var seenHrefs = new Set();
@@ -407,9 +402,6 @@ async function extractMutualConnectionNames() {
           break; // one name per result item
         }
       });
-      if (nameElements.length > 0) {
-        console.log(`✓ Extracted ${nameElements.length} names via data-attribute item approach`);
-      }
     }
 
     // Fallback: try legacy class-based selectors
@@ -426,14 +418,12 @@ async function extractMutualConnectionNames() {
       ];
       for (var selector of legacySelectors) {
         var elements = Array.from(searchDoc.querySelectorAll(selector));
-        console.log(`Trying selector "${selector}": found ${elements.length} elements`);
         if (elements.length > 0) {
           var candidates = elements.map(function(el) {
             return { innerText: (el.textContent || el.innerText || '').replace(/<!---->/g, '').trim() };
           }).filter(function(el) { return el.innerText.length > 0; });
           if (candidates.length > 0) {
             nameElements = candidates;
-            console.log(`✓ Using legacy selector: ${selector} (${nameElements.length} matches)`);
             break;
           }
         }
