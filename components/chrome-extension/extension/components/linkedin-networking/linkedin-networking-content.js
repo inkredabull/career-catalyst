@@ -484,39 +484,47 @@ async function extractMutualConnectionNames() {
   }
 }
 
+function getAllSearchableDocs() {
+  var docs = [document];
+  Array.from(document.querySelectorAll('iframe')).forEach(function(f) {
+    try {
+      var d = f.contentDocument || (f.contentWindow && f.contentWindow.document);
+      if (d && d !== document) docs.push(d);
+    } catch(e) {}
+  });
+  return docs;
+}
+
 async function findNextPageButton(searchDoc) {
   var nextPageNum = paginationState.currentPage + 1;
-  // Results are in the iframe; pagination controls are in the top-level document.
-  // Check both, top-level first.
-  var docsToSearch = [document];
-  if (searchDoc && searchDoc !== document) docsToSearch.push(searchDoc);
-
   console.log('findNextPageButton: looking for page', nextPageNum);
 
   var deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
-    for (var d of docsToSearch) {
+    for (var d of getAllSearchableDocs()) {
       var li = d.querySelector(`[data-test-pagination-page-btn="${nextPageNum}"]`);
       if (li) {
         var btn = li.querySelector('button');
         if (btn && !btn.disabled) {
-          console.log(`Found page ${nextPageNum} button in ${d === document ? 'top-level' : 'iframe'} doc`);
+          console.log(`Found page ${nextPageNum} button via data-test-pagination-page-btn`);
           return btn;
         }
       }
       var numbered = d.querySelector(`button[aria-label="Page ${nextPageNum}"]`);
       if (numbered && !numbered.disabled) {
-        console.log(`Found page ${nextPageNum} button (aria-label) in ${d === document ? 'top-level' : 'iframe'} doc`);
+        console.log(`Found page ${nextPageNum} button via aria-label`);
         return numbered;
       }
     }
     await new Promise(r => setTimeout(r, 300));
   }
 
-  // Diagnostic: show what pagination is visible in each doc
-  docsToSearch.forEach(function(d) {
+  // Diagnostic: dump all iframes and their pagination state
+  console.log('Iframes on page:', Array.from(document.querySelectorAll('iframe')).map(f => f.src || f.getAttribute('src') || '(no src)'));
+  getAllSearchableDocs().forEach(function(d, i) {
     var btns = d.querySelectorAll('[data-test-pagination-page-btn]');
-    console.log(`${d === document ? 'top-level' : 'iframe'} pagination li count: ${btns.length}`,
+    var ariabtns = d.querySelectorAll('button[aria-label^="Page "]');
+    console.log(`doc[${i}] pagination li: ${btns.length}, aria-label page btns: ${ariabtns.length}`,
       Array.from(btns).map(el => el.getAttribute('data-test-pagination-page-btn')));
   });
   return null;
