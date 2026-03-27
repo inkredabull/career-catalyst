@@ -351,6 +351,7 @@ async function extractMutualConnectionNames() {
 
     console.log('Waiting for search results (up to 10s, checks top-level + interop-iframe)...');
     var searchDoc = await findSearchDocument(10000);
+    console.log(`searchDoc resolved: ${searchDoc === document ? 'top-level document' : 'iframe document'}`);
 
     // Extract connections from current page
     var nameElements = [];
@@ -463,29 +464,35 @@ async function extractMutualConnectionNames() {
 function findNextPageButton(searchDoc) {
   var doc = searchDoc || document;
   var nextPageNum = paginationState.currentPage + 1;
+  var isIframe = doc !== document;
+  console.log(`findNextPageButton: looking for page ${nextPageNum}, doc is ${isIframe ? 'iframe' : 'top-level'}`);
 
-  // Primary: LinkedIn uses numbered page buttons (aria-label="Page N")
+  // Primary: find the <li data-test-pagination-page-btn="N"> then its button
+  var li = doc.querySelector(`[data-test-pagination-page-btn="${nextPageNum}"]`);
+  if (li) {
+    var btn = li.querySelector('button');
+    if (btn && !btn.disabled) {
+      console.log(`Found page ${nextPageNum} button via data-test-pagination-page-btn`);
+      return btn;
+    }
+  }
+
+  // Secondary: aria-label
   var numbered = doc.querySelector(`button[aria-label="Page ${nextPageNum}"]`);
   if (numbered && !numbered.disabled) {
     console.log(`Found page ${nextPageNum} button via aria-label`);
     return numbered;
   }
 
-  // Fallbacks for other LinkedIn pagination styles
-  var fallbackSelectors = [
-    'button[aria-label="Next"]',
-    'button[aria-label="next"]',
-    '.artdeco-pagination__button--next',
-    '[data-test-pagination-page-btn="next"]'
-  ];
-  for (var selector of fallbackSelectors) {
-    try {
-      var button = doc.querySelector(selector);
-      if (button && !button.disabled && !button.classList.contains('artdeco-button--disabled')) {
-        console.log(`Found next button via fallback selector: ${selector}`);
-        return button;
-      }
-    } catch (e) { continue; }
+  // Log what pagination elements are actually present to aid debugging
+  var allPageBtns = doc.querySelectorAll('[data-test-pagination-page-btn]');
+  console.log(`Pagination li count: ${allPageBtns.length}`, Array.from(allPageBtns).map(el => el.getAttribute('data-test-pagination-page-btn')));
+
+  // Fallback: artdeco Next button
+  var nextBtn = doc.querySelector('.artdeco-pagination__button--next, button[aria-label="Next"]');
+  if (nextBtn && !nextBtn.disabled && !nextBtn.classList.contains('artdeco-button--disabled')) {
+    console.log('Found next button via artdeco selector');
+    return nextBtn;
   }
 
   console.log(`No button found for page ${nextPageNum}`);
