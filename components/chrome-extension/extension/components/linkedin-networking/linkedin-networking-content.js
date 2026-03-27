@@ -303,15 +303,32 @@ async function extractMutualConnectionNames() {
 
     console.log(`Extracted first name from URL: "${targetFirstName}"`);
 
-    // Initialize pagination state on first extraction
+    // Initialize pagination state — restore from localStorage if resuming after URL navigation
     if (!paginationState.isExtracting) {
-      paginationState.isExtracting = true;
-      paginationState.allResults = [];
-      paginationState.seenNames = new Set();
-      paginationState.currentPage = 1;
-      paginationState.targetProfileUrl = targetProfileUrl;
-      paginationState.targetFirstName = targetFirstName;
-      paginationState.searchDoc = null;
+      var savedState = localStorage.getItem('linkedin_pagination_state');
+      if (savedState) {
+        try {
+          var s = JSON.parse(savedState);
+          paginationState.isExtracting = true;
+          paginationState.allResults = s.allResults || [];
+          paginationState.seenNames = new Set(s.seenNames || []);
+          paginationState.currentPage = s.currentPage || 1;
+          paginationState.targetProfileUrl = s.targetProfileUrl || targetProfileUrl;
+          paginationState.targetFirstName = s.targetFirstName || targetFirstName;
+          paginationState.searchDoc = null;
+          localStorage.removeItem('linkedin_pagination_state');
+          console.log(`Resuming pagination: page ${paginationState.currentPage}, ${paginationState.allResults.length} results so far`);
+        } catch(e) { savedState = null; }
+      }
+      if (!savedState) {
+        paginationState.isExtracting = true;
+        paginationState.allResults = [];
+        paginationState.seenNames = new Set();
+        paginationState.currentPage = 1;
+        paginationState.targetProfileUrl = targetProfileUrl;
+        paginationState.targetFirstName = targetFirstName;
+        paginationState.searchDoc = null;
+      }
     }
 
     // LinkedIn renders its SPA content inside a full-viewport same-origin iframe
@@ -440,41 +457,26 @@ async function extractMutualConnectionNames() {
       }
     });
 
-    // Check if there's a next page button
-    console.log('Checking for next page button...');
-    var nextPageButton = await findNextPageButton(searchDoc);
-    console.log('findNextPageButton resolved:', nextPageButton ? 'found' : 'null');
+    // Paginate via URL (?page=N) — far more reliable than hunting DOM pagination buttons
+    if (nameElements.length > 0) {
+      var nextPageNum = paginationState.currentPage + 1;
+      var nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('page', nextPageNum);
 
-    if (nextPageButton) {
-      console.log(`Navigating to page ${paginationState.currentPage + 1}...`);
-      paginationState.currentPage++;
+      // Persist accumulated state across the page navigation
+      localStorage.setItem('linkedin_pagination_state', JSON.stringify({
+        allResults: paginationState.allResults,
+        seenNames: Array.from(paginationState.seenNames),
+        currentPage: nextPageNum,
+        targetProfileUrl: paginationState.targetProfileUrl,
+        targetFirstName: paginationState.targetFirstName
+      }));
+      localStorage.setItem('linkedin_awaiting_mutual_connections', 'true');
 
-      // Fingerprint the first result so we can detect when the page has actually changed
-      var firstItem = searchDoc.querySelector(RESULT_SELECTOR);
-      var fingerprint = firstItem ? (firstItem.getAttribute('data-chameleon-result-urn') || firstItem.textContent.trim().slice(0, 60)) : null;
-      console.log('Page fingerprint before click:', fingerprint ? fingerprint.slice(0, 40) : 'none');
-
-      nextPageButton.click();
-
-      // Wait until results are present AND different from the previous page (up to 8s)
-      await new Promise(r => setTimeout(r, 200));
-      var changeDeadline = Date.now() + 8000;
-      while (Date.now() < changeDeadline) {
-        var newFirst = searchDoc.querySelector(RESULT_SELECTOR);
-        if (newFirst) {
-          var newFingerprint = newFirst.getAttribute('data-chameleon-result-urn') || newFirst.textContent.trim().slice(0, 60);
-          if (newFingerprint !== fingerprint) {
-            console.log('New page content loaded:', newFingerprint.slice(0, 40));
-            break;
-          }
-        }
-        await new Promise(r => setTimeout(r, 300));
-      }
-
-      extractMutualConnectionNames();
+      console.log(`Navigating to page ${nextPageNum}: ${nextUrl.toString()}`);
+      window.location.href = nextUrl.toString();
     } else {
-      // No more pages, output all accumulated results
-      console.log('No more pages found. Outputting all results...');
+      console.log('No results on this page — extraction complete.');
       outputAccumulatedResults();
     }
 
@@ -484,61 +486,6 @@ async function extractMutualConnectionNames() {
   }
 }
 
-function getAllSearchableDocs(root, visited) {
-  if (!visited) visited = new Set();
-  var baseDoc = root || document;
-  if (visited.has(baseDoc)) return [];
-  visited.add(baseDoc);
-  var docs = [baseDoc];
-  try {
-    Array.from(baseDoc.querySelectorAll('iframe')).forEach(function(f) {
-      try {
-        var d = f.contentDocument || (f.contentWindow && f.contentWindow.document);
-        if (d && !visited.has(d)) {
-          docs = docs.concat(getAllSearchableDocs(d, visited));
-        }
-      } catch(e) {}
-    });
-  } catch(e) {}
-  return docs;
-}
-
-async function findNextPageButton(searchDoc) {
-  var nextPageNum = paginationState.currentPage + 1;
-  console.log('findNextPageButton: looking for page', nextPageNum);
-
-  var deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    for (var d of getAllSearchableDocs()) {
-      var li = d.querySelector(`[data-test-pagination-page-btn="${nextPageNum}"]`);
-      if (li) {
-        var btn = li.querySelector('button');
-        if (btn && !btn.disabled) {
-          console.log(`Found page ${nextPageNum} button via data-test-pagination-page-btn`);
-          return btn;
-        }
-      }
-      var numbered = d.querySelector(`button[aria-label="Page ${nextPageNum}"]`);
-      if (numbered && !numbered.disabled) {
-        console.log(`Found page ${nextPageNum} button via aria-label`);
-        return numbered;
-      }
-    }
-    await new Promise(r => setTimeout(r, 300));
-  }
-
-  // Diagnostic: dump all reachable docs and their pagination state
-  var allDocs = getAllSearchableDocs();
-  console.log(`Total searchable docs (recursive): ${allDocs.length}`);
-  allDocs.forEach(function(d, i) {
-    var btns = d.querySelectorAll('[data-test-pagination-page-btn]');
-    var ariabtns = d.querySelectorAll('button[aria-label^="Page "]');
-    var iframes = d.querySelectorAll('iframe');
-    console.log(`doc[${i}] iframes:${iframes.length} pagination-li:${btns.length} aria-page-btns:${ariabtns.length}`,
-      Array.from(btns).map(el => el.getAttribute('data-test-pagination-page-btn')));
-  });
-  return null;
-}
 
 function outputAccumulatedResults() {
   if (paginationState.allResults.length === 0) {
