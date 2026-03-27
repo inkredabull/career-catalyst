@@ -432,7 +432,7 @@ async function extractMutualConnectionNames() {
     });
 
     // Check if there's a next page button
-    var nextPageButton = findNextPageButton(searchDoc);
+    var nextPageButton = await findNextPageButton(searchDoc);
 
     if (nextPageButton) {
       console.log(`Found next page button, navigating to page ${paginationState.currentPage + 1}...`);
@@ -461,41 +461,35 @@ async function extractMutualConnectionNames() {
   }
 }
 
-function findNextPageButton(searchDoc) {
+async function findNextPageButton(searchDoc) {
   var doc = searchDoc || document;
   var nextPageNum = paginationState.currentPage + 1;
-  var isIframe = doc !== document;
-  console.log(`findNextPageButton: looking for page ${nextPageNum}, doc is ${isIframe ? 'iframe' : 'top-level'}`);
 
-  // Primary: find the <li data-test-pagination-page-btn="N"> then its button
-  var li = doc.querySelector(`[data-test-pagination-page-btn="${nextPageNum}"]`);
-  if (li) {
-    var btn = li.querySelector('button');
-    if (btn && !btn.disabled) {
-      console.log(`Found page ${nextPageNum} button via data-test-pagination-page-btn`);
-      return btn;
+  // Pagination renders after results — poll up to 5s for it to appear
+  var deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    // Primary: <li data-test-pagination-page-btn="N"> → button
+    var li = doc.querySelector(`[data-test-pagination-page-btn="${nextPageNum}"]`);
+    if (li) {
+      var btn = li.querySelector('button');
+      if (btn && !btn.disabled) {
+        console.log(`Found page ${nextPageNum} button via data-test-pagination-page-btn`);
+        return btn;
+      }
     }
+    // Secondary: aria-label
+    var numbered = doc.querySelector(`button[aria-label="Page ${nextPageNum}"]`);
+    if (numbered && !numbered.disabled) {
+      console.log(`Found page ${nextPageNum} button via aria-label`);
+      return numbered;
+    }
+    await new Promise(r => setTimeout(r, 300));
   }
 
-  // Secondary: aria-label
-  var numbered = doc.querySelector(`button[aria-label="Page ${nextPageNum}"]`);
-  if (numbered && !numbered.disabled) {
-    console.log(`Found page ${nextPageNum} button via aria-label`);
-    return numbered;
-  }
-
-  // Log what pagination elements are actually present to aid debugging
+  // Log what's actually present to aid future debugging
   var allPageBtns = doc.querySelectorAll('[data-test-pagination-page-btn]');
-  console.log(`Pagination li count: ${allPageBtns.length}`, Array.from(allPageBtns).map(el => el.getAttribute('data-test-pagination-page-btn')));
-
-  // Fallback: artdeco Next button
-  var nextBtn = doc.querySelector('.artdeco-pagination__button--next, button[aria-label="Next"]');
-  if (nextBtn && !nextBtn.disabled && !nextBtn.classList.contains('artdeco-button--disabled')) {
-    console.log('Found next button via artdeco selector');
-    return nextBtn;
-  }
-
-  console.log(`No button found for page ${nextPageNum}`);
+  console.log(`No page ${nextPageNum} button after 5s. Pagination li count: ${allPageBtns.length}`,
+    Array.from(allPageBtns).map(el => el.getAttribute('data-test-pagination-page-btn')));
   return null;
 }
 
