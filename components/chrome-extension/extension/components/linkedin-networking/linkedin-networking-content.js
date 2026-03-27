@@ -312,11 +312,13 @@ async function extractMutualConnectionNames() {
       paginationState.targetFirstName = targetFirstName;
     }
 
-    // Wait for LinkedIn's React render using MutationObserver (more reliable than polling)
-    console.log('Waiting for LinkedIn search results to render (up to 20s)...');
+    // Wait for LinkedIn's React render.
+    // LinkedIn SSR delivers <li> nodes in the initial HTML then stamps data attributes
+    // during hydration — attribute mutations, not childList. We observe both.
+    console.log('Waiting for LinkedIn search results to render (up to 10s)...');
+    var RESULT_SELECTOR = '[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]';
     var resultsReady = await new Promise(function(resolve) {
-      var RESULT_SELECTOR = '[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]';
-      // Check if already present
+      // Check if already present (full-page load with SSR)
       if (document.querySelector(RESULT_SELECTOR)) {
         console.log('Results already present in DOM');
         resolve(true);
@@ -324,9 +326,9 @@ async function extractMutualConnectionNames() {
       }
       var timer = setTimeout(function() {
         observer.disconnect();
-        console.log('Results did not appear within 20s — attempting extraction anyway');
+        console.log('Results did not appear within 10s — attempting extraction anyway');
         resolve(false);
-      }, 20000);
+      }, 10000);
       var observer = new MutationObserver(function() {
         if (document.querySelector(RESULT_SELECTOR)) {
           clearTimeout(timer);
@@ -335,7 +337,13 @@ async function extractMutualConnectionNames() {
           resolve(true);
         }
       });
-      observer.observe(document.body, { childList: true, subtree: true });
+      // childList catches client-side rendered nodes; attributes catches SSR hydration
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-chameleon-result-urn', 'data-view-name']
+      });
     });
 
     // Extract connections from current page
@@ -343,9 +351,7 @@ async function extractMutualConnectionNames() {
 
     // Primary: target each result item by stable data attribute, extract name from the
     // name link's span[dir="ltr"] > span[aria-hidden="true"] (observed in 2026 DOM)
-    var resultItems = Array.from(document.querySelectorAll(
-      '[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]'
-    ));
+    var resultItems = Array.from(document.querySelectorAll(RESULT_SELECTOR));
     console.log(`Found ${resultItems.length} result items via data attribute`);
 
     if (resultItems.length > 0) {
