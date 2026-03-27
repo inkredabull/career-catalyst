@@ -312,46 +312,52 @@ async function extractMutualConnectionNames() {
       paginationState.targetFirstName = targetFirstName;
     }
 
-    // Wait for LinkedIn's React render.
-    // LinkedIn SSR delivers <li> nodes in the initial HTML then stamps data attributes
-    // during hydration — attribute mutations, not childList. We observe both.
-    console.log('Waiting for LinkedIn search results to render (up to 10s)...');
+    // LinkedIn renders its SPA content inside a full-viewport same-origin iframe
+    // (data-testid="interop-iframe", src="/preload/"). We must query that document.
     var RESULT_SELECTOR = '[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]';
-    var resultsReady = await new Promise(function(resolve) {
-      // Check if already present (full-page load with SSR)
-      if (document.querySelector(RESULT_SELECTOR)) {
-        console.log('Results already present in DOM');
-        resolve(true);
-        return;
-      }
-      var timer = setTimeout(function() {
-        observer.disconnect();
-        console.log('Results did not appear within 10s — attempting extraction anyway');
-        resolve(false);
-      }, 10000);
-      var observer = new MutationObserver(function() {
-        if (document.querySelector(RESULT_SELECTOR)) {
-          clearTimeout(timer);
-          observer.disconnect();
-          console.log('Results detected via MutationObserver');
-          resolve(true);
+
+    async function findSearchDocument(timeoutMs) {
+      var deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        // Prefer the interop iframe LinkedIn uses for SPA content
+        var iframe = document.querySelector('iframe[data-testid="interop-iframe"]');
+        if (iframe) {
+          try {
+            var iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+            if (iDoc && iDoc.querySelector(RESULT_SELECTOR)) {
+              console.log('Found results in interop-iframe');
+              return iDoc;
+            }
+          } catch(e) { /* cross-origin guard, shouldn't happen for linkedin.com */ }
         }
-      });
-      // childList catches client-side rendered nodes; attributes catches SSR hydration
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['data-chameleon-result-urn', 'data-view-name']
-      });
-    });
+        // Fallback: top-level document (for non-iframe renders)
+        if (document.querySelector(RESULT_SELECTOR)) {
+          console.log('Found results in top-level document');
+          return document;
+        }
+        await new Promise(function(r) { setTimeout(r, 300); });
+      }
+      // Timeout — return whatever we have
+      var iframe = document.querySelector('iframe[data-testid="interop-iframe"]');
+      if (iframe) {
+        try {
+          var iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+          if (iDoc) { console.log('Timeout — using interop-iframe document anyway'); return iDoc; }
+        } catch(e) {}
+      }
+      console.log('Timeout — falling back to top-level document');
+      return document;
+    }
+
+    console.log('Waiting for search results (up to 10s, checks top-level + interop-iframe)...');
+    var searchDoc = await findSearchDocument(10000);
 
     // Extract connections from current page
     var nameElements = [];
 
     // Primary: target each result item by stable data attribute, extract name from the
     // name link's span[dir="ltr"] > span[aria-hidden="true"] (observed in 2026 DOM)
-    var resultItems = Array.from(document.querySelectorAll(RESULT_SELECTOR));
+    var resultItems = Array.from(searchDoc.querySelectorAll(RESULT_SELECTOR));
     console.log(`Found ${resultItems.length} result items via data attribute`);
 
     if (resultItems.length > 0) {
@@ -392,7 +398,7 @@ async function extractMutualConnectionNames() {
         'div.mb1 a span>span:not(.visually-hidden)'
       ];
       for (var selector of legacySelectors) {
-        var elements = Array.from(document.querySelectorAll(selector));
+        var elements = Array.from(searchDoc.querySelectorAll(selector));
         console.log(`Trying selector "${selector}": found ${elements.length} elements`);
         if (elements.length > 0) {
           var candidates = elements.map(function(el) {
@@ -425,7 +431,7 @@ async function extractMutualConnectionNames() {
     });
 
     // Check if there's a next page button
-    var nextPageButton = findNextPageButton();
+    var nextPageButton = findNextPageButton(searchDoc);
 
     if (nextPageButton) {
       console.log(`Found next page button, navigating to page ${paginationState.currentPage + 1}...`);
@@ -450,7 +456,8 @@ async function extractMutualConnectionNames() {
   }
 }
 
-function findNextPageButton() {
+function findNextPageButton(searchDoc) {
+  var doc = searchDoc || document;
   // Try multiple selectors for LinkedIn's next page button
   var nextButtonSelectors = [
     'button[aria-label="Next"]',
@@ -463,19 +470,18 @@ function findNextPageButton() {
 
   for (var selector of nextButtonSelectors) {
     try {
-      var button = document.querySelector(selector);
+      var button = doc.querySelector(selector);
       if (button && !button.disabled && !button.classList.contains('artdeco-button--disabled')) {
         console.log(`Found next button with selector: ${selector}`);
         return button;
       }
     } catch (e) {
-      // Some selectors might fail, continue to next
       continue;
     }
   }
 
   // Scope to the pagination container only to avoid false matches
-  var paginationContainer = document.querySelector('.artdeco-pagination, [data-test-pagination]');
+  var paginationContainer = doc.querySelector('.artdeco-pagination, [data-test-pagination]');
   if (paginationContainer) {
     var btn = paginationContainer.querySelector('button[aria-label="Next"], button[aria-label="next"]');
     if (btn && !btn.disabled && !btn.classList.contains('artdeco-button--disabled')) {
