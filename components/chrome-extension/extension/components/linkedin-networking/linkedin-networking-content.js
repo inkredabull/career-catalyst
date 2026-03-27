@@ -484,14 +484,22 @@ async function extractMutualConnectionNames() {
   }
 }
 
-function getAllSearchableDocs() {
-  var docs = [document];
-  Array.from(document.querySelectorAll('iframe')).forEach(function(f) {
-    try {
-      var d = f.contentDocument || (f.contentWindow && f.contentWindow.document);
-      if (d && d !== document) docs.push(d);
-    } catch(e) {}
-  });
+function getAllSearchableDocs(root, visited) {
+  if (!visited) visited = new Set();
+  var baseDoc = root || document;
+  if (visited.has(baseDoc)) return [];
+  visited.add(baseDoc);
+  var docs = [baseDoc];
+  try {
+    Array.from(baseDoc.querySelectorAll('iframe')).forEach(function(f) {
+      try {
+        var d = f.contentDocument || (f.contentWindow && f.contentWindow.document);
+        if (d && !visited.has(d)) {
+          docs = docs.concat(getAllSearchableDocs(d, visited));
+        }
+      } catch(e) {}
+    });
+  } catch(e) {}
   return docs;
 }
 
@@ -519,12 +527,14 @@ async function findNextPageButton(searchDoc) {
     await new Promise(r => setTimeout(r, 300));
   }
 
-  // Diagnostic: dump all iframes and their pagination state
-  console.log('Iframes on page:', Array.from(document.querySelectorAll('iframe')).map(f => f.src || f.getAttribute('src') || '(no src)'));
-  getAllSearchableDocs().forEach(function(d, i) {
+  // Diagnostic: dump all reachable docs and their pagination state
+  var allDocs = getAllSearchableDocs();
+  console.log(`Total searchable docs (recursive): ${allDocs.length}`);
+  allDocs.forEach(function(d, i) {
     var btns = d.querySelectorAll('[data-test-pagination-page-btn]');
     var ariabtns = d.querySelectorAll('button[aria-label^="Page "]');
-    console.log(`doc[${i}] pagination li: ${btns.length}, aria-label page btns: ${ariabtns.length}`,
+    var iframes = d.querySelectorAll('iframe');
+    console.log(`doc[${i}] iframes:${iframes.length} pagination-li:${btns.length} aria-page-btns:${ariabtns.length}`,
       Array.from(btns).map(el => el.getAttribute('data-test-pagination-page-btn')));
   });
   return null;
