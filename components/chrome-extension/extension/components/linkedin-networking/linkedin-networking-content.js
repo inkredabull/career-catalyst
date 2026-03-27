@@ -17,7 +17,8 @@ let paginationState = {
   allResults: [],
   currentPage: 1,
   targetProfileUrl: '',
-  targetFirstName: ''
+  targetFirstName: '',
+  searchDoc: null   // cached once on first page, reused for all subsequent pages
 };
 
 // Settings
@@ -310,6 +311,7 @@ async function extractMutualConnectionNames() {
       paginationState.currentPage = 1;
       paginationState.targetProfileUrl = targetProfileUrl;
       paginationState.targetFirstName = targetFirstName;
+      paginationState.searchDoc = null;
     }
 
     // LinkedIn renders its SPA content inside a full-viewport same-origin iframe
@@ -349,9 +351,16 @@ async function extractMutualConnectionNames() {
       return document;
     }
 
-    console.log('Waiting for search results (up to 10s, checks top-level + interop-iframe)...');
-    var searchDoc = await findSearchDocument(10000);
-    console.log(`searchDoc resolved: ${searchDoc === document ? 'top-level document' : 'iframe document'}`);
+    var searchDoc;
+    if (paginationState.searchDoc) {
+      searchDoc = paginationState.searchDoc;
+      console.log('Using cached searchDoc');
+    } else {
+      console.log('Waiting for search results (up to 10s, checks top-level + interop-iframe)...');
+      searchDoc = await findSearchDocument(10000);
+      console.log(`searchDoc resolved: ${searchDoc === document ? 'top-level document' : 'iframe document'}`);
+      paginationState.searchDoc = searchDoc;
+    }
 
     // Extract connections from current page
     var nameElements = [];
@@ -437,19 +446,29 @@ async function extractMutualConnectionNames() {
     console.log('findNextPageButton resolved:', nextPageButton ? 'found' : 'null');
 
     if (nextPageButton) {
-      console.log(`Found next page button, navigating to page ${paginationState.currentPage + 1}...`);
+      console.log(`Navigating to page ${paginationState.currentPage + 1}...`);
       paginationState.currentPage++;
+
+      // Fingerprint the first result so we can detect when the page has actually changed
+      var firstItem = searchDoc.querySelector(RESULT_SELECTOR);
+      var fingerprint = firstItem ? (firstItem.getAttribute('data-chameleon-result-urn') || firstItem.textContent.trim().slice(0, 60)) : null;
+      console.log('Page fingerprint before click:', fingerprint ? fingerprint.slice(0, 40) : 'none');
+
       nextPageButton.click();
 
-      // Phase 1: wait for the old results to clear (avoids re-extracting stale page)
-      await new Promise(r => setTimeout(r, 300));
-      var clearDeadline = Date.now() + 4000;
-      while (Date.now() < clearDeadline && searchDoc.querySelector(RESULT_SELECTOR)) {
-        await new Promise(r => setTimeout(r, 200));
+      // Wait until the content changes (new page loaded), up to 8s
+      await new Promise(r => setTimeout(r, 200));
+      var changeDeadline = Date.now() + 8000;
+      while (Date.now() < changeDeadline) {
+        var newFirst = searchDoc.querySelector(RESULT_SELECTOR);
+        var newFingerprint = newFirst ? (newFirst.getAttribute('data-chameleon-result-urn') || newFirst.textContent.trim().slice(0, 60)) : null;
+        if (newFingerprint !== fingerprint) {
+          console.log('Content changed — new page detected');
+          break;
+        }
+        await new Promise(r => setTimeout(r, 300));
       }
-      console.log('Old results cleared — waiting for next page...');
 
-      // Phase 2: findSearchDocument in the next call will wait for fresh results
       extractMutualConnectionNames();
     } else {
       // No more pages, output all accumulated results
