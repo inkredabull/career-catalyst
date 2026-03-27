@@ -436,14 +436,18 @@ async function extractMutualConnectionNames() {
     if (nextPageButton) {
       console.log(`Found next page button, navigating to page ${paginationState.currentPage + 1}...`);
       paginationState.currentPage++;
-
-      // Click the next button and wait for page to load
       nextPageButton.click();
 
-      // Wait for the next page to load, then continue extraction
-      setTimeout(() => {
-        extractMutualConnectionNames();
-      }, 3000);
+      // Phase 1: wait for the old results to clear (avoids re-extracting stale page)
+      await new Promise(r => setTimeout(r, 300));
+      var clearDeadline = Date.now() + 4000;
+      while (Date.now() < clearDeadline && searchDoc.querySelector(RESULT_SELECTOR)) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+      console.log('Old results cleared — waiting for next page...');
+
+      // Phase 2: findSearchDocument in the next call will wait for fresh results
+      extractMutualConnectionNames();
     } else {
       // No more pages, output all accumulated results
       console.log('No more pages found. Outputting all results...');
