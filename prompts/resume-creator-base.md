@@ -237,11 +237,11 @@ The general structure MUST be (in this exact order):
 
 ## Heading
 
-Lead with "<CANDIDATE NAME>" (name only, no title or role after name).
+Lead with the candidate's full name as extracted from the CV (name only, no title or role after name).
 
 ## Contact Information
 
-<CITY> | <PHONE> | <EMAIL> | <LINKEDIN>
+Format as: City | Phone | Email | LinkedIn URL — all extracted from the CV.
 
 ## Summary
 

@@ -64,11 +64,11 @@ The general structure should be:
 
 ## Heading
 
-Lead with "<CANDIDATE NAME> : ROLE" where role is the role from the job description.
+Lead with the candidate's full name (from the CV) followed by a colon and the role from the job description.
 
 ## Contact Information
 
-<CITY> | <PHONE> | <EMAIL> | <LINKEDIN>
+Format as: City | Phone | Email | LinkedIn URL — all extracted from the CV.
 
 ## Summary
 
