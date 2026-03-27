@@ -456,15 +456,17 @@ async function extractMutualConnectionNames() {
 
       nextPageButton.click();
 
-      // Wait until the content changes (new page loaded), up to 8s
+      // Wait until results are present AND different from the previous page (up to 8s)
       await new Promise(r => setTimeout(r, 200));
       var changeDeadline = Date.now() + 8000;
       while (Date.now() < changeDeadline) {
         var newFirst = searchDoc.querySelector(RESULT_SELECTOR);
-        var newFingerprint = newFirst ? (newFirst.getAttribute('data-chameleon-result-urn') || newFirst.textContent.trim().slice(0, 60)) : null;
-        if (newFingerprint !== fingerprint) {
-          console.log('Content changed — new page detected');
-          break;
+        if (newFirst) {
+          var newFingerprint = newFirst.getAttribute('data-chameleon-result-urn') || newFirst.textContent.trim().slice(0, 60);
+          if (newFingerprint !== fingerprint) {
+            console.log('New page content loaded:', newFingerprint.slice(0, 40));
+            break;
+          }
         }
         await new Promise(r => setTimeout(r, 300));
       }
