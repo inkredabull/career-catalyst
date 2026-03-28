@@ -26,7 +26,7 @@ function blurb(): readonly string[] {
 
 function sendWarmup(): void {
   const row: Record<string, string> = { [COLS.RECIPIENT]: requireProp(SCRIPT_PROPS.MY_EMAIL) };
-  sendViaGmail(row, { subject: 'Morning Warmup', text: pickRandomContacts(), html: '' }, null);
+  sendViaGmail(row, { subject: 'Morning Warmup', text: pickRandomContacts(), html: '' }, null); // warmup never has SEND_SMS flag; return value is always null
 }
 
 // ── Outreach message generation ───────────────────────────────────────────────

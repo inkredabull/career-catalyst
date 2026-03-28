@@ -24,46 +24,65 @@ interface SendParams {
 
 // ── LinkedIn DM modal ─────────────────────────────────────────────────────────
 
-const showLinkedInMessageDialog = (linkedInUrl: string, message: string, firstName: string): void => {
-  const urlJson = JSON.stringify(linkedInUrl);
-  const msgJson = JSON.stringify(message);
-  const title = `LinkedIn DM${firstName ? ` — ${firstName}` : ''}`;
+interface LinkedInContact {
+  url: string;
+  message: string;
+  firstName: string;
+}
+
+/** Shows a single paged modal for one or more LinkedIn contacts (Prev/Next navigation). */
+const showLinkedInMultiDialog = (contacts: LinkedInContact[]): void => {
+  const contactsJson = JSON.stringify(contacts);
+  const count = contacts.length;
   const html = `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:380px}
-h3{margin:0 0 10px}
-.open-btn{display:block;width:100%;padding:8px;margin-bottom:12px;font-size:13px;cursor:pointer;background:#0a66c2;color:#fff;border:none;border-radius:4px;text-align:center}
+h3{margin:0 0 4px}
+.nav{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.nav button{padding:4px 10px;cursor:pointer}
+.counter{font-size:13px;color:#555;flex:1;text-align:center}
+.open-btn{display:block;width:100%;padding:8px;margin-bottom:10px;font-size:13px;cursor:pointer;background:#0a66c2;color:#fff;border:none;border-radius:4px;text-align:center}
 .open-btn:hover{background:#004182}
-.no-url{color:#888;font-size:13px;margin-bottom:12px}
+.no-url{color:#888;font-size:13px;margin-bottom:10px}
 p{margin:0 0 4px;font-size:13px}
-textarea{width:100%;height:110px;font-size:13px;padding:8px;box-sizing:border-box;resize:vertical}
-.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+textarea{width:100%;height:100px;font-size:13px;padding:8px;box-sizing:border-box;resize:vertical}
+.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
 button{padding:6px 16px;cursor:pointer}
 </style></head><body>
-<h3>LinkedIn DM</h3>
-<script>
-var url=${urlJson};
-var msg=${msgJson};
-if(url){document.write('<button class="open-btn" onclick="window.open(url,\\'_blank\\')">Open LinkedIn Profile ↗</button>');}
-else{document.write('<p class="no-url">(No LinkedIn URL found — open manually)</p>');}
-document.addEventListener('DOMContentLoaded',function(){document.getElementById('msg').value=msg;});
-function copyMsg(){
-  var t=document.getElementById('msg');
-  t.select();
-  document.execCommand('copy');
-  t.blur();
-}
-</script>
+<h3 id="title">LinkedIn DM</h3>
+<div class="nav">
+  <button onclick="prev()">&#9664;</button>
+  <span class="counter" id="counter"></span>
+  <button onclick="next()">&#9654;</button>
+</div>
+<div id="link-area"></div>
 <p>Message:</p>
 <textarea id="msg" readonly></textarea>
 <div class="btns">
 <button onclick="copyMsg()">Copy Message</button>
-<button onclick="google.script.host.close()">Close</button>
+<button onclick="google.script.host.close()">Done</button>
 </div>
+<script>
+var contacts=${contactsJson};
+var idx=0;
+function render(){
+  var c=contacts[idx];
+  document.getElementById('title').textContent='LinkedIn DM'+(c.firstName?' \u2014 '+c.firstName:'');
+  document.getElementById('counter').textContent=(idx+1)+' of '+contacts.length;
+  document.getElementById('msg').value=c.message;
+  var la=document.getElementById('link-area');
+  if(c.url){la.innerHTML='<button class="open-btn" onclick="window.open('+JSON.stringify(c.url)+',\\'_blank\\')">Open LinkedIn Profile \u2197</button>';}
+  else{la.innerHTML='<p class="no-url">(No LinkedIn URL found \u2014 open manually)</p>';}
+}
+function prev(){if(idx>0){idx--;render();}}
+function next(){if(idx<contacts.length-1){idx++;render();}}
+function copyMsg(){var t=document.getElementById('msg');t.select();document.execCommand('copy');t.blur();}
+render();
+</script>
 </body></html>`;
 
   SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(460).setHeight(240),
-    title
+    HtmlService.createHtmlOutput(html).setWidth(480).setHeight(count > 1 ? 320 : 290),
+    `LinkedIn DM${count > 1 ? ` (${count} contacts)` : ''}`
   );
 };
 
@@ -90,7 +109,7 @@ export const sendViaGmail = (
   msgObj: MsgObj,
   emailTemplate?: { attachments: GoogleAppsScript.Base.Blob[] } | null,
   draftSubject?: string
-): void => {
+): LinkedInContact | null => {
   const subjectLine = msgObj.subject;
   Logger.log('Sending via Gmail: %s', subjectLine);
 
@@ -141,13 +160,14 @@ export const sendViaGmail = (
     if (isSelfOrMissing) {
       const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
       const message = buildSmsMessage(firstName, row[COLS.RECIPIENT]);
-      Logger.log('Opening LinkedIn dialog - URL: "%s", Message length: %s', linkedInUrl, message.length);
-      showLinkedInMessageDialog(linkedInUrl, message, firstName);
+      Logger.log('Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
+      return { url: linkedInUrl, message, firstName };
     } else {
       Logger.log('Sending SMS to: %s', cellValue);
       notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue);
     }
   }
+  return null;
 };
 
 // ── Queue / bulk send ─────────────────────────────────────────────────────────
@@ -253,7 +273,8 @@ export const doSendTestEmail = (
 
   row[COLS.RECIPIENT] = testRecipient;
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-  sendViaGmail(row, msgObj, emailTemplate, subject);
+  const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject);
+  if (linkedin) showLinkedInMultiDialog([linkedin]);
   Logger.log('Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
 };
@@ -289,12 +310,14 @@ export const doSendEmails = (
 
   const out: [string | Date][] = [];
   let sentCount = 0;
+  const linkedInContacts: LinkedInContact[] = [];
 
   for (const row of rows) {
     if (row[COLS.EMAIL_SENT] === '') {
       try {
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-        sendViaGmail(row, msgObj, emailTemplate, subject);
+        const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject);
+        if (linkedin) linkedInContacts.push(linkedin);
         out.push([new Date()]);
         sentCount++;
       } catch (e) {
@@ -307,6 +330,10 @@ export const doSendEmails = (
 
   sheet.getRange(2, emailSentColIdx + 1, out.length).setValues(out);
   SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
+
+  if (linkedInContacts.length > 0) {
+    showLinkedInMultiDialog(linkedInContacts);
+  }
 };
 
 export const sendEmails = (subjectLine?: string): void => {
