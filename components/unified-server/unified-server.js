@@ -1374,30 +1374,13 @@ app.get('/check-resume/:jobId', (req, res) => {
     const files = fs.readdirSync(jobDir);
     const resumeFiles = files.filter(f => f.startsWith('tailored-') && f.endsWith('.md'));
 
-    if (resumeFiles.length === 0) {
-      return res.json({
-        success: true,
-        exists: false,
-        resumePath: null
-      });
-    }
-
-    // Get the most recent resume file
-    const mostRecentResume = resumeFiles.sort().reverse()[0];
-    const relativePath = `logs/${jobId}/${mostRecentResume}`;
-
-    console.log(`  -> Resume found: ${relativePath}`);
-
-    // Check for Google Drive URL in job JSON
-    // Job files are named job-{timestamp}.json, not job-{jobId}.json
+    // Check for Google Drive URL in job JSON (independent of whether local resume exists)
     let driveUrl = null;
     const jobFiles = files.filter(f => f.startsWith('job-') && f.endsWith('.json'));
     if (jobFiles.length > 0) {
-      // Use the most recent job file
       const jobFile = path.join(jobDir, jobFiles.sort().reverse()[0]);
       try {
         const jobData = JSON.parse(fs.readFileSync(jobFile, 'utf-8'));
-        // resumeUrl holds the Drive URL; fall back to legacy resumeGoogleDriveUrl field
         const candidate = jobData.resumeUrl || jobData.resumeGoogleDriveUrl || null;
         driveUrl = (candidate && candidate.includes('drive.google.com')) ? candidate : null;
         console.log(`  -> Drive URL from job JSON: ${driveUrl || 'not set'}`);
@@ -1407,6 +1390,21 @@ app.get('/check-resume/:jobId', (req, res) => {
     } else {
       console.log(`  -> No job JSON file found in ${jobDir}`);
     }
+
+    if (resumeFiles.length === 0) {
+      return res.json({
+        success: true,
+        exists: false,
+        resumePath: null,
+        driveUrl: driveUrl
+      });
+    }
+
+    // Get the most recent resume file
+    const mostRecentResume = resumeFiles.sort().reverse()[0];
+    const relativePath = `logs/${jobId}/${mostRecentResume}`;
+
+    console.log(`  -> Resume found: ${relativePath}`);
 
     res.json({
       success: true,
