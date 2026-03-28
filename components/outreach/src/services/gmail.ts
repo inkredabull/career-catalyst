@@ -40,7 +40,7 @@ h3{margin:0 0 4px}
 .nav{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .nav button{padding:4px 10px;cursor:pointer}
 .counter{font-size:13px;color:#555;flex:1;text-align:center}
-.open-btn{display:block;width:100%;padding:8px;margin-bottom:10px;font-size:13px;cursor:pointer;background:#0a66c2;color:#fff;border:none;border-radius:4px;text-align:center}
+.open-btn{display:block;width:100%;padding:8px;margin-bottom:10px;font-size:13px;cursor:pointer;background:#0a66c2;color:#fff;border:none;border-radius:4px;text-align:center;text-decoration:none;box-sizing:border-box}
 .open-btn:hover{background:#004182}
 .no-url{color:#888;font-size:13px;margin-bottom:10px}
 p{margin:0 0 4px;font-size:13px}
@@ -66,11 +66,10 @@ var contacts=${contactsJson};
 var idx=0;
 function render(){
   var c=contacts[idx];
-  document.getElementById('title').textContent='LinkedIn DM'+(c.firstName?' \u2014 '+c.firstName:'');
   document.getElementById('counter').textContent=(idx+1)+' of '+contacts.length;
   document.getElementById('msg').value=c.message;
   var la=document.getElementById('link-area');
-  if(c.url){la.innerHTML='<button class="open-btn" onclick="window.open('+JSON.stringify(c.url)+',\\'_blank\\')">Open LinkedIn Profile \u2197</button>';}
+  if(c.url){la.innerHTML='<a class="open-btn" href="'+c.url+'" target="_blank">Open LinkedIn Profile \u2197</a>';}
   else{la.innerHTML='<p class="no-url">(No LinkedIn URL found \u2014 open manually)</p>';}
 }
 function prev(){if(idx>0){idx--;render();}}
