@@ -536,7 +536,9 @@ export function generateAchievementWithModel(modelName: string): ModelGeneration
     const endTime = new Date().getTime();
     const latencyMs = endTime - startTime;
 
-    Logger.log(`Generated achievement using ${modelName}: ${response.length} chars in ${latencyMs}ms`);
+    Logger.log(
+      `Generated achievement using ${modelName}: ${response.length} chars in ${latencyMs}ms`
+    );
 
     // Log if response is empty
     if (!response || response.length === 0) {
@@ -733,6 +735,73 @@ export function include(filename: string): string {
   return HtmlService.createTemplateFromFile(filename).evaluate().getContent();
 }
 
+/**
+ * Extract Situation and Task from the Challenge column of the active row (STAR decomposition).
+ * Writes "Situation|Task" result into the active cell.
+ * Menu item: "Extract Situation & Task"
+ */
+export function extractSituationAndTasks(): void {
+  try {
+    const services = initializeServices();
+    const { row, headers } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
+    const challenge = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE)] as string;
+
+    if (!challenge) {
+      DialogService.showAlert('No Challenge text found in this row.');
+      return;
+    }
+
+    const result = services.achievement.extractSituationAndTasks(challenge);
+    const [situation, task] = result.split('|').map((s) => s.trim());
+
+    SpreadsheetApp.getUi().alert(
+      'Situation & Task',
+      `SITUATION:\n${situation ?? result}\n\nTASK:\n${task ?? '(not separated)'}`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  } catch (error) {
+    Logger.error('Error in extractSituationAndTasks', error as Error);
+    DialogService.showAlert(`Error extracting situation and tasks: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Rebuild the Table of Contents in the first sheet.
+ * Creates clickable HYPERLINK formulas for every subsequent sheet.
+ * Menu item: "Update Table of Contents"
+ */
+export function generateTableOfContents(): void {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = ss.getSheets();
+    const tocSheet = sheets[0];
+    const ssId = ss.getId();
+
+    tocSheet.clear();
+    tocSheet
+      .getRange(1, 1, 1, 2)
+      .setValues([['Sheet Name', 'Link']])
+      .setFontWeight('bold');
+
+    const data: string[][] = [];
+    for (let i = 1; i < sheets.length; i++) {
+      const sheetName = sheets[i].getName();
+      const gid = sheets[i].getSheetId();
+      const link = `=HYPERLINK("https://docs.google.com/spreadsheets/d/${ssId}/edit#gid=${gid}","${sheetName}")`;
+      data.push([sheetName, link]);
+    }
+
+    if (data.length > 0) {
+      tocSheet.getRange(2, 1, data.length, 2).setValues(data);
+    }
+
+    SpreadsheetApp.getUi().alert('Table of Contents updated!');
+  } catch (error) {
+    Logger.error('Error in generateTableOfContents', error as Error);
+    DialogService.showAlert(`Error generating table of contents: ${(error as Error).message}`);
+  }
+}
+
 // Make functions globally available for Google Apps Script
 declare const global: {
   onOpen: typeof onOpen;
@@ -757,6 +826,8 @@ declare const global: {
   setupAPIKeys: typeof setupAPIKeys;
   handleGenerate: typeof handleGenerate;
   include: typeof include;
+  extractSituationAndTasks: typeof extractSituationAndTasks;
+  generateTableOfContents: typeof generateTableOfContents;
 };
 
 global.onOpen = onOpen;
@@ -781,3 +852,5 @@ global.refreshModelsMenu = refreshModelsMenu;
 global.setupAPIKeys = setupAPIKeys;
 global.handleGenerate = handleGenerate;
 global.include = include;
+global.extractSituationAndTasks = extractSituationAndTasks;
+global.generateTableOfContents = generateTableOfContents;

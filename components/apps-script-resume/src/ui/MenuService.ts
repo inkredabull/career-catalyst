@@ -31,6 +31,9 @@ export class MenuService {
       .addItem('Sort', 'sortSheet')
       .addItem('Create ID', 'createID')
       .addItem('Customize', 'createCustomization')
+      .addSeparator()
+      .addItem('Extract Situation & Task', 'extractSituationAndTasks')
+      .addItem('Update Table of Contents', 'generateTableOfContents')
       .addToUi();
   }
 }
