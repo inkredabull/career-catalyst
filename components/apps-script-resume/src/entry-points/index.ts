@@ -584,12 +584,217 @@ export function chooseModel(): void {
 }
 
 /**
- * Compare models
+ * Compare models side-by-side
  * Menu item: "Compare Models"
  */
 export function compareModels(): void {
-  // This function requires HTML template - skipping for now
-  DialogService.showAlert('Compare Models feature requires HTML template migration');
+  try {
+    const services = initializeServices();
+    const models = services.ai['modelMap'] as Record<string, string>;
+
+    const claudeModel = models['claude'] || CONFIG.AI.FALLBACK_MODELS.CLAUDE;
+    const geminiModel = models['gemini'] || CONFIG.AI.FALLBACK_MODELS.GEMINI;
+    const openaiModel = models['openai'] || CONFIG.AI.FALLBACK_MODELS.OPENAI;
+    const mistralModel = models['mistral'] || CONFIG.AI.FALLBACK_MODELS.MISTRAL;
+    const cohereModel = models['cohere'] || CONFIG.AI.FALLBACK_MODELS.COHERE;
+
+    const fmt = (id: string): string => {
+      const parts = id.split('/');
+      const model = parts[1] || id;
+      return model.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).substring(0, 50);
+    };
+
+    const claudeDisplay = fmt(claudeModel);
+    const geminiDisplay = fmt(geminiModel);
+    const openaiDisplay = fmt(openaiModel);
+    const mistralDisplay = fmt(mistralModel);
+    const cohereDisplay = fmt(cohereModel);
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body{font-family:Arial,sans-serif;padding:20px;margin:0;background:#f5f5f5}
+    .container{max-width:1200px;margin:0 auto}
+    .controls{background:white;padding:20px;border-radius:8px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);text-align:center}
+    .results{display:grid;grid-template-columns:repeat(5,1fr);gap:15px}
+    .result-card{background:white;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);min-height:250px;display:flex;flex-direction:column}
+    .result-card h4{margin:0 0 10px;color:#1a73e8;border-bottom:2px solid #1a73e8;padding-bottom:8px;font-size:15px}
+    .model-label{font-size:12px;color:#666;margin-bottom:15px}
+    .result-content{flex:1;line-height:1.6;color:#333;font-size:14px;overflow-wrap:break-word}
+    .loading{text-align:center;color:#999;font-style:italic;padding:40px 0}
+    .char-count{font-size:12px;color:#666;margin-top:15px;padding-top:10px;border-top:1px solid #eee;font-weight:600}
+    .metadata{font-size:11px;color:#666;margin-top:10px;padding:8px;background:#f8f9fa;border-radius:4px;font-family:monospace;display:none}
+    .metadata-row{margin:4px 0;display:flex;justify-content:space-between;align-items:center}
+    .metadata-label{font-weight:600;color:#555}
+    .metadata-value{color:#333}
+    .latency{color:#28a745;font-weight:600}
+    .latency.slow{color:#ffc107}
+    .latency.very-slow{color:#dc3545}
+    .prompt-link{color:#1a73e8;text-decoration:none;cursor:pointer;font-size:11px}
+    .prompt-link:hover{text-decoration:underline}
+    .choose-btn{width:100%;padding:8px;margin-top:10px;background:#1a73e8;color:white;border:none;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;display:none}
+    .choose-btn:hover{background:#1557b0}
+    .choose-btn:disabled{background:#ccc;cursor:not-allowed}
+    .choose-btn.success{background:#28a745}
+    .winner{background:#d4edda;border:2px solid #28a745}
+    .winner h4{color:#28a745;border-bottom-color:#28a745}
+    .winner-badge{display:inline-block;background:#28a745;color:white;padding:2px 8px;border-radius:12px;font-size:10px;margin-left:8px;font-weight:normal}
+    .status{margin-top:15px;padding:10px;border-radius:4px;display:none;text-align:center}
+    .status.error{background:#f8d7da;color:#721c24;display:block}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="controls">
+      <div id="status" class="status">Generating all models...</div>
+    </div>
+    <div class="results" id="results">
+      <div class="result-card" id="resultClaude">
+        <h4>🤖 ${claudeDisplay}</h4>
+        <div class="model-label">${claudeModel}</div>
+        <div class="result-content" id="contentClaude"><div class="loading">Generating...</div></div>
+        <div class="char-count" id="countClaude"></div>
+        <div class="metadata" id="metadataClaude"></div>
+        <button class="choose-btn" id="chooseClaude" onclick="chooseModel('claude')">✓ Choose This</button>
+      </div>
+      <div class="result-card" id="resultGemini">
+        <h4>🔮 ${geminiDisplay}</h4>
+        <div class="model-label">${geminiModel}</div>
+        <div class="result-content" id="contentGemini"><div class="loading">Generating...</div></div>
+        <div class="char-count" id="countGemini"></div>
+        <div class="metadata" id="metadataGemini"></div>
+        <button class="choose-btn" id="chooseGemini" onclick="chooseModel('gemini')">✓ Choose This</button>
+      </div>
+      <div class="result-card" id="resultOpenAI">
+        <h4>💬 ${openaiDisplay}</h4>
+        <div class="model-label">${openaiModel}</div>
+        <div class="result-content" id="contentOpenAI"><div class="loading">Generating...</div></div>
+        <div class="char-count" id="countOpenAI"></div>
+        <div class="metadata" id="metadataOpenAI"></div>
+        <button class="choose-btn" id="chooseOpenAI" onclick="chooseModel('openai')">✓ Choose This</button>
+      </div>
+      <div class="result-card" id="resultMistral">
+        <h4>⚡ ${mistralDisplay}</h4>
+        <div class="model-label">${mistralModel}</div>
+        <div class="result-content" id="contentMistral"><div class="loading">Generating...</div></div>
+        <div class="char-count" id="countMistral"></div>
+        <div class="metadata" id="metadataMistral"></div>
+        <button class="choose-btn" id="chooseMistral" onclick="chooseModel('mistral')">✓ Choose This</button>
+      </div>
+      <div class="result-card" id="resultCohere">
+        <h4>🔷 ${cohereDisplay}</h4>
+        <div class="model-label">${cohereModel}</div>
+        <div class="result-content" id="contentCohere"><div class="loading">Generating...</div></div>
+        <div class="char-count" id="countCohere"></div>
+        <div class="metadata" id="metadataCohere"></div>
+        <button class="choose-btn" id="chooseCohere" onclick="chooseModel('cohere')">✓ Choose This</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const MODELS=[
+      {key:'claude',contentId:'contentClaude',countId:'countClaude',cardId:'resultClaude',buttonId:'chooseClaude',metadataId:'metadataClaude'},
+      {key:'gemini',contentId:'contentGemini',countId:'countGemini',cardId:'resultGemini',buttonId:'chooseGemini',metadataId:'metadataGemini'},
+      {key:'openai',contentId:'contentOpenAI',countId:'countOpenAI',cardId:'resultOpenAI',buttonId:'chooseOpenAI',metadataId:'metadataOpenAI'},
+      {key:'mistral',contentId:'contentMistral',countId:'countMistral',cardId:'resultMistral',buttonId:'chooseMistral',metadataId:'metadataMistral'},
+      {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere'}
+    ];
+    var modelResults={};
+    function runComparison(){
+      var status=document.getElementById('status');
+      status.textContent='Generating all models...';
+      status.style.display='block';
+      MODELS.forEach(function(m){
+        document.getElementById(m.contentId).innerHTML='<div class="loading">Generating...</div>';
+        document.getElementById(m.countId).textContent='';
+        document.getElementById(m.metadataId).style.display='none';
+        document.getElementById(m.cardId).classList.remove('winner');
+        document.getElementById(m.buttonId).style.display='none';
+        var h=document.getElementById(m.cardId).querySelector('h4');
+        var b=h.querySelector('.winner-badge');if(b)b.remove();
+      });
+      modelResults={};
+      var completed=0;
+      MODELS.forEach(function(m){
+        google.script.run
+          .withSuccessHandler(function(result){
+            modelResults[m.key]=result;
+            displayResult(m.contentId,m.countId,result,m.key);
+            completed++;
+            if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';}
+            else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
+          })
+          .withFailureHandler(function(error){
+            document.getElementById(m.contentId).innerHTML='<div style="color:red">Error: '+error.message+'</div>';
+            completed++;
+            if(completed===MODELS.length){status.textContent='Completed with errors';status.className='status error';}
+            else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
+          })
+          .generateAchievementWithModel(m.key);
+      });
+    }
+    function chooseModel(key){
+      var m=MODELS.find(function(x){return x.key===key;});
+      if(!m){alert('Model not found');return;}
+      var r=modelResults[key];
+      if(!r||!r.text){alert('No result available');return;}
+      var btn=document.getElementById(m.buttonId);
+      btn.disabled=true;btn.textContent='Applying...';
+      google.script.run
+        .withSuccessHandler(function(){btn.textContent='✓ Applied!';btn.classList.add('success');setTimeout(function(){google.script.host.close();},1000);})
+        .withFailureHandler(function(e){btn.disabled=false;btn.textContent='✓ Choose This';alert('Error: '+e.message);})
+        .setActiveCellValue(r.text);
+    }
+    function displayResult(contentId,countId,r,key){
+      var text=r.text||'';
+      document.getElementById(contentId)[text.length===0?'innerHTML':'textContent']=text.length===0?'<div style="color:#e67e22;font-style:italic">⚠️ Empty response</div>':text;
+      document.getElementById(countId).textContent='Characters: '+text.length;
+      var m=MODELS.find(function(x){return x.key===key;});
+      if(!m)return;
+      var el=document.getElementById(m.metadataId);
+      var cls='latency'+(r.latencyMs>5000?' very-slow':r.latencyMs>2000?' slow':'');
+      el.innerHTML='<div class="metadata-row"><span class="metadata-label">⚡ Latency:</span><span class="'+cls+'">'+(r.latencyMs/1000).toFixed(2)+'s</span></div>'
+        +'<div class="metadata-row"><span class="metadata-label">Model ID:</span><span class="metadata-value">'+r.config.model+'</span></div>'
+        +'<div class="metadata-row"><span class="metadata-label">Max Tokens:</span><span class="metadata-value">'+r.config.maxTokens+'</span></div>'
+        +'<div class="metadata-row"><span class="metadata-label">Audience:</span><span class="metadata-value">'+r.config.targetAudience+'</span></div>'
+        +'<div class="metadata-row"><span class="metadata-label">Prompt:</span><a class="prompt-link" onclick="showPrompt(\''+key+'\')">View Full Prompt</a></div>';
+      el.style.display='block';
+      document.getElementById(m.buttonId).style.display='block';
+    }
+    function showPrompt(key){
+      var r=modelResults[key];
+      if(!r||!r.prompt){alert('Prompt not available');return;}
+      var w=window.open('','Prompt','width=800,height=600,scrollbars=yes');
+      w.document.write('<html><head><title>Prompt for '+key+'</title><style>body{font-family:monospace;padding:20px;white-space:pre-wrap;word-wrap:break-word}h3{font-family:Arial}</style></head><body><h3>Full Prompt — '+key.toUpperCase()+'</h3><hr>'+r.prompt+'</body></html>');
+      w.document.close();
+    }
+    function finishComparison(results){
+      var shortest=null,shortestLen=Infinity,shortestKey=null;
+      Object.keys(results).forEach(function(k){
+        var t=results[k].text||results[k];
+        if(t.length>=40&&t.length<shortestLen){shortest=t;shortestLen=t.length;shortestKey=k;}
+      });
+      if(shortestKey){
+        var wm=MODELS.find(function(m){return m.key===shortestKey;});
+        if(wm){
+          document.getElementById(wm.cardId).classList.add('winner');
+          document.getElementById(wm.cardId).querySelector('h4').innerHTML+='<span class="winner-badge">Most Concise</span>';
+        }
+      }
+    }
+    window.addEventListener('DOMContentLoaded',function(){runComparison();});
+  </script>
+</body>
+</html>`;
+
+    const htmlOutput = HtmlService.createHtmlOutput(html).setWidth(1250).setHeight(650);
+    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Compare All AI Models');
+  } catch (error) {
+    Logger.error('Error in compareModels', error as Error);
+    DialogService.showAlert(`Error showing comparison: ${(error as Error).message}`);
+  }
 }
 
 /**
