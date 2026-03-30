@@ -736,36 +736,6 @@ export function include(filename: string): string {
 }
 
 /**
- * Extract Situation and Task from the Challenge column of the active row (STAR decomposition).
- * Writes "Situation|Task" result into the active cell.
- * Menu item: "Extract Situation & Task"
- */
-export function extractSituationAndTasks(): void {
-  try {
-    const services = initializeServices();
-    const { row, headers } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
-    const challenge = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE)] as string;
-
-    if (!challenge) {
-      DialogService.showAlert('No Challenge text found in this row.');
-      return;
-    }
-
-    const result = services.achievement.extractSituationAndTasks(challenge);
-    const [situation, task] = result.split('|').map((s) => s.trim());
-
-    SpreadsheetApp.getUi().alert(
-      'Situation & Task',
-      `SITUATION:\n${situation ?? result}\n\nTASK:\n${task ?? '(not separated)'}`,
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-  } catch (error) {
-    Logger.error('Error in extractSituationAndTasks', error as Error);
-    DialogService.showAlert(`Error extracting situation and tasks: ${(error as Error).message}`);
-  }
-}
-
-/**
  * Rebuild the Table of Contents in the first sheet.
  * Creates clickable HYPERLINK formulas for every subsequent sheet.
  * Menu item: "Update Table of Contents"
@@ -833,7 +803,6 @@ declare const global: {
   setupAPIKeys: typeof setupAPIKeys;
   handleGenerate: typeof handleGenerate;
   include: typeof include;
-  extractSituationAndTasks: typeof extractSituationAndTasks;
   generateTableOfContents: typeof generateTableOfContents;
 };
 
@@ -859,5 +828,4 @@ global.refreshModelsMenu = refreshModelsMenu;
 global.setupAPIKeys = setupAPIKeys;
 global.handleGenerate = handleGenerate;
 global.include = include;
-global.extractSituationAndTasks = extractSituationAndTasks;
 global.generateTableOfContents = generateTableOfContents;

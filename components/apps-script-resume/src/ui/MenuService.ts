@@ -32,7 +32,6 @@ export class MenuService {
       .addItem('Create ID', 'createID')
       .addItem('Customize', 'createCustomization')
       .addSeparator()
-      .addItem('Extract Situation & Task', 'extractSituationAndTasks')
       .addItem('Update Table of Contents', 'generateTableOfContents')
       .addToUi();
   }
