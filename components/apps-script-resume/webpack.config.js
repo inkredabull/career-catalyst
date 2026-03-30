@@ -7,7 +7,7 @@ module.exports = {
   output: {
     filename: 'Code.js',
     path: path.resolve(__dirname, 'dist'),
-    clean: true,
+    iife: false,
   },
   resolve: {
     extensions: ['.ts', '.js'],
@@ -39,12 +39,7 @@ module.exports = {
       },
     ],
   },
-  plugins: [
-    new GasPlugin({
-      // Automatically expose global functions for Google Apps Script
-      autoGlobalExportsFiles: ['**/*.ts'],
-    }),
-  ],
+  plugins: [new GasPlugin()],
   optimization: {
     minimize: false, // Google Apps Script doesn't work well with minification
     concatenateModules: true,
