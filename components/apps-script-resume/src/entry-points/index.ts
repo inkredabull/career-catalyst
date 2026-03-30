@@ -777,6 +777,11 @@ export function generateTableOfContents(): void {
     const tocSheet = sheets[0];
     const ssId = ss.getId();
 
+    if (!tocSheet) {
+      DialogService.showAlert('No sheets found in this spreadsheet.');
+      return;
+    }
+
     tocSheet.clear();
     tocSheet
       .getRange(1, 1, 1, 2)
@@ -785,8 +790,10 @@ export function generateTableOfContents(): void {
 
     const data: string[][] = [];
     for (let i = 1; i < sheets.length; i++) {
-      const sheetName = sheets[i].getName();
-      const gid = sheets[i].getSheetId();
+      const sheet = sheets[i];
+      if (!sheet) continue;
+      const sheetName = sheet.getName();
+      const gid = sheet.getSheetId();
       const link = `=HYPERLINK("https://docs.google.com/spreadsheets/d/${ssId}/edit#gid=${gid}","${sheetName}")`;
       data.push([sheetName, link]);
     }
