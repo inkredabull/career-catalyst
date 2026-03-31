@@ -717,9 +717,19 @@ export function compareModels(): void {
       });
       modelResults={};
       var completed=0;
+      var TIMEOUT_MS=60000;
       MODELS.forEach(function(m){
+        var timer=setTimeout(function(){
+          if(!modelResults[m.key]){
+            document.getElementById(m.contentId).innerHTML='<div style="color:#e67e22;font-style:italic">⏱ Timed out after 60s</div>';
+            completed++;
+            if(completed===MODELS.length){status.textContent='Completed with timeouts';status.className='status error';}
+            else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
+          }
+        },TIMEOUT_MS);
         google.script.run
           .withSuccessHandler(function(result){
+            clearTimeout(timer);
             modelResults[m.key]=result;
             displayResult(m.contentId,m.countId,result,m.key);
             completed++;
@@ -727,6 +737,7 @@ export function compareModels(): void {
             else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
           })
           .withFailureHandler(function(error){
+            clearTimeout(timer);
             document.getElementById(m.contentId).innerHTML='<div style="color:red">Error: '+error.message+'</div>';
             completed++;
             if(completed===MODELS.length){status.textContent='Completed with errors';status.className='status error';}
@@ -784,7 +795,9 @@ export function compareModels(): void {
         }
       }
     }
-    window.addEventListener('DOMContentLoaded',function(){runComparison();});
+    // Defer start by 500ms so the GAS warden transport fully initialises before
+    // google.script.run calls are fired (DOMContentLoaded fires too early).
+    window.addEventListener('DOMContentLoaded',function(){setTimeout(runComparison,500);});
   </script>
 </body>
 </html>`;
