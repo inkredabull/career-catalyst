@@ -590,7 +590,10 @@ export function chooseModel(): void {
 export function compareModels(): void {
   try {
     const services = initializeServices();
-    const models = (services.ai as unknown as Record<string, unknown>)['modelMap'] as Record<string, string>;
+    const models = (services.ai as unknown as Record<string, unknown>)['modelMap'] as Record<
+      string,
+      string
+    >;
 
     const claudeModel = models['claude'] || CONFIG.AI.FALLBACK_MODELS.CLAUDE;
     const geminiModel = models['gemini'] || CONFIG.AI.FALLBACK_MODELS.GEMINI;
@@ -657,7 +660,7 @@ export function compareModels(): void {
       <button class="run-btn" id="runBtn" onclick="startComparison()">&#9654; Run Comparison</button>
       <div id="status" class="status"></div>
     </div>
-    <div class="results" id="results">
+    <div class="results" id="results" style="display:none">
       <div class="result-card" id="resultClaude">
         <h4>🤖 ${claudeDisplay}</h4>
         <div class="model-label">${claudeModel}</div>
@@ -712,7 +715,8 @@ export function compareModels(): void {
     function startComparison(){
       var btn=document.getElementById('runBtn');
       btn.disabled=true;
-      btn.textContent='Running...';
+      btn.innerHTML='Running...';
+      document.getElementById('results').style.display='grid';
       runComparison();
     }
     function runComparison(){
@@ -736,7 +740,7 @@ export function compareModels(): void {
           if(!modelResults[m.key]){
             document.getElementById(m.contentId).innerHTML='<div style="color:#e67e22;font-style:italic">⏱ Timed out after 60s</div>';
             completed++;
-            if(completed===MODELS.length){status.textContent='Completed with timeouts';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.textContent='&#9654; Run Again';}
+            if(completed===MODELS.length){status.textContent='Completed with timeouts';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
             else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
           }
         },TIMEOUT_MS);
@@ -746,14 +750,14 @@ export function compareModels(): void {
             modelResults[m.key]=result;
             displayResult(m.contentId,m.countId,result,m.key);
             completed++;
-            if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.textContent='&#9654; Run Again';}
+            if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
             else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
           })
           .withFailureHandler(function(error){
             clearTimeout(timer);
             document.getElementById(m.contentId).innerHTML='<div style="color:red">Error: '+error.message+'</div>';
             completed++;
-            if(completed===MODELS.length){status.textContent='Completed with errors';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.textContent='&#9654; Run Again';}
+            if(completed===MODELS.length){status.textContent='Completed with errors';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
             else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
           })
           .generateAchievementWithModel(m.key);
