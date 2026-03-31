@@ -590,7 +590,7 @@ export function chooseModel(): void {
 export function compareModels(): void {
   try {
     const services = initializeServices();
-    const models = services.ai['modelMap'] as Record<string, string>;
+    const models = (services.ai as unknown as Record<string, unknown>)['modelMap'] as Record<string, string>;
 
     const claudeModel = models['claude'] || CONFIG.AI.FALLBACK_MODELS.CLAUDE;
     const geminiModel = models['gemini'] || CONFIG.AI.FALLBACK_MODELS.GEMINI;
@@ -601,7 +601,10 @@ export function compareModels(): void {
     const fmt = (id: string): string => {
       const parts = id.split('/');
       const model = parts[1] || id;
-      return model.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).substring(0, 50);
+      return model
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .substring(0, 50);
     };
 
     const claudeDisplay = fmt(claudeModel);
@@ -638,6 +641,9 @@ export function compareModels(): void {
     .choose-btn:hover{background:#1557b0}
     .choose-btn:disabled{background:#ccc;cursor:not-allowed}
     .choose-btn.success{background:#28a745}
+    .run-btn{padding:10px 28px;background:#1a73e8;color:white;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:10px}
+    .run-btn:hover{background:#1557b0}
+    .run-btn:disabled{background:#ccc;cursor:not-allowed}
     .winner{background:#d4edda;border:2px solid #28a745}
     .winner h4{color:#28a745;border-bottom-color:#28a745}
     .winner-badge{display:inline-block;background:#28a745;color:white;padding:2px 8px;border-radius:12px;font-size:10px;margin-left:8px;font-weight:normal}
@@ -648,7 +654,8 @@ export function compareModels(): void {
 <body>
   <div class="container">
     <div class="controls">
-      <div id="status" class="status">Generating all models...</div>
+      <button class="run-btn" id="runBtn" onclick="startComparison()">&#9654; Run Comparison</button>
+      <div id="status" class="status"></div>
     </div>
     <div class="results" id="results">
       <div class="result-card" id="resultClaude">
@@ -702,6 +709,12 @@ export function compareModels(): void {
       {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere'}
     ];
     var modelResults={};
+    function startComparison(){
+      var btn=document.getElementById('runBtn');
+      btn.disabled=true;
+      btn.textContent='Running...';
+      runComparison();
+    }
     function runComparison(){
       var status=document.getElementById('status');
       status.textContent='Generating all models...';
@@ -723,7 +736,7 @@ export function compareModels(): void {
           if(!modelResults[m.key]){
             document.getElementById(m.contentId).innerHTML='<div style="color:#e67e22;font-style:italic">⏱ Timed out after 60s</div>';
             completed++;
-            if(completed===MODELS.length){status.textContent='Completed with timeouts';status.className='status error';}
+            if(completed===MODELS.length){status.textContent='Completed with timeouts';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.textContent='&#9654; Run Again';}
             else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
           }
         },TIMEOUT_MS);
@@ -733,14 +746,14 @@ export function compareModels(): void {
             modelResults[m.key]=result;
             displayResult(m.contentId,m.countId,result,m.key);
             completed++;
-            if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';}
+            if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.textContent='&#9654; Run Again';}
             else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
           })
           .withFailureHandler(function(error){
             clearTimeout(timer);
             document.getElementById(m.contentId).innerHTML='<div style="color:red">Error: '+error.message+'</div>';
             completed++;
-            if(completed===MODELS.length){status.textContent='Completed with errors';status.className='status error';}
+            if(completed===MODELS.length){status.textContent='Completed with errors';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.textContent='&#9654; Run Again';}
             else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
           })
           .generateAchievementWithModel(m.key);
@@ -770,7 +783,7 @@ export function compareModels(): void {
         +'<div class="metadata-row"><span class="metadata-label">Model ID:</span><span class="metadata-value">'+r.config.model+'</span></div>'
         +'<div class="metadata-row"><span class="metadata-label">Max Tokens:</span><span class="metadata-value">'+r.config.maxTokens+'</span></div>'
         +'<div class="metadata-row"><span class="metadata-label">Audience:</span><span class="metadata-value">'+r.config.targetAudience+'</span></div>'
-        +'<div class="metadata-row"><span class="metadata-label">Prompt:</span><a class="prompt-link" onclick="showPrompt(\''+key+'\')">View Full Prompt</a></div>';
+        +'<div class="metadata-row"><span class="metadata-label">Prompt:</span><a class="prompt-link" onclick="showPrompt(&quot;'+key+'&quot;)">View Full Prompt</a></div>';
       el.style.display='block';
       document.getElementById(m.buttonId).style.display='block';
     }
@@ -795,9 +808,6 @@ export function compareModels(): void {
         }
       }
     }
-    // Defer start by 500ms so the GAS warden transport fully initialises before
-    // google.script.run calls are fired (DOMContentLoaded fires too early).
-    window.addEventListener('DOMContentLoaded',function(){setTimeout(runComparison,500);});
   </script>
 </body>
 </html>`;
