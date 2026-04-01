@@ -123,7 +123,7 @@ export const getAllContacts = (): PersonResource[] => {
   do {
     const response = People.People!.Connections!.list('people/me', {
       pageSize: 1000,
-      personFields: 'names,emailAddresses,urls',
+      personFields: 'names,emailAddresses,urls,memberships',
       pageToken,
     });
     if (response.connections?.length) people = people.concat(response.connections);
@@ -131,6 +131,22 @@ export const getAllContacts = (): PersonResource[] => {
   } while (pageToken);
 
   return people;
+};
+
+interface ContactGroupInfo {
+  id: string;
+  name: string;
+  groupType: string;
+}
+
+const getContactGroupInfo = (): ContactGroupInfo[] => {
+  const response = People.ContactGroups!.list({ pageSize: 200 });
+  return (response.contactGroups ?? []).map(g => ({
+    // resourceName is "contactGroups/<id>"; contactGroupMembership.contactGroupId is just "<id>"
+    id: (g.resourceName ?? '').replace('contactGroups/', ''),
+    name: g.name ?? '',
+    groupType: g.groupType ?? '',
+  }));
 };
 
 export const shuffle = <T>(array: T[]): void => {
@@ -141,7 +157,28 @@ export const shuffle = <T>(array: T[]): void => {
 };
 
 export const pickRandomContacts = (count = 5): string => {
-  const all = getAllContacts();
+  const groups = getContactGroupInfo();
+  const excludedIds = new Set(
+    groups
+      .filter(g => g.name.startsWith('Relational') || g.name.startsWith('Spiritual'))
+      .map(g => g.id)
+  );
+  const userGroupIds = new Set(
+    groups.filter(g => g.groupType === 'USER_CONTACT_GROUP').map(g => g.id)
+  );
+
+  const all = getAllContacts().filter(contact => {
+    const memberships = contact.memberships ?? [];
+    const userMemberships = memberships.filter(
+      m => m.contactGroupMembership?.contactGroupId != null &&
+           userGroupIds.has(m.contactGroupMembership.contactGroupId)
+    );
+    if (userMemberships.length === 0) return true;
+    return !userMemberships.some(
+      m => excludedIds.has(m.contactGroupMembership!.contactGroupId!)
+    );
+  });
+
   shuffle(all);
   const selected = all.slice(0, count);
 
