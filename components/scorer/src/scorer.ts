@@ -25,7 +25,7 @@ Dimensions:
 4. Compensation & Stability — Target: $255K+ TC. Flag if not disclosed or likely below target.
 5. Learning & Innovation — Will Anthony be stretched technically and strategically?
 6. Company Culture Norms — Evidence of async-first, high-trust, low-bureaucracy culture?
-7. Lifestyle & Flexibility — Remote-friendly with quarterly onsites preferred. Flag hybrid/in-office mandates.
+7. Lifestyle & Flexibility — Remote-friendly preferred; in-person in San Francisco is acceptable. Only flag roles requiring relocation or outside SF Bay Area.
 8. Network & Access — Does this company or exec team open doors Anthony doesn't already have?
 9. Personal Excitement & Curiosity — Would Anthony be energized by this problem space?
 10. Leadership Reputation — Any signals on the exec team (prior exits, public presence, employee sentiment)?
@@ -37,7 +37,7 @@ Dimensions:
 
 Hard filters (score 1 if triggered):
 - Comp ceiling clearly below $255K TC
-- Full-time in-office (non-remote)
+- Full-time in-office outside San Francisco Bay Area (requires relocation)
 - IC-heavy with no direct reports or org-building mandate
 - No AI/ML component to the product or platform
 
@@ -167,7 +167,7 @@ export async function scoreJD(input: string): Promise<string> {
 
   while (true) {
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       tools,
