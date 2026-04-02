@@ -10,6 +10,7 @@ export const SCRIPT_PROPS = {
   NGROK_SMS_URL: 'NGROK_SMS_URL',
   PHOTO_URL: 'PHOTO_URL',
   RESUME_URL: 'RESUME_URL',
+  WARMUP_EXCLUDE_LABEL_PREFIXES: 'WARMUP_EXCLUDE_LABEL_PREFIXES',
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */
@@ -43,7 +44,7 @@ export const SHEETS = {
 export const SUBJECT_LINES = [
   'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
   'Need some fractional ENG help?',
-  'Q1 2026 latest-and-greatest',
+  'Q2 2026 latest-and-greatest',
 ];
 
 // Feature flags - can be overridden per subject line
@@ -58,7 +59,7 @@ export const FLAGS = {
 export const SUBJECT_LINE_FLAGS: Record<string, Partial<typeof FLAGS>> = {
   'Get your help for role as {{JobTitleShorthand}} at {{Company}}?': { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
   'Need some fractional ENG help?': { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
-  'Q1 2026 latest-and-greatest': { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
+  'Q2 2026 latest-and-greatest': { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
 } as const;
 
 // Helper function to get flags for a specific subject line

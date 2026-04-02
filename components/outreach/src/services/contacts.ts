@@ -1,6 +1,6 @@
 // Google Contacts / People API helpers.
 
-import { COLS } from '../config/settings';
+import { COLS, SCRIPT_PROPS } from '../config/settings';
 
 type PersonResource = GoogleAppsScript.People.Schema.Person;
 
@@ -157,10 +157,14 @@ export const shuffle = <T>(array: T[]): void => {
 };
 
 export const pickRandomContacts = (count = 5): string => {
+  const rawPrefixes = PropertiesService.getScriptProperties()
+    .getProperty(SCRIPT_PROPS.WARMUP_EXCLUDE_LABEL_PREFIXES) ?? '';
+  const excludedPrefixes = rawPrefixes.split(',').map(p => p.trim()).filter(Boolean);
+
   const groups = getContactGroupInfo();
   const excludedIds = new Set(
     groups
-      .filter(g => g.name.startsWith('Relational') || g.name.startsWith('Spiritual'))
+      .filter(g => excludedPrefixes.some(prefix => g.name.startsWith(prefix)))
       .map(g => g.id)
   );
   const userGroupIds = new Set(

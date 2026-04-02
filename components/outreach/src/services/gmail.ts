@@ -48,7 +48,6 @@ textarea{width:100%;height:100px;font-size:13px;padding:8px;box-sizing:border-bo
 .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
 button{padding:6px 16px;cursor:pointer}
 </style></head><body>
-<h3 id="title">LinkedIn DM</h3>
 <div class="nav">
   <button onclick="prev()">&#9664;</button>
   <span class="counter" id="counter"></span>
