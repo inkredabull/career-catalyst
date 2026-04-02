@@ -101,7 +101,7 @@ export declare function setActiveCellValue(content: string): void;
  */
 export declare function chooseModel(): void;
 /**
- * Compare models
+ * Compare models side-by-side
  * Menu item: "Compare Models"
  */
 export declare function compareModels(): void;
@@ -131,5 +131,11 @@ export declare function handleGenerate(): void;
  * @returns HTML content
  */
 export declare function include(filename: string): string;
+/**
+ * Rebuild the Table of Contents in the first sheet.
+ * Creates clickable HYPERLINK formulas for every subsequent sheet.
+ * Menu item: "Update Table of Contents"
+ */
+export declare function generateTableOfContents(): void;
 export {};
 //# sourceMappingURL=index.d.ts.map
