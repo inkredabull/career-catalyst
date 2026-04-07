@@ -11,6 +11,7 @@ import {
   type ContactPriorityTier
 } from './profileLookup.js';
 import { parseEventFromFileName } from './eventParser.js';
+import { openMessageModal } from './linkedinAutomation.js';
 import { loadAllCachedProfiles } from './cache.js';
 
 const program = new Command();
@@ -270,24 +271,22 @@ program
 
         console.log('\nFinished opening LinkedIn profiles.');
 
-        // Print personalized messages for HITL copy-paste
-        const messageTemplate = process.env.LINKEDIN_MESSAGE_TEMPLATE ||
-          'Hi {{firstName}}, looking forward to connecting!';
+        // Wait for pages to load before injecting
+        console.log('\nWaiting 4s for pages to load...');
+        await new Promise(resolve => setTimeout(resolve, 4000));
 
-        console.log('\n--- Connection messages (copy-paste as needed) ---\n');
-        for (const profile of sendCandidates) {
-          const firstName = profile.firstName || profile.name.split(' ')[0];
-          const summary = profile.condensedSummary || profile.domain || 'your industry';
-          const message = messageTemplate
-            .replace(/\{\{firstName\}\}/g, firstName)
-            .replace(/\{\{summary\}\}/g, summary)
-            .replace(/\{\{event\}\}/g, eventInfo.eventName);
-          console.log(`${profile.name} (${profile.priorityTier}):`);
-          console.log(`  ${message}`);
-          console.log('');
+        console.log('\nOpening message modals...\n');
+        for (let i = 0; i < sendCandidates.length; i++) {
+          const profile = sendCandidates[i];
+          const tabIndex = startingTabCount + i + 1;
+          await openMessageModal(profile, tabIndex, eventInfo.eventName);
+          if (i < sendCandidates.length - 1) {
+            const delay = Math.floor(Math.random() * (1500 - 800 + 1)) + 800;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
         }
 
-        console.log('✅ Tabs open. Send connection requests when ready.');
+        console.log('\n✅ Message modals populated. Review and send each when ready.');
       } else if (sendMode) {
         const tierLabel = sendTier === 'NONE' ? 'ALL' : sendTier;
         console.log(`\nNo send candidates found for tier filter ${tierLabel}.`);
