@@ -1422,6 +1422,9 @@ Action required: Complete and submit application`,
       };
 
       // Reminder 3: "Ping" follow-up reminder
+      const pingShorthand = (jobData as any).titleShorthand || jobData.title || 'Unknown Position';
+      const pingSubject = `${pingShorthand} at ${jobData.company || 'Unknown Company'}`;
+      const pingGmailUrl = `https://mail.google.com/mail/u/0/#search/from%3Ame+in%3Asent+subject%3A${encodeURIComponent(`"${pingSubject}"`)}`;
       const pingReminder = {
         title: `Ping about ${jobTitle}`,
         notes: `Follow up on application status
@@ -1438,7 +1441,8 @@ Suggested actions:
         priority: reminderPriority || config.default_priority,
         tags: commonTags,
         dueDate: today,
-        dueTime: '17:00' // Afternoon reminder
+        dueTime: '17:00', // Afternoon reminder
+        url: pingGmailUrl
       };
 
       // Reminder 4: "Prep for" interview preparation reminder

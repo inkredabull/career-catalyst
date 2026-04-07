@@ -45,6 +45,7 @@ export const SUBJECT_LINES = [
   'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
   'Need some fractional ENG help?',
   'Q2 2026 latest-and-greatest',
+  "Quick Favor - Exploring What's Next"
 ];
 
 // Feature flags - can be overridden per subject line
@@ -60,6 +61,7 @@ export const SUBJECT_LINE_FLAGS: Record<string, Partial<typeof FLAGS>> = {
   'Get your help for role as {{JobTitleShorthand}} at {{Company}}?': { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
   'Need some fractional ENG help?': { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
   'Q2 2026 latest-and-greatest': { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
+  "Quick Favor - Exploring What's Next": { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
 } as const;
 
 // Helper function to get flags for a specific subject line
