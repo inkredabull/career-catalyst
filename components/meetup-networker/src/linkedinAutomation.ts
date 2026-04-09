@@ -24,8 +24,18 @@ function generateConnectScript(message: string): string {
       else { setTimeout(fillNote, 500); }
     }
 
+    // Find the profile action area by locating the Message button and walking up
     var btns = Array.from(document.querySelectorAll('button'));
-    var connectBtn = btns.find(function(b) {
+    var msgBtn = btns.find(function(b) {
+      return (b.getAttribute('aria-label') || '').toLowerCase().startsWith('message ');
+    });
+
+    var actionContainer = msgBtn ? msgBtn.closest('div') : null;
+    var actionBtns = actionContainer
+      ? Array.from(actionContainer.querySelectorAll('button'))
+      : btns;
+
+    var connectBtn = actionBtns.find(function(b) {
       var label = (b.getAttribute('aria-label') || '').toLowerCase();
       var text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
       return label.startsWith('invite ') || text === 'connect';
@@ -37,9 +47,9 @@ function generateConnectScript(message: string): string {
       return;
     }
 
-    var moreBtn = btns.find(function(b) {
-      var label = (b.getAttribute('aria-label') || '').toLowerCase();
-      return label.includes('more');
+    // Connect hidden behind ... — find the More button in the profile action area
+    var moreBtn = actionBtns.find(function(b) {
+      return (b.getAttribute('aria-label') || '').toLowerCase() === 'more';
     });
     if (moreBtn) {
       moreBtn.click();
