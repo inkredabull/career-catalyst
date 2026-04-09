@@ -58,6 +58,7 @@ export interface LinkedInProfile {
   summary?: string;
   condensedSummary?: string;
   error?: string;
+  connectionSent?: boolean;
 }
 
 interface EnrichLayerCreditBalance {

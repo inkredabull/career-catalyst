@@ -90,6 +90,34 @@ export function getCachedLookup(
 }
 
 /**
+ * Mark a cached profile as having had a connection request sent
+ */
+export function markConnectionSent(
+  firstName: string,
+  lastName: string,
+  eventName: string
+): void {
+  const eventDirs = [
+    join(CACHE_DIR, normalizeEventName(eventName)),
+    join(CACHE_DIR, `${normalizeEventName(eventName)}-csv`),
+  ];
+
+  for (const eventDir of eventDirs) {
+    const cacheFile = join(eventDir, getCacheKey(firstName, lastName));
+    if (existsSync(cacheFile)) {
+      try {
+        const data = JSON.parse(readFileSync(cacheFile, 'utf-8'));
+        data.connectionSent = true;
+        writeFileSync(cacheFile, JSON.stringify(data, null, 2), 'utf-8');
+      } catch (error) {
+        console.warn(`  Warning: Could not mark connectionSent for ${firstName} ${lastName}`);
+      }
+      return;
+    }
+  }
+}
+
+/**
  * Save a lookup result to the cache
  */
 export function saveLookupToCache(

@@ -12,7 +12,7 @@ import {
 } from './profileLookup.js';
 import { parseEventFromFileName } from './eventParser.js';
 import { openMessageModal } from './linkedinAutomation.js';
-import { loadAllCachedProfiles } from './cache.js';
+import { loadAllCachedProfiles, markConnectionSent } from './cache.js';
 
 const program = new Command();
 
@@ -232,9 +232,14 @@ program
 
       // Weekly loop: review by default, explicit send only when --send is passed.
       const sendCandidates = targetContacts
-        .filter(p => p.linkedinUrl && isTierSelected(p.priorityTier, sendTier))
+        .filter(p => p.linkedinUrl && isTierSelected(p.priorityTier, sendTier) && !p.connectionSent)
         .sort((a, b) => tierRank(a.priorityTier) - tierRank(b.priorityTier))
         .slice(0, maxSends);
+
+      const alreadySentCount = targetContacts.filter(p => p.connectionSent).length;
+      if (alreadySentCount > 0) {
+        console.log(`Skipping ${alreadySentCount} already-sent connection(s)`);
+      }
 
       if (!sendMode && sendCandidates.length > 0) {
         console.log('\nReview complete. To send this week, run with:');
@@ -280,6 +285,14 @@ program
           const profile = sendCandidates[i];
           const tabIndex = startingTabCount + i + 1;
           await openMessageModal(profile, tabIndex, eventInfo.eventName);
+
+          // Mark as sent in cache
+          const nameParts = profile.name.trim().split(/\s+/);
+          const first = profile.firstName || nameParts[0] || '';
+          const last = nameParts[nameParts.length - 1] || '';
+          markConnectionSent(first, last, eventInfo.eventName);
+          console.log(`  Marked ${profile.name} as connection sent`);
+
           if (i < sendCandidates.length - 1) {
             const delay = Math.floor(Math.random() * (1500 - 800 + 1)) + 800;
             await new Promise(resolve => setTimeout(resolve, delay));
