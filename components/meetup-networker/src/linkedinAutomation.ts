@@ -6,6 +6,12 @@ function generateConnectScript(message: string): string {
   return `(function() {
     var message = ${JSON.stringify(message)};
 
+    // Skip if already pending
+    var isPending = Array.from(document.querySelectorAll('button')).some(function(b) {
+      return (b.innerText || '').trim().toLowerCase() === 'pending';
+    });
+    if (isPending) { console.log('Skipping — already pending'); return; }
+
     function fillNote() {
       var ta = document.querySelector('textarea');
       if (!ta) {
