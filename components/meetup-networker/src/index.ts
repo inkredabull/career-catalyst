@@ -269,7 +269,7 @@ program
 
           // Add random delay between 1250ms and 3000ms (except for last one)
           if (i < sendCandidates.length - 1) {
-            const delay = Math.floor(Math.random() * (3000 - 1250 + 1)) + 1250;
+            const delay = Math.floor(Math.random() * (3750 - 1600 + 1)) + 1600;
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
