@@ -24,18 +24,10 @@ function generateConnectScript(message: string): string {
       else { setTimeout(fillNote, 500); }
     }
 
-    // Find the profile action area by locating the Message button and walking up
     var btns = Array.from(document.querySelectorAll('button'));
-    var msgBtn = btns.find(function(b) {
-      return (b.getAttribute('aria-label') || '').toLowerCase().startsWith('message ');
-    });
 
-    var actionContainer = msgBtn ? msgBtn.closest('div') : null;
-    var actionBtns = actionContainer
-      ? Array.from(actionContainer.querySelectorAll('button'))
-      : btns;
-
-    var connectBtn = actionBtns.find(function(b) {
+    // Direct Connect button on profile
+    var connectBtn = btns.find(function(b) {
       var label = (b.getAttribute('aria-label') || '').toLowerCase();
       var text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
       return label.startsWith('invite ') || text === 'connect';
@@ -47,21 +39,35 @@ function generateConnectScript(message: string): string {
       return;
     }
 
-    // Connect hidden behind ... — find the More button in the profile action area
-    var moreBtn = actionBtns.find(function(b) {
-      return (b.getAttribute('aria-label') || '').toLowerCase() === 'more';
+    // Connect hidden behind ... — find the More button near the Message button
+    var msgBtn = btns.find(function(b) {
+      return (b.getAttribute('aria-label') || '').toLowerCase().startsWith('message ');
     });
+
+    // Walk up from Message button until we find a container that also has a More button
+    var moreBtn = null;
+    var node = msgBtn ? msgBtn.parentElement : null;
+    while (node && !moreBtn) {
+      var moreCandidates = Array.from(node.querySelectorAll('button')).filter(function(b) {
+        return (b.getAttribute('aria-label') || '').toLowerCase() === 'more';
+      });
+      if (moreCandidates.length > 0) { moreBtn = moreCandidates[0]; }
+      else { node = node.parentElement; }
+    }
+
     if (moreBtn) {
       moreBtn.click();
       setTimeout(function() {
-        var elems = Array.from(document.querySelectorAll('button, div[role="menuitem"], li[role="menuitem"]'));
+        // Search entire document for the Connect item that appears in the dropdown
+        var elems = Array.from(document.querySelectorAll('button, [role="menuitem"], li'));
         var conn = elems.find(function(e) {
-          var l = (e.getAttribute('aria-label') || e.innerText || '').toLowerCase();
-          return l.startsWith('invite ') || l.trim() === 'connect';
+          var l = (e.getAttribute('aria-label') || '').toLowerCase();
+          var t = (e.innerText || '').trim().toLowerCase();
+          return l.startsWith('invite ') || l.includes('to connect') || t === 'connect';
         });
         if (conn) { conn.click(); setTimeout(clickAddNote, 2000); }
         else { console.log('Connect not found in More menu'); }
-      }, 800);
+      }, 1000);
       return;
     }
 
