@@ -20,8 +20,8 @@ function generateConnectScript(message: string): string {
       var addNote = btns.find(function(b) {
         return (b.innerText || '').toLowerCase().includes('add a note');
       });
-      if (addNote) { addNote.click(); setTimeout(fillNote, 1000); }
-      else { fillNote(); }
+      if (addNote) { addNote.click(); setTimeout(fillNote, 1500); }
+      else { setTimeout(fillNote, 500); }
     }
 
     var btns = Array.from(document.querySelectorAll('button'));
@@ -33,7 +33,7 @@ function generateConnectScript(message: string): string {
 
     if (connectBtn) {
       connectBtn.click();
-      setTimeout(clickAddNote, 1000);
+      setTimeout(clickAddNote, 2000);
       return;
     }
 
@@ -49,7 +49,7 @@ function generateConnectScript(message: string): string {
           var l = (e.getAttribute('aria-label') || e.innerText || '').toLowerCase();
           return l.startsWith('invite ') || l.trim() === 'connect';
         });
-        if (conn) { conn.click(); setTimeout(clickAddNote, 1000); }
+        if (conn) { conn.click(); setTimeout(clickAddNote, 2000); }
         else { console.log('Connect not found in More menu'); }
       }, 800);
       return;
