@@ -11,7 +11,8 @@ import { MetricsAgent } from './agents/metrics-agent';
 import { WhoGotHiredAgent } from './agents/whogothired-agent';
 import { ModeDetectorAgent } from './agents/mode-detector-agent';
 import { StatementType, AboutMeSection } from './types';
-import { getConfig, getAnthropicConfig, getResumeGenerationConfig, getCritiqueAndJudgeMaxAttempts } from './config';
+import { getConfig, getAnthropicConfig, getResumeGenerationConfig, getCritiqueAndJudgeMaxAttempts, getBlurbConfig } from './config';
+import { BlurbGeneratorAgent } from './agents/blurb-generator-agent';
 import { LLMProviderConfig } from './providers/llm-provider';
 import * as crypto from 'crypto';
 import * as path from 'path';
@@ -482,6 +483,30 @@ program
           result.data.company,
           result.data.url || ''
         );
+      }
+
+      // Auto-generate first and third person blurbs via Gemini Flash (free)
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          console.log('\n✍️  Generating blurbs...');
+          const blurbAgent = new BlurbGeneratorAgent(getBlurbConfig());
+          const blurbs = await blurbAgent.generate({
+            title: result.data.title,
+            company: result.data.company,
+            description: result.data.description || ''
+          });
+
+          const blurbPath = path.join(jobDir, 'blurbs.json');
+          await fs.writeFile(blurbPath, JSON.stringify({ jobId, role: result.data.title, company: result.data.company, generatedAt: new Date().toISOString(), ...blurbs }, null, 2), 'utf-8');
+
+          console.log('\n📝 FIRST PERSON:');
+          console.log(blurbs.firstPerson);
+          console.log('\n📝 THIRD PERSON:');
+          console.log(blurbs.thirdPerson);
+          console.log(`\n💾 Blurbs saved to ${blurbPath}`);
+        } catch (blurbError) {
+          console.warn(`⚠️  Blurb generation failed (non-blocking): ${blurbError instanceof Error ? blurbError.message : blurbError}`);
+        }
       }
 
       // Automatically score the job unless --no-score or --skip-post-workflow is specified

@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { AgentConfig } from './types';
+import { LLMProviderConfig } from './providers/llm-provider';
 
 // Find and load .env from project root (supports running from workspace packages)
 function loadEnvFromProjectRoot() {
@@ -107,6 +108,20 @@ export interface ResumeGenerationConfig {
   maxTokens: number;
   maxRoles: number;
   temperature: number;
+}
+
+export function getBlurbConfig(): LLMProviderConfig {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is required for blurb generation');
+  }
+  return {
+    provider: 'gemini',
+    apiKey,
+    model: process.env.BLURB_LLM_MODEL ?? 'gemini-2.0-flash',
+    maxTokens: 600,
+    temperature: 0.7
+  };
 }
 
 export function getResumeGenerationConfig(): ResumeGenerationConfig {
