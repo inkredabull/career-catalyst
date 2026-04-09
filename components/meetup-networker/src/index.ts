@@ -75,9 +75,9 @@ function isTierSelected(profileTier: ContactPriorityTier | undefined, sendTier: 
     return false;
   }
   if (sendTier === 'NONE') {
-    return true;
+    return true; // --send-tier all
   }
-  return tierRank(profileTier) <= tierRank(sendTier);
+  return profileTier === sendTier; // exact tier match only
 }
 
 program
