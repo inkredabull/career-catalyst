@@ -343,6 +343,10 @@ function createGutter() {
               <input type="checkbox" id="reminder-followup" class="reminder-checkbox" checked>
               <span>📧 Follow-up</span>
             </label>
+            <label class="reminder-checkbox-label">
+              <input type="checkbox" id="reminder-reachout" class="reminder-checkbox" checked>
+              <span>🤝 Reach Out Directly</span>
+            </label>
           </div>
         </div>
 
@@ -1623,6 +1627,7 @@ async function handleTrackFromForm() {
     if (document.getElementById('reminder-ping')?.checked) selectedReminders.push('ping');
     if (document.getElementById('reminder-prep')?.checked) selectedReminders.push('prep');
     if (document.getElementById('reminder-followup')?.checked) selectedReminders.push('followup');
+    if (document.getElementById('reminder-reachout')?.checked) selectedReminders.push('reachout');
 
     console.log('Career Catalyst: Tracking job from form fields:', jobInfo);
     console.log('Career Catalyst: Reminder priority:', reminderPriority);

@@ -1371,6 +1371,7 @@ Return only the synthesized job description text, no additional formatting or co
       const config = reminderService.getConfig();
 
       const today = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
+      const twoDaysFromToday = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Two days from today (Ping + 2)
       const threeDaysFromToday = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Three days from today in YYYY-MM-DD format
       const jobTitle = `${jobData.title || 'Unknown Position'} at ${jobData.company || 'Unknown Company'}`;
 
@@ -1490,6 +1491,27 @@ Outreach activities:
         url: `https://mail.google.com/mail/u/0/#search/in%3Asent+from%3Ame+subject%3A${encodeURIComponent(jobData.company || 'Unknown Company')}`
       };
 
+      // Reminder 6: "Reach Out Directly" — 2 days after Ping reminder
+      const reachOutReminder = {
+        title: `Reach out directly for: ${jobTitle}`,
+        notes: `Directly contact someone at the company
+
+Position: ${jobData.title || 'Unknown Position'}
+Company: ${jobData.company || 'Unknown Company'}
+Job ID: ${jobId}
+
+Suggested actions:
+- Find hiring manager or team lead on LinkedIn
+- Send a direct connection request with a personalized note
+- Reference the specific role and your relevant experience
+- Ask for a brief informational conversation`,
+        list: config.list_name,
+        priority: reminderPriority || config.default_priority,
+        tags: commonTags,
+        dueDate: twoDaysFromToday,
+        dueTime: '10:00' // Morning reminder
+      };
+
       // Create all reminders as separate top-level reminders
       // Filter based on selectedReminders if provided
       const allReminders = {
@@ -1497,7 +1519,8 @@ Outreach activities:
         apply: applyReminder,
         ping: pingReminder,
         prep: prepReminder,
-        followup: followUpReminder
+        followup: followUpReminder,
+        reachout: reachOutReminder
       };
 
       let remindersToCreate: any[] = [];
@@ -1511,7 +1534,7 @@ Outreach activities:
         console.log(`📋 Creating ${remindersToCreate.length} selected reminder(s): ${selectedReminders.join(', ')}`);
       } else {
         // Sheet insertion now handles tracking; create only action reminders by default
-        remindersToCreate = [applyReminder, pingReminder, prepReminder, followUpReminder];
+        remindersToCreate = [applyReminder, pingReminder, reachOutReminder, prepReminder, followUpReminder];
       }
 
       if (remindersToCreate.length === 0) {
