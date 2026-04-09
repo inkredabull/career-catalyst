@@ -59,7 +59,7 @@ function generateConnectScript(message: string): string {
       moreBtn.click();
       setTimeout(function() {
         // Search entire document for the Connect item that appears in the dropdown
-        var elems = Array.from(document.querySelectorAll('button, [role="menuitem"], li'));
+        var elems = Array.from(document.querySelectorAll('button, [role="menuitem"], li, a'));
         var conn = elems.find(function(e) {
           var l = (e.getAttribute('aria-label') || '').toLowerCase();
           var t = (e.innerText || '').trim().toLowerCase();
