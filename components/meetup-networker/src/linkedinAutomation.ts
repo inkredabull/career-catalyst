@@ -1,73 +1,74 @@
 import { execSync } from 'child_process';
+import { writeFileSync, unlinkSync } from 'fs';
 import { LinkedInProfile } from './profileLookup.js';
 
 function generateConnectScript(message: string): string {
-  const escaped = message
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r');
+  return `(function() {
+    var message = ${JSON.stringify(message)};
 
-  return [
-    '(function() {',
-    '  function fillTextarea() {',
-    '    var ta = document.querySelector("textarea");',
-    '    if (!ta) { console.log("Textarea not found"); return; }',
-    `    ta.value = "${escaped}";`,
-    '    ta.dispatchEvent(new Event("input", { bubbles: true }));',
-    '    ta.dispatchEvent(new Event("change", { bubbles: true }));',
-    '    console.log("Note filled");',
-    '  }',
-    '  function clickAddNote() {',
-    '    var btns = Array.from(document.querySelectorAll("button"));',
-    '    var addNote = btns.find(function(b) {',
-    '      return (b.innerText || "").toLowerCase().includes("add a note");',
-    '    });',
-    '    if (addNote) { addNote.click(); setTimeout(fillTextarea, 800); }',
-    '    else { fillTextarea(); }',
-    '  }',
-    '  var btns = Array.from(document.querySelectorAll("button"));',
-    '  var connectBtn = btns.find(function(b) {',
-    '    var label = (b.getAttribute("aria-label") || b.innerText || "").toLowerCase();',
-    '    return label.startsWith("invite ") || label === "connect";',
-    '  });',
-    '  if (!connectBtn) {',
-    '    var moreBtn = btns.find(function(b) {',
-    '      var t = (b.innerText || "").toLowerCase().trim();',
-    '      var l = (b.getAttribute("aria-label") || "").toLowerCase();',
-    '      return t === "more" || l.includes("more");',
-    '    });',
-    '    if (moreBtn) {',
-    '      moreBtn.click();',
-    '      setTimeout(function() {',
-    '        var elems = Array.from(document.querySelectorAll("button, div[role=\\"menuitem\\"]"));',
-    '        var conn = elems.find(function(e) {',
-    '          var l = (e.getAttribute("aria-label") || e.innerText || "").toLowerCase();',
-    '          return l.startsWith("invite ");',
-    '        });',
-    '        if (conn) { conn.click(); setTimeout(clickAddNote, 800); }',
-    '        else { console.log("Connect not found in More menu"); }',
-    '      }, 600);',
-    '    } else { console.log("No Connect or More button found"); }',
-    '    return;',
-    '  }',
-    '  connectBtn.click();',
-    '  setTimeout(clickAddNote, 800);',
-    '})();',
-  ].join('');
+    function fillNote() {
+      var ta = document.querySelector('textarea');
+      if (!ta) { console.log('Textarea not found'); return; }
+      ta.value = message;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      ta.dispatchEvent(new Event('change', { bubbles: true }));
+      console.log('Note filled');
+    }
+
+    function clickAddNote() {
+      var btns = Array.from(document.querySelectorAll('button'));
+      var addNote = btns.find(function(b) {
+        return (b.innerText || '').toLowerCase().includes('add a note');
+      });
+      if (addNote) { addNote.click(); setTimeout(fillNote, 1000); }
+      else { fillNote(); }
+    }
+
+    var btns = Array.from(document.querySelectorAll('button'));
+    var connectBtn = btns.find(function(b) {
+      var label = (b.getAttribute('aria-label') || '').toLowerCase();
+      var text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+      return label.startsWith('invite ') || text === 'connect';
+    });
+
+    if (connectBtn) {
+      connectBtn.click();
+      setTimeout(clickAddNote, 1000);
+      return;
+    }
+
+    var moreBtn = btns.find(function(b) {
+      var label = (b.getAttribute('aria-label') || '').toLowerCase();
+      return label.includes('more');
+    });
+    if (moreBtn) {
+      moreBtn.click();
+      setTimeout(function() {
+        var elems = Array.from(document.querySelectorAll('button, div[role="menuitem"], li[role="menuitem"]'));
+        var conn = elems.find(function(e) {
+          var l = (e.getAttribute('aria-label') || e.innerText || '').toLowerCase();
+          return l.startsWith('invite ') || l.trim() === 'connect';
+        });
+        if (conn) { conn.click(); setTimeout(clickAddNote, 1000); }
+        else { console.log('Connect not found in More menu'); }
+      }, 800);
+      return;
+    }
+
+    console.log('No Connect button found');
+  })();`;
 }
 
 function injectJavaScriptIntoChrome(tabIndex: number, javascript: string): void {
-  const escapedJs = javascript
-    .trim()
-    .replace(/\n/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"');
+  // Write JS to a temp file — avoids AppleScript string escaping entirely
+  const tmpFile = `/tmp/li_inject_${Date.now()}.js`;
+  writeFileSync(tmpFile, javascript, 'utf-8');
 
-  const appleScript = `tell application "Google Chrome"
+  const appleScript = `
+set jsCode to read POSIX file "${tmpFile}"
+tell application "Google Chrome"
   tell tab ${tabIndex} of front window
-    execute javascript "${escapedJs}"
+    execute javascript jsCode
   end tell
 end tell`;
 
@@ -75,6 +76,8 @@ end tell`;
     execSync('osascript', { input: appleScript, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
   } catch (error) {
     console.log(`  ⚠️  Error injecting into tab ${tabIndex}`);
+  } finally {
+    try { unlinkSync(tmpFile); } catch { /* ignore */ }
   }
 }
 
