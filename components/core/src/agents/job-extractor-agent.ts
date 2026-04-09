@@ -1426,7 +1426,7 @@ Action required: Complete and submit application`,
       const pingSubject = `${pingShorthand} at ${jobData.company || 'Unknown Company'}`;
       const pingGmailUrl = `https://mail.google.com/mail/u/0/#search/from%3Ame+in%3Asent+subject%3A${encodeURIComponent(`"${pingSubject}"`)}`;
       const pingReminder = {
-        title: `Ping about ${jobTitle}`,
+        title: `Ping network contacts about ${jobTitle}`,
         notes: `Follow up on application status
 
 Position: ${jobData.title || 'Unknown Position'}
