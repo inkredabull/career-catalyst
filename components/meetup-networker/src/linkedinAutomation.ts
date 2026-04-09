@@ -39,20 +39,30 @@ function generateConnectScript(message: string): string {
       return;
     }
 
-    // Connect hidden behind ... — find the More button near the Message button
-    var msgBtn = btns.find(function(b) {
-      return (b.getAttribute('aria-label') || '').toLowerCase().startsWith('message ');
+    // Connect hidden behind ... — find the More button near the Message/Follow button
+    var anchorBtn = btns.find(function(b) {
+      var label = (b.getAttribute('aria-label') || '').toLowerCase();
+      var text = (b.innerText || '').trim().toLowerCase();
+      return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
     });
 
-    // Walk up from Message button until we find a container that also has a More button
+    // Walk up from anchor button until we find a container that also has a More button
     var moreBtn = null;
-    var node = msgBtn ? msgBtn.parentElement : null;
+    var node = anchorBtn ? anchorBtn.parentElement : null;
     while (node && !moreBtn) {
       var moreCandidates = Array.from(node.querySelectorAll('button')).filter(function(b) {
         return (b.getAttribute('aria-label') || '').toLowerCase() === 'more';
       });
       if (moreCandidates.length > 0) { moreBtn = moreCandidates[0]; }
       else { node = node.parentElement; }
+    }
+
+    // Last resort: try all More buttons from the bottom of the DOM up (profile action one is usually last)
+    if (!moreBtn) {
+      var allMore = btns.filter(function(b) {
+        return (b.getAttribute('aria-label') || '').toLowerCase() === 'more';
+      });
+      moreBtn = allMore[allMore.length - 1] || null;
     }
 
     if (moreBtn) {
