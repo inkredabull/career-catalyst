@@ -8,16 +8,30 @@ function generateConnectScript(message: string): string {
 
     function fillNote() {
       var ta = document.querySelector('textarea');
+      if (!ta) {
+        // Try shadow root (LinkedIn renders the invite modal inside a shadow DOM)
+        var shadowHost = Array.from(document.querySelectorAll('*')).find(function(el) {
+          return el.shadowRoot && el.shadowRoot.querySelector('textarea');
+        });
+        if (shadowHost) { ta = shadowHost.shadowRoot.querySelector('textarea'); }
+      }
       if (!ta) { console.log('Textarea not found'); return; }
       ta.value = message;
       ta.dispatchEvent(new Event('input', { bubbles: true }));
       ta.dispatchEvent(new Event('change', { bubbles: true }));
-      console.log('Note filled');
+      ta.dispatchEvent(new Event('blur', { bubbles: true }));
+      console.log('Note filled: ' + ta.value.slice(0, 30));
     }
 
     function clickAddNote() {
-      var btns = Array.from(document.querySelectorAll('button'));
-      var addNote = btns.find(function(b) {
+      var allBtns = Array.from(document.querySelectorAll('button'));
+      // Also search shadow roots
+      Array.from(document.querySelectorAll('*')).forEach(function(el) {
+        if (el.shadowRoot) {
+          allBtns = allBtns.concat(Array.from(el.shadowRoot.querySelectorAll('button')));
+        }
+      });
+      var addNote = allBtns.find(function(b) {
         return (b.innerText || '').toLowerCase().includes('add a note');
       });
       if (addNote) { addNote.click(); setTimeout(fillNote, 2000); }
