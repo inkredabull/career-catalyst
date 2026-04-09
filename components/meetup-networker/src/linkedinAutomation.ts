@@ -46,8 +46,8 @@ function generateConnectScript(message: string): string {
 
     var btns = Array.from(document.querySelectorAll('button'));
 
-    // Direct Connect button on profile
-    var connectBtn = btns.find(function(b) {
+    // Direct Connect button on profile — may be a <button> or <a> tag
+    var connectBtn = Array.from(document.querySelectorAll('button, a')).find(function(b) {
       var label = (b.getAttribute('aria-label') || '').toLowerCase();
       var text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
       return label.startsWith('invite ') || text === 'connect';
