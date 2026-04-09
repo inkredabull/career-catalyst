@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import { LinkedInProfile } from './profileLookup.js';
 
-function generateClickMessageScript(message: string): string {
+function generateConnectScript(message: string): string {
   const escaped = message
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
@@ -10,23 +10,49 @@ function generateClickMessageScript(message: string): string {
 
   return [
     '(function() {',
-    '  var allButtons = Array.from(document.querySelectorAll("button"));',
-    '  var msgBtn = allButtons.find(function(b) {',
-    '    var label = b.getAttribute("aria-label") || "";',
-    '    return label.toLowerCase().startsWith("message ");',
+    '  function fillTextarea() {',
+    '    var ta = document.querySelector("textarea");',
+    '    if (!ta) { console.log("Textarea not found"); return; }',
+    `    ta.value = "${escaped}";`,
+    '    ta.dispatchEvent(new Event("input", { bubbles: true }));',
+    '    ta.dispatchEvent(new Event("change", { bubbles: true }));',
+    '    console.log("Note filled");',
+    '  }',
+    '  function clickAddNote() {',
+    '    var btns = Array.from(document.querySelectorAll("button"));',
+    '    var addNote = btns.find(function(b) {',
+    '      return (b.innerText || "").toLowerCase().includes("add a note");',
+    '    });',
+    '    if (addNote) { addNote.click(); setTimeout(fillTextarea, 800); }',
+    '    else { fillTextarea(); }',
+    '  }',
+    '  var btns = Array.from(document.querySelectorAll("button"));',
+    '  var connectBtn = btns.find(function(b) {',
+    '    var label = (b.getAttribute("aria-label") || b.innerText || "").toLowerCase();',
+    '    return label.startsWith("invite ") || label === "connect";',
     '  });',
-    '  if (!msgBtn) { console.log("Message button not found"); return; }',
-    '  msgBtn.click();',
-    '  console.log("Clicked Message button");',
-    '  setTimeout(function() {',
-    '    var box = document.querySelector(".msg-form__contenteditable[contenteditable=\\"true\\"]")',
-    '           || document.querySelector("div[role=\\"textbox\\"][contenteditable=\\"true\\"]");',
-    '    if (!box) { console.log("Compose box not found"); return; }',
-    '    box.focus();',
-    `    document.execCommand("selectAll", false, null);`,
-    `    document.execCommand("insertText", false, "${escaped}");`,
-    '    console.log("Message filled");',
-    '  }, 1500);',
+    '  if (!connectBtn) {',
+    '    var moreBtn = btns.find(function(b) {',
+    '      var t = (b.innerText || "").toLowerCase().trim();',
+    '      var l = (b.getAttribute("aria-label") || "").toLowerCase();',
+    '      return t === "more" || l.includes("more");',
+    '    });',
+    '    if (moreBtn) {',
+    '      moreBtn.click();',
+    '      setTimeout(function() {',
+    '        var elems = Array.from(document.querySelectorAll("button, div[role=\\"menuitem\\"]"));',
+    '        var conn = elems.find(function(e) {',
+    '          var l = (e.getAttribute("aria-label") || e.innerText || "").toLowerCase();',
+    '          return l.startsWith("invite ");',
+    '        });',
+    '        if (conn) { conn.click(); setTimeout(clickAddNote, 800); }',
+    '        else { console.log("Connect not found in More menu"); }',
+    '      }, 600);',
+    '    } else { console.log("No Connect or More button found"); }',
+    '    return;',
+    '  }',
+    '  connectBtn.click();',
+    '  setTimeout(clickAddNote, 800);',
     '})();',
   ].join('');
 }
@@ -66,6 +92,6 @@ export async function openMessageModal(
     .replace(/\{\{summary\}\}/g, summary)
     .replace(/\{\{event\}\}/g, eventName);
 
-  console.log(`  Opening message modal for ${profile.name} (tab ${tabIndex})...`);
-  injectJavaScriptIntoChrome(tabIndex, generateClickMessageScript(message));
+  console.log(`  Sending connect invite for ${profile.name} (tab ${tabIndex})...`);
+  injectJavaScriptIntoChrome(tabIndex, generateConnectScript(message));
 }
