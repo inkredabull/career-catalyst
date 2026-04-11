@@ -22,6 +22,9 @@ export class GeminiProvider extends BaseLLMProvider {
   }
 
   async makeRequest(request: LLMRequest): Promise<LLMResponse> {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 15000; // 15s base — Gemini free tier RPM resets quickly
+
     const startTime = Date.now();
     console.log(`🤖 Sending request to Gemini (${this.config.model})...`);
 
@@ -31,48 +34,63 @@ export class GeminiProvider extends BaseLLMProvider {
       process.stdout.write(`\r⏱️  Elapsed time: ${elapsedSeconds}s...`);
     }, 1000);
 
-    try {
-      let fullPrompt = request.prompt;
-      if (request.cachedContent) {
-        fullPrompt = request.cachedContent + '\n\n' + request.prompt;
-      }
-
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-      if (request.systemPrompt) {
-        messages.push({ role: 'system', content: request.systemPrompt });
-      }
-      messages.push({ role: 'user', content: fullPrompt });
-
-      const response = await this.openai.chat.completions.create({
-        model: this.config.model,
-        messages,
-        max_tokens: this.config.maxTokens || 600,
-        temperature: this.config.temperature || 0.7
-      });
-
-      clearInterval(timerInterval);
-      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-      process.stdout.write(`\r⏱️  Elapsed time: ${duration}s (complete)\n`);
-
-      const usage = {
-        inputTokens: response.usage?.prompt_tokens || 0,
-        outputTokens: response.usage?.completion_tokens || 0,
-        cachedTokens: 0
-      };
-
-      console.log(`✅ Gemini response received (${usage.inputTokens.toLocaleString()} in, ${usage.outputTokens.toLocaleString()} out) — free tier`);
-
-      return {
-        text: response.choices[0]?.message?.content || '',
-        usage,
-        cost: this.calculateActualCost(usage)
-      };
-    } catch (error) {
-      clearInterval(timerInterval);
-      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-      process.stdout.write(`\r⏱️  Elapsed time: ${duration}s (failed)\n`);
-      throw error;
+    let fullPrompt = request.prompt;
+    if (request.cachedContent) {
+      fullPrompt = request.cachedContent + '\n\n' + request.prompt;
     }
+
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+    if (request.systemPrompt) {
+      messages.push({ role: 'system', content: request.systemPrompt });
+    }
+    messages.push({ role: 'user', content: fullPrompt });
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await this.openai.chat.completions.create({
+          model: this.config.model,
+          messages,
+          max_tokens: this.config.maxTokens || 600,
+          temperature: this.config.temperature || 0.7
+        });
+
+        clearInterval(timerInterval);
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        process.stdout.write(`\r⏱️  Elapsed time: ${duration}s (complete)\n`);
+
+        const usage = {
+          inputTokens: response.usage?.prompt_tokens || 0,
+          outputTokens: response.usage?.completion_tokens || 0,
+          cachedTokens: 0
+        };
+
+        console.log(`✅ Gemini response received (${usage.inputTokens.toLocaleString()} in, ${usage.outputTokens.toLocaleString()} out) — free tier`);
+
+        return {
+          text: response.choices[0]?.message?.content || '',
+          usage,
+          cost: this.calculateActualCost(usage)
+        };
+      } catch (error) {
+        const status = (error as any)?.status ?? (error as any)?.statusCode;
+        const isRateLimit = status === 429;
+
+        if (isRateLimit && attempt < MAX_RETRIES) {
+          const waitMs = RETRY_DELAY_MS * attempt; // 15s, 30s
+          process.stdout.write(`\r⏱️  Rate limited (429) — retrying in ${waitMs / 1000}s (attempt ${attempt}/${MAX_RETRIES - 1})...\n`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+          continue;
+        }
+
+        clearInterval(timerInterval);
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        process.stdout.write(`\r⏱️  Elapsed time: ${duration}s (failed)\n`);
+        throw error;
+      }
+    }
+
+    // Unreachable — loop always returns or throws
+    throw new Error('Gemini request failed after max retries');
   }
 
   calculateActualCost(_usage: { inputTokens: number; outputTokens: number; cachedTokens?: number; cacheWriteTokens?: number }): {
