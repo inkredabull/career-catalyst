@@ -23,7 +23,7 @@ export class GeminiProvider extends BaseLLMProvider {
 
   async makeRequest(request: LLMRequest): Promise<LLMResponse> {
     const MAX_RETRIES = 3;
-    const RETRY_DELAY_MS = 15000; // 15s base — Gemini free tier RPM resets quickly
+    const RETRY_DELAY_MS = 60000; // 60s base — Gemini free tier quota window
 
     const startTime = Date.now();
     console.log(`🤖 Sending request to Gemini (${this.config.model})...`);
@@ -77,7 +77,7 @@ export class GeminiProvider extends BaseLLMProvider {
 
         if (isRateLimit && attempt < MAX_RETRIES) {
           const waitMs = RETRY_DELAY_MS * attempt; // 15s, 30s
-          process.stdout.write(`\r⏱️  Rate limited (429) — retrying in ${waitMs / 1000}s (attempt ${attempt}/${MAX_RETRIES - 1})...\n`);
+          process.stdout.write(`\n⏱️  Rate limited (429) — retrying in ${waitMs / 1000}s (attempt ${attempt}/${MAX_RETRIES - 1})...\n`);
           await new Promise(resolve => setTimeout(resolve, waitMs));
           continue;
         }
