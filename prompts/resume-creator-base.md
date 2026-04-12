@@ -49,6 +49,23 @@ If the job description mentions: HIPAA, SOC2, compliance, clinical, patient data
 - Audit or regulatory experience
 - High-stakes reliability work
 
+### Global / International / Multilingual Environments
+If the company name or job description signals international scope — e.g., "global", "international", "multilingual", "multi-lingual", "localization", "translation", "cross-border", or the company itself operates internationally (serving multiple countries, regions, or languages):
+
+**Emphasize:**
+- Any experience working with multilingual users or systems
+- International deployments or global user bases
+- Cross-cultural collaboration and communication
+- Language skills (even if conversational)
+
+**Surface from CV:**
+- Language proficiencies listed in the CV — include a LANGUAGES section in the resume
+- Any role involving multilingual platforms, localization, or international users
+- Experience working with distributed teams across countries or cultures
+- Government, NGO, or international organization work (e.g., UN agencies, IAEA) — even if older, it signals international credibility
+
+**Note:** Language skills and international experience are differentiators worth surfacing even when the job description doesn't explicitly list them — international companies notice them.
+
 ### Enterprise / Scale Stage
 If the job description emphasizes: enterprise customers, scale, maturity, predictability
 
