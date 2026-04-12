@@ -250,6 +250,7 @@ The general structure MUST be (in this exact order):
 * Contact Information
 * Summary
 * Roles (with optional Technologies lines per role)
+* Earlier Career (OPTIONAL — condensed older roles, max 3 entries)
 * "Complete work history available upon request." (in italics)
 * Skills
 * Education (MANDATORY - must always be included)
@@ -291,6 +292,17 @@ The {{maxRoles}} value is a soft suggestion (~{{maxRoles}} roles), but you shoul
 - Within BOTH the "RELEVANT EXPERIENCE" and "RELATED EXPERIENCE" sections, roles MUST be listed in strict reverse-chronological order (most recent first)
 - Sort by the END date of each role (e.g., a role ending in 2024 comes before a role ending in 2022)
 - Never group roles by relevance if it breaks chronological order within a section
+
+### Earlier Career (optional condensed section)
+
+If there are older roles (10+ years ago) that provide important context — international experience, domain credibility, foundational technical work — include them as a condensed `## EARLIER CAREER` section placed after the main experience section. Use compact formatting:
+
+```
+**Role Title @ Company** | *Years*
+One-line summary of the most relevant contribution.
+```
+
+Use this section for roles that would dilute the main experience section if given full treatment, but are worth mentioning. Maximum 3 entries. **Skip this section entirely if the main roles already fill two pages.** Always use it when the candidate has international, multilingual, or government/NGO experience that is a differentiator for the target role.
 
 {{rolesSpecificInstructions}}
 

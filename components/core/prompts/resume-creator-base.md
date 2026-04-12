@@ -127,7 +127,10 @@ Be sure bullets reflect the verbiage used in the job description.
 
 {{technologiesSection}}
 
-Stipulate "Complete work history available upon request." in italics before a SKILLS section.
+If there are older roles (10+ years ago) that provide important context — international experience, domain credibility, government/NGO work — include them as a condensed `## EARLIER CAREER` section before the work history note. Format each as:
+`**Role Title @ Company** | *Years*` followed by one line summarizing the most relevant contribution. Maximum 3 entries.
+
+Stipulate "Complete work history available upon request." in italics after the EARLIER CAREER section (if present) and before a SKILLS section.
 
 ## Skills
 

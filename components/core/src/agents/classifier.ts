@@ -6,7 +6,7 @@ const CLASSIFIER_MODEL = 'claude-haiku-4-5-20251001';
 const CLASSIFIER_SYSTEM_PROMPT = `You are a resume strategy classifier. Given a job posting and a brief CV summary, return ONLY a JSON object with these fields:
 - domain: one of "regulated" | "enterprise" | "platform" | "general"
 - format: "split" if the candidate has a mix of highly-aligned recent roles AND older/adjacent supporting roles worth showing; "standard" only if all relevant roles are equally aligned (no meaningful distinction between primary and supporting)
-- rolesIncluded: integer 3–7 based on relevance depth
+- rolesIncluded: integer 5–8 based on relevance depth; use the higher end (7–8) for senior candidates (Director/VP/Head of/CTO) with 15+ years of experience — they have more differentiating history worth showing
 - reasoning: 1–2 sentence explanation
 - domainSignals: array of specific keywords detected in the job posting
 

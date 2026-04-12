@@ -157,7 +157,8 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
 ==================================================
 DOMAIN: ${classification.domain}
 ACTIVE DOMAIN SIGNALS: ${classification.domainSignals.join(', ') || 'none'}
-FORMAT (MANDATORY — DO NOT OVERRIDE): ${classification.format} with ${classification.rolesIncluded} roles
+FORMAT (MANDATORY — DO NOT OVERRIDE): ${classification.format}
+TARGET ROLE COUNT: ${classification.rolesIncluded} (soft target — go up to 2 more if needed to fill a second page or surface important differentiating experience)
 REASONING: ${classification.reasoning}
 
 INSTRUCTIONS: Use the pre-classified domain above. The domain-specific language guidance has been filtered to match this domain. Apply the corresponding emphasis rules for this domain directly.
