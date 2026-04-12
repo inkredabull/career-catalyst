@@ -50,9 +50,20 @@ Respond with ONLY valid JSON. The values must be plain prose strings with no emb
       throw new Error('BlurbGeneratorAgent: response missing firstPerson or thirdPerson fields');
     }
 
-    // Strip any leading heading line (e.g. "First Person Perspective\n...") and collapse newlines
-    const clean = (s: string): string =>
-      s.replace(/^[A-Z][^\n]{0,40}\n/, '').replace(/\n+/g, ' ').trim();
+    // Strip any leading heading line, collapse newlines, then hard-truncate to ≤150 words at sentence boundary
+    const clean = (s: string): string => {
+      const flat = s.replace(/^[A-Z][^\n]{0,40}\n/, '').replace(/\n+/g, ' ').trim();
+      const words = flat.split(/\s+/);
+      if (words.length <= 150) return flat;
+      // Truncate at last sentence-ending punctuation at or before word 150
+      const truncated = words.slice(0, 150).join(' ');
+      const lastSentenceEnd = Math.max(
+        truncated.lastIndexOf('. '),
+        truncated.lastIndexOf('! '),
+        truncated.lastIndexOf('? ')
+      );
+      return lastSentenceEnd > 0 ? truncated.slice(0, lastSentenceEnd + 1) : truncated;
+    };
     parsed.firstPerson = clean(parsed.firstPerson);
     parsed.thirdPerson = clean(parsed.thirdPerson);
 
