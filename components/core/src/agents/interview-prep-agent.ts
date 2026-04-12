@@ -2236,16 +2236,8 @@ ${project.result}`;
 
       console.log(`🔍 Researching company values for: ${companyName}`);
 
-      // Use provided URL if available, otherwise derive from job data, then prompt user
+      // Use provided URL if available, otherwise prompt user
       let companyUrl: string | null = providedCompanyUrl || null;
-      if (!companyUrl) {
-        // Auto-derive from linkedInCompany slug if present
-        const linkedInSlug = (jobData as any).linkedInCompany;
-        if (linkedInSlug) {
-          companyUrl = `https://www.linkedin.com/company/${linkedInSlug}/about/`;
-          console.log(`🌐 Auto-derived company URL from LinkedIn slug: ${companyUrl}`);
-        }
-      }
       if (!companyUrl) {
         companyUrl = await this.promptForCompanyUrl(companyName);
         if (!companyUrl) {
@@ -2253,7 +2245,7 @@ ${project.result}`;
           return null;
         }
       } else {
-        console.log(`🌐 Using company URL: ${companyUrl}`);
+        console.log(`🌐 Using provided company URL: ${companyUrl}`);
       }
 
       console.log(`🌐 Fetching company website: ${companyUrl}`);
