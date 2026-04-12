@@ -5,10 +5,15 @@ const CLASSIFIER_MODEL = 'claude-haiku-4-5-20251001';
 
 const CLASSIFIER_SYSTEM_PROMPT = `You are a resume strategy classifier. Given a job posting and a brief CV summary, return ONLY a JSON object with these fields:
 - domain: one of "regulated" | "enterprise" | "platform" | "general"
-- format: "standard" if candidate has <4 relevant roles, otherwise "split"
-- rolesIncluded: integer 3–6 based on relevance depth
+- format: "split" if the candidate has a mix of highly-aligned recent roles AND older/adjacent supporting roles worth showing; "standard" only if all relevant roles are equally aligned (no meaningful distinction between primary and supporting)
+- rolesIncluded: integer 3–7 based on relevance depth
 - reasoning: 1–2 sentence explanation
 - domainSignals: array of specific keywords detected in the job posting
+
+Format guidance:
+- Default to "split" for senior candidates (Director, VP, Head of, CTO) with 10+ years of experience — they almost always have a mix of core and supporting roles
+- Use "standard" only when all included roles are equally directly relevant (e.g. same title, same domain, consecutive roles)
+- "split" produces RELEVANT EXPERIENCE + RELATED EXPERIENCE sections, which tells a richer career story
 
 Return ONLY the JSON object. No preamble, no markdown.`;
 
