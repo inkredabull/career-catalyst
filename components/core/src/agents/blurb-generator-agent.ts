@@ -25,10 +25,12 @@ ${job.description.slice(0, 2000)}
 
 Generate two blurbs for Anthony based on this specific role and company. Each blurb should be 100-150 words, specific to this job (not generic), and avoid clichés.
 
+CRITICAL: Each blurb must be exactly ONE paragraph — no line breaks, no blank lines, no multiple paragraphs.
+
 Respond with ONLY valid JSON in this exact format:
 {
-  "firstPerson": "<first person blurb using 'I', 'my', 'me' — written as an opening paragraph for a cover letter or elevator pitch>",
-  "thirdPerson": "<third person blurb using 'Anthony' — written for a LinkedIn About section or recruiter summary>"
+  "firstPerson": "<single paragraph, 100-150 words, using 'I', 'my', 'me' — written as an opening paragraph for a cover letter or elevator pitch. NO line breaks inside.>",
+  "thirdPerson": "<single paragraph, 100-150 words, using 'Anthony' — written for a LinkedIn About section or recruiter summary. NO line breaks inside.>"
 }`;
 
     const response = await provider.makeRequest({ prompt });
@@ -46,6 +48,10 @@ Respond with ONLY valid JSON in this exact format:
     if (!parsed.firstPerson || !parsed.thirdPerson) {
       throw new Error('BlurbGeneratorAgent: response missing firstPerson or thirdPerson fields');
     }
+
+    // Collapse any stray line breaks the model may have inserted despite instructions
+    parsed.firstPerson = parsed.firstPerson.replace(/\n+/g, ' ').trim();
+    parsed.thirdPerson = parsed.thirdPerson.replace(/\n+/g, ' ').trim();
 
     return parsed;
   }
