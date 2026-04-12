@@ -43,7 +43,10 @@ If the job description mentions: HIPAA, SOC2, compliance, clinical, patient data
 - High-stakes reliability work
 
 ### Global / International / Multilingual Environments
-If the company name or job description signals international scope — e.g., "global", "international", "multilingual", "multi-lingual", "localization", "translation", "cross-border", or the company itself operates internationally (serving multiple countries, regions, or languages):
+If ANY of the following are true:
+- The **company name contains "Global"** (e.g., "Piedmont Global", "Global Relay")
+- The job description contains: "global", "international", "multilingual", "multi-lingual", "globally distributed", "distributed team", "localization", "translation", "cross-border"
+- The role involves supporting users or teams across multiple countries or regions
 
 **Emphasize:**
 - Any experience working with multilingual users or systems
