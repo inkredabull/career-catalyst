@@ -295,14 +295,18 @@ The {{maxRoles}} value is a soft suggestion (~{{maxRoles}} roles), but you shoul
 
 ### Earlier Career (optional condensed section)
 
-If there are older roles (10+ years ago) that provide important context — international experience, domain credibility, foundational technical work — include them as a condensed `## EARLIER CAREER` section placed after the main experience section. Use compact formatting:
+If there are older roles (10+ years ago) that provide important context — international experience, domain credibility, foundational technical work — include them as a `## EARLIER CAREER` section placed after the main experience sections.
 
+Use the **same role header format** as the main sections:
 ```
-**Role Title @ Company** | *Years*
-One-line summary of the most relevant contribution.
+**{Title}** @ {Company} ({Start Mon/YYYY} - {End Mon/YYYY})
 ```
 
-Use this section for roles that would dilute the main experience section if given full treatment, but are worth mentioning. Maximum 3 entries. **Skip this section entirely if the main roles already fill two pages.** Always use it when the candidate has international, multilingual, or government/NGO experience that is a differentiator for the target role.
+After the header, include:
+- A single overview sentence (100-150 characters) summarising the most relevant contribution
+- 1-2 bullets maximum (same 70-80 character limit as main roles)
+
+Maximum 3 entries. **Skip this section entirely if the main roles already fill two pages.** Always include it when the candidate has international, multilingual, or government/NGO experience that is a differentiator for the target role.
 
 {{rolesSpecificInstructions}}
 
