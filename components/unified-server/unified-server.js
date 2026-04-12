@@ -641,7 +641,7 @@ app.post('/extract', async (req, res) => {
 
         // Async background processing for Medium/High priority jobs
         const priority = parseInt(reminderPriority) || 5;
-        if (priority <= 5) {
+        if (false && priority <= 5) { // scoring paused
           console.log(`  -> 🔄 Triggering async background scoring and resume generation for priority ${priority} job`);
           setImmediate(async () => {
             try {
