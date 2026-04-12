@@ -1075,7 +1075,7 @@ program
 program
   .command('prep')
   .description('Generate interview preparation materials (cover letter, endorsement, interview, general)')
-  .argument('<type>', 'Type of statement: cover-letter, endorsement, interview, about-me, general, themes, stories, profile, project, or list-projects')
+  .argument('<type>', 'Type of statement: cover-letter, endorsement, interview, focus, about-me, general, themes, stories, profile, project, or list-projects')
   .argument('[jobId]', 'Job ID to generate statement for (not required for profile)')
   .argument('[projectNumber]', 'Project number to extract (for project type only)')
   .option('-e, --emphasis <text>', 'Special emphasis or instructions for the material')
@@ -1276,6 +1276,14 @@ program
       }
 
       // Handle interview command (merges about-me and focus)
+      // 'focus' is a legacy alias for 'interview'
+      if (type === 'focus') {
+        console.log('ℹ️  "focus" is now an alias for "interview" (focus story is included within interview prep)');
+        // fall through by reassigning type
+        (options as any)._type = 'interview';
+        type = 'interview';
+      }
+
       if (type === 'interview') {
         if (!jobId) {
           console.error('❌ Job ID is required for interview generation');
@@ -1345,7 +1353,7 @@ program
       const validTypes: StatementType[] = ['cover-letter', 'endorsement', 'about-me', 'general'];
       if (!validTypes.includes(type as StatementType)) {
         console.error(`❌ Invalid material type: ${type}`);
-        console.error(`Valid types: ${validTypes.join(', ')}, interview, themes, stories, profile, project, list-projects`);
+        console.error(`Valid types: ${validTypes.join(', ')}, interview, focus (alias for interview), themes, stories, profile, project, list-projects`);
         process.exit(1);
       }
 
