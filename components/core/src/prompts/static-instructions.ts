@@ -123,8 +123,9 @@ export function filterDomainAdaptation(
   const fullDomainSection = domainSectionMatch[0];
 
   // Extract individual domain subsections
+  // Order in prompt: Regulated → Global → Enterprise → Platform → Forward Deployed → AI/LLM
   const sections: Record<string, RegExp> = {
-    regulated: /Regulated \/ High-Trust Environments[\s\S]*?(?=Enterprise \/ Scale Stage|Platform Engineering|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
+    regulated: /Regulated \/ High-Trust Environments[\s\S]*?(?=Global \/ International|Enterprise \/ Scale Stage|Platform Engineering|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
     enterprise: /Enterprise \/ Scale Stage[\s\S]*?(?=Platform Engineering|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
     platform: /Platform Engineering \/ Infrastructure Leadership[\s\S]*?(?=Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
     'forward-deployed': /Forward Deployed \/ Customer-Facing Roles[\s\S]*?(?=AI\/LLM Roles|Intelligent Role Selection|$)/
@@ -143,6 +144,10 @@ export function filterDomainAdaptation(
   const relevantSectionMatch = fullDomainSection.match(sections[domain]);
   const relevantSection = relevantSectionMatch ? relevantSectionMatch[0] : '';
 
+  // Always include Global/International section — triggered by company name or JD keywords, not by domain
+  const globalSectionMatch = fullDomainSection.match(/Global \/ International \/ Multilingual Environments[\s\S]*?(?=Enterprise \/ Scale Stage|Platform Engineering|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/);
+  const globalSection = globalSectionMatch ? globalSectionMatch[0] : '';
+
   // Always include AI/LLM section if present
   const aiSectionMatch = fullDomainSection.match(/AI\/LLM Roles - Technical Depth Requirements[\s\S]*?(?=Intelligent Role Selection|$)/);
   const aiSection = aiSectionMatch ? aiSectionMatch[0] : '';
@@ -152,6 +157,10 @@ export function filterDomainAdaptation(
 
   if (relevantSection) {
     filteredSection += relevantSection + '\n\n';
+  }
+
+  if (globalSection) {
+    filteredSection += globalSection + '\n\n';
   }
 
   if (aiSection) {
