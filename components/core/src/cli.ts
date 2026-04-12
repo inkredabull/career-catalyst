@@ -485,8 +485,8 @@ program
         );
       }
 
-      // Auto-generate first and third person blurbs via Gemini Flash (free)
-      if (process.env.GEMINI_API_KEY) {
+      // Auto-generate first and third person blurbs via Gemini Flash (via OpenRouter)
+      if (process.env.OPENROUTER_API_KEY) {
         try {
           console.log('\n✍️  Generating blurbs...');
           const blurbAgent = new BlurbGeneratorAgent(getBlurbConfig());

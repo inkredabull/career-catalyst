@@ -111,14 +111,14 @@ export interface ResumeGenerationConfig {
 }
 
 export function getBlurbConfig(): LLMProviderConfig {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is required for blurb generation');
+    throw new Error('OPENROUTER_API_KEY environment variable is required for blurb generation');
   }
   return {
-    provider: 'gemini',
+    provider: 'openrouter',
     apiKey,
-    model: process.env.BLURB_LLM_MODEL ?? 'gemini-2.0-flash',
+    model: process.env.BLURB_LLM_MODEL ?? 'google/gemini-2.0-flash-001',
     maxTokens: 600,
     temperature: 0.7
   };
