@@ -139,9 +139,13 @@ Bold the skill umbrella.
 Include at most five relevant skill areas and only include relevant skills.
 Each line of skills should be at maximum 95 characters long.
 
+## Languages
+
+If the CV lists language proficiencies AND the company name or job description signals international/global scope, include a `## LANGUAGES` section after SKILLS listing each language and proficiency level. Otherwise omit.
+
 ## Education
 
-Include an "EDUCATION" section after the SKILLS section. Use bullet points.
+Include an "EDUCATION" section after the LANGUAGES section (if present) or after the SKILLS section. Use bullet points.
 
 ## Misc
 

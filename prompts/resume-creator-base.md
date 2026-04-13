@@ -253,6 +253,7 @@ The general structure MUST be (in this exact order):
 * Earlier Career (OPTIONAL — condensed older roles, max 3 entries)
 * "Complete work history available upon request." (in italics)
 * Skills
+* Languages (OPTIONAL — include a `## LANGUAGES` section if the CV lists language proficiencies AND the company name or job description signals international/global scope)
 * Education (MANDATORY - must always be included)
 * Beyond Work (OPTIONAL - include if present in CV)
 
