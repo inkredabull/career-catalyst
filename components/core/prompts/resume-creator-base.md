@@ -127,7 +127,7 @@ Be sure bullets reflect the verbiage used in the job description.
 
 {{technologiesSection}}
 
-If there are older roles (10+ years ago) that provide important context — international experience, domain credibility, government/NGO work — include them as a `## EARLIER CAREER` section before the work history note. Use the same role header format as the main sections: `**{Title}** @ {Company} ({Start Mon/YYYY} - {End Mon/YYYY})`, then a single overview sentence (100-150 chars), then 1-2 bullets (70-80 chars each, same rules as main roles). Maximum 3 entries.
+If there are older roles (10+ years ago) that provide important context — international experience, domain credibility, government/NGO work — include them as a `## EARLIER CAREER` section before the work history note. Use the same role header format as the main sections: `**{Title}** @ {Company} ({Start Mon/YYYY} - {End Mon/YYYY})`, then a single overview sentence (100-150 chars), then 1-2 bullets (70-80 chars each, same rules as main roles). Maximum 3 entries. Do NOT skip this section when the candidate has international/multilingual/NGO experience — that is a differentiator that must appear. CRITICAL: Roles ending before ~2013 must NOT appear in the main experience sections — they belong here or are omitted.
 
 Stipulate "Complete work history available upon request." in italics after the EARLIER CAREER section (if present) and before a SKILLS section.
 

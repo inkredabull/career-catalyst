@@ -307,7 +307,9 @@ After the header, include:
 - A single overview sentence (100-150 characters) summarising the most relevant contribution
 - 1-2 bullets maximum (same 70-80 character limit as main roles)
 
-Maximum 3 entries. **Skip this section entirely if the main roles already fill two pages.** Always include it when the candidate has international, multilingual, or government/NGO experience that is a differentiator for the target role.
+Maximum 3 entries. **Do NOT skip this section when the candidate has international, multilingual, or government/NGO experience** — that content is a differentiator that must appear regardless of page density. If space is tight, trim bullets from Related Experience roles instead.
+
+**CRITICAL: Roles older than 12 years must NOT appear in RELEVANT EXPERIENCE or RELATED EXPERIENCE.** Any role ending before ~2013 belongs in Earlier Career or is omitted entirely. Do not use a full experience slot on an old role when a condensed Earlier Career entry would serve better.
 
 {{rolesSpecificInstructions}}
 
