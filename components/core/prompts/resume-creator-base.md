@@ -54,7 +54,7 @@ If ANY of the following are true:
 - Cross-cultural collaboration and communication
 - Language skills (even if conversational)
 
-**Surface from CV:**
+**Surface from CV (only when this Global section's trigger conditions are met):**
 - Language proficiencies listed in the CV — include a LANGUAGES section in the resume
 - Any role involving multilingual platforms, localization, or international users
 - Experience working with distributed teams across countries or cultures
@@ -127,7 +127,7 @@ Be sure bullets reflect the verbiage used in the job description.
 
 {{technologiesSection}}
 
-If there are older roles (10+ years ago) that provide important context — international experience, domain credibility, government/NGO work — include them as a `## EARLIER CAREER` section before the work history note. Use the same role header format as the main sections: `**{Title}** @ {Company} ({Start Mon/YYYY} - {End Mon/YYYY})`, then a single overview sentence (100-150 chars), then 1-2 bullets (70-80 chars each, same rules as main roles). Maximum 3 entries. Do NOT skip this section when the candidate has international/multilingual/NGO experience — that is a differentiator that must appear. CRITICAL: Roles ending before ~2013 must NOT appear in the main experience sections — they belong here or are omitted.
+If there are older roles (10+ years ago) that provide important context — international experience, domain credibility, government/NGO work — include them as a `## EARLIER CAREER` section before the work history note. Use the same role header format as the main sections: `**{Title}** @ {Company} ({Start Mon/YYYY} - {End Mon/YYYY})`, then a single overview sentence (100-150 chars), then 1-2 bullets (70-80 chars each, same rules as main roles). Maximum 3 entries. **Only include this section when BOTH conditions are true: (1) the JD or company name signals international/global scope (company name contains "Global", or JD contains: global, international, multilingual, globally distributed, cross-border, localization, translation), AND (2) the candidate has older roles with international/multilingual/NGO experience relevant to those signals. If neither the JD nor company signals global scope, omit Earlier Career entirely.** CRITICAL: Roles ending before ~2013 must NOT appear in the main experience sections — they belong here or are omitted.
 
 Stipulate "Complete work history available upon request." in italics after the EARLIER CAREER section (if present) and before a SKILLS section.
 
@@ -141,7 +141,11 @@ Each line of skills should be at maximum 95 characters long.
 
 ## Languages
 
-If the CV lists language proficiencies AND the company name or job description signals international/global scope, include a `## LANGUAGES` section after SKILLS listing each language and proficiency level. Otherwise omit.
+**CONDITIONAL — default is to OMIT this section.** Only include a `## LANGUAGES` section when ALL of the following are true:
+1. The CV explicitly lists language proficiencies
+2. The company name contains "Global" OR the job description contains at least one of: global, international, multilingual, multi-lingual, globally distributed, cross-border, localization, translation
+
+If neither condition is met, omit entirely. When in doubt, omit.
 
 ## Education
 

@@ -61,7 +61,7 @@ If ANY of the following are true:
 - Cross-cultural collaboration and communication
 - Language skills (even if conversational)
 
-**Surface from CV:**
+**Surface from CV (only when this Global section's trigger conditions are met):**
 - Language proficiencies listed in the CV — include a LANGUAGES section in the resume
 - Any role involving multilingual platforms, localization, or international users
 - Experience working with distributed teams across countries or cultures
@@ -253,7 +253,7 @@ The general structure MUST be (in this exact order):
 * Earlier Career (OPTIONAL — condensed older roles, max 3 entries)
 * "Complete work history available upon request." (in italics)
 * Skills
-* Languages (OPTIONAL — include a `## LANGUAGES` section if the CV lists language proficiencies AND the company name or job description signals international/global scope)
+* Languages (**OMIT unless** the CV lists language proficiencies AND the company name or job description explicitly signals international/global scope — same triggers as the Global / International section)
 * Education (MANDATORY - must always be included)
 * Beyond Work (OPTIONAL - include if present in CV)
 
@@ -307,7 +307,13 @@ After the header, include:
 - A single overview sentence (100-150 characters) summarising the most relevant contribution
 - 1-2 bullets maximum (same 70-80 character limit as main roles)
 
-Maximum 3 entries. **Do NOT skip this section when the candidate has international, multilingual, or government/NGO experience** — that content is a differentiator that must appear regardless of page density. If space is tight, trim bullets from Related Experience roles instead.
+Maximum 3 entries. **Only include this section when BOTH conditions are true:**
+1. **The JD or company name signals international/global scope** (company name contains "Global", or JD contains: global, international, multilingual, multi-lingual, globally distributed, cross-border, localization, translation — same triggers as the Global / International section above).
+2. **The candidate has older roles (10+ years ago) with international, multilingual, or government/NGO experience that is directly relevant to those signals.**
+
+If neither the JD nor company name signals global scope, **omit Earlier Career entirely** — even if the candidate has older international experience. That experience is not a differentiator for a domestic role.
+
+When both conditions are met, do not skip this section. If space is tight, trim bullets from Related Experience roles instead.
 
 **CRITICAL: Roles older than 12 years must NOT appear in RELEVANT EXPERIENCE or RELATED EXPERIENCE.** Any role ending before ~2013 belongs in Earlier Career or is omitted entirely. Do not use a full experience slot on an old role when a condensed Earlier Career entry would serve better.
 
@@ -360,6 +366,14 @@ After all roles, stipulate "*Complete work history available upon request.*" in 
 Bold the skill umbrella.
 Include at most five relevant skill areas and only include relevant skills.
 Each line of skills should be at maximum 95 characters long.
+
+## Languages
+
+**CONDITIONAL — default is to OMIT this section.** Only include a `## LANGUAGES` section when ALL of the following are true:
+1. The CV explicitly lists language proficiencies
+2. The company name contains "Global" OR the job description contains at least one of: global, international, multilingual, multi-lingual, globally distributed, cross-border, localization, translation
+
+If Anthropic, a US domestic company with no international scope signals, is the employer — omit this section. When in doubt, omit.
 
 ## Education
 
