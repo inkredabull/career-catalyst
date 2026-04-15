@@ -162,7 +162,7 @@ export interface RoleSelection {
 }
 
 export interface ClassificationResult {
-  domain: 'regulated' | 'enterprise' | 'platform' | 'general';
+  domain: 'regulated' | 'enterprise' | 'platform' | 'blockchain' | 'general';
   format: 'standard' | 'split';
   rolesIncluded: number;
   reasoning: string;

@@ -4,7 +4,8 @@ import { ClassificationResult } from '../types';
 const CLASSIFIER_MODEL = 'claude-haiku-4-5-20251001';
 
 const CLASSIFIER_SYSTEM_PROMPT = `You are a resume strategy classifier. Given a job posting and a brief CV summary, return ONLY a JSON object with these fields:
-- domain: one of "regulated" | "enterprise" | "platform" | "general"
+- domain: one of "regulated" | "enterprise" | "platform" | "blockchain" | "general"
+  - "blockchain": use when the JD mentions blockchain, Web3, crypto, DeFi, EVM, smart contracts, protocol, Layer 1/2, ZK, consensus, on-chain, or the company is a chain/protocol/crypto-native firm (e.g. Ava Labs, Ethereum Foundation, Coinbase, OpenSea)
 - format: "split" if the candidate has a mix of highly-aligned recent roles AND older/adjacent supporting roles worth showing; "standard" only if all relevant roles are equally aligned (no meaningful distinction between primary and supporting)
 - rolesIncluded: integer 5–8 based on relevance depth; use the higher end (7–8) for senior candidates (Director/VP/Head of/CTO) with 15+ years of experience — they have more differentiating history worth showing
 - reasoning: 1–2 sentence explanation

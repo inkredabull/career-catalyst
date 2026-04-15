@@ -109,6 +109,44 @@ If the job description mentions: platform engineering, infrastructure, developer
 - Cross-functional leadership and influence
 - Organizational restructuring for reliability/velocity
 
+### Blockchain / Web3 / Crypto Infrastructure
+If the job description mentions: blockchain, Web3, crypto, DeFi, NFT, EVM, consensus, on-chain, smart contracts, protocol, Avalanche, Ethereum, Solana, Layer 1, Layer 2, ZK, rollups, validator, node, RPC, builder ecosystem, developer ecosystem (blockchain context), decentralized
+
+**CRITICAL: Frame every relevant role through a decentralization and trust-minimization lens. Crypto hiring panels scan for native fluency — generic platform/infrastructure language will read as a non-native candidate.**
+
+**Language to emphasize:**
+- "Built developer tooling for [chain/protocol] ecosystem" (ecosystem as product surface)
+- "Integrated on-chain primitives (EVM, RPC, Seaport) to enable [outcome]" (specific protocol fluency)
+- "Defined product strategy for [validator/node/protocol layer]" (infra as product)
+- "Grew builder ecosystem from [X] to [Y] projects/integrations"
+- "Designed cross-chain interoperability for [use case]"
+- "Partnered with protocol engineering on consensus/EVM upgrade"
+- "Established technical roadmap bridging Web2 and Web3 adoption"
+
+**Emphasize:**
+- On-chain integration work (smart contracts, RPC, wallets, oracles)
+- Developer/builder ecosystem growth metrics (integrations, TVL, DAUs, protocols)
+- Protocol-level understanding (EVM, ZK, consensus, MEV, bridging)
+- 0→1 Web3 product launches with real adoption metrics
+- Cross-functional work with protocol engineers, validators, and dApp builders
+- Security-first mindset (key management, audit processes, trustless design)
+- Decentralized governance or token-based incentive mechanism design (if applicable)
+
+**Surface from CV:**
+- Any work with EVM-compatible chains, Solidity, or on-chain contracts
+- RPC/node infrastructure (QuickNode, Infura, Alchemy, self-hosted)
+- NFT or DeFi product work (Seaport Protocol, OpenSea, marketplaces)
+- Web3 wallet integrations (MetaMask, WalletConnect, Rainbow Kit)
+- Blockchain analytics or on-chain data tooling
+- Token or NFT community/ecosystem management
+- Smart contract audit processes or bug bounty programs
+- Any role at a company whose core product is a blockchain, protocol, or Web3 platform
+
+**Avoid:**
+- Framing Web3 experience purely as "e-commerce" or "marketplace" (bury the lead)
+- Using "AI/ML" as the headline for roles at blockchain companies — lead with chain-native work
+- Generic "distributed systems" language when you have specific protocol terms to use
+
 ### Forward Deployed / Customer-Facing Roles
 If the job description mentions: forward deployed, customer-facing, embedded, field engineering, solutions engineering, on-site, client integration
 

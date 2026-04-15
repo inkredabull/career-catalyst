@@ -114,7 +114,7 @@ export function buildStaticInstructions(options: StaticInstructionsOptions): str
  */
 export function filterDomainAdaptation(
   instructions: string,
-  domain: 'regulated' | 'enterprise' | 'platform' | 'general'
+  domain: 'regulated' | 'enterprise' | 'platform' | 'blockchain' | 'general'
 ): string {
   // Extract the Domain Adaptation section
   const domainSectionMatch = instructions.match(/Domain Adaptation & Vocabulary[\s\S]*?(?=Intelligent Role Selection|$)/);
@@ -125,9 +125,10 @@ export function filterDomainAdaptation(
   // Extract individual domain subsections
   // Order in prompt: Regulated → Global → Enterprise → Platform → Forward Deployed → AI/LLM
   const sections: Record<string, RegExp> = {
-    regulated: /Regulated \/ High-Trust Environments[\s\S]*?(?=Global \/ International|Enterprise \/ Scale Stage|Platform Engineering|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
-    enterprise: /Enterprise \/ Scale Stage[\s\S]*?(?=Platform Engineering|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
-    platform: /Platform Engineering \/ Infrastructure Leadership[\s\S]*?(?=Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
+    regulated: /Regulated \/ High-Trust Environments[\s\S]*?(?=Global \/ International|Enterprise \/ Scale Stage|Platform Engineering|Blockchain|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
+    enterprise: /Enterprise \/ Scale Stage[\s\S]*?(?=Platform Engineering|Blockchain|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
+    platform: /Platform Engineering \/ Infrastructure Leadership[\s\S]*?(?=Blockchain|Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
+    blockchain: /Blockchain \/ Web3 \/ Crypto Infrastructure[\s\S]*?(?=Forward Deployed|AI\/LLM Roles|Intelligent Role Selection|$)/,
     'forward-deployed': /Forward Deployed \/ Customer-Facing Roles[\s\S]*?(?=AI\/LLM Roles|Intelligent Role Selection|$)/
   };
 
