@@ -126,7 +126,10 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       // Post-process: fix hard-wrapped bullets (join 2-space continuation lines)
       result.markdownContent = this.fixHardWrappedBullets(result.markdownContent);
 
-      // Post-process: warn on long role bullets (skills lines are allowed to be longer)
+      // Post-process: trim bullets that still exceed 80 chars via a targeted LLM rewrite
+      result.markdownContent = await this.trimLongBullets(result.markdownContent);
+
+      // Post-process: warn on remaining long role bullets after trimming
       const bulletViolations = this.warnLongBullets(result.markdownContent);
 
       // Cap changes array to max 5
@@ -179,6 +182,63 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       }
     }
     return out.join('\n');
+  }
+
+  /**
+   * Batch-rewrites all role bullets exceeding 80 characters via a targeted LLM call.
+   * Sends overlong bullets in one request; replaces originals in the markdown.
+   * Skills lines (bold-prefixed) are excluded — they have a wider limit.
+   */
+  private async trimLongBullets(markdown: string): Promise<string> {
+    const longBullets: string[] = [];
+    for (const line of markdown.split('\n')) {
+      if (/^- \*\*/.test(line)) continue; // skills category line
+      if (/^- /.test(line) && line.length > 80) {
+        longBullets.push(line);
+      }
+    }
+    if (longBullets.length === 0) return markdown;
+
+    console.log(`✂️  Trimming ${longBullets.length} overlong bullet(s) via LLM...`);
+
+    const prompt = `Rewrite each bullet point below to be ≤80 characters (including the leading "- "). Preserve the core action verb, primary metric, and most important detail. Do not add new information. Return ONLY a JSON array of rewritten strings, one per input, same order, no explanation.
+
+Bullets to rewrite:
+${JSON.stringify(longBullets)}`;
+
+    let rewritten: string[];
+    try {
+      const response = await this.provider.makeRequest({
+        prompt,
+        systemPrompt: 'You are a resume editor. Return ONLY a valid JSON array of strings. No markdown, no explanation.'
+      });
+
+      let jsonText = response.text.trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```\s*$/i, '')
+        .trim();
+      rewritten = JSON.parse(jsonText) as string[];
+
+      if (!Array.isArray(rewritten) || rewritten.length !== longBullets.length) {
+        console.warn('⚠️  trimLongBullets: unexpected response shape, skipping trim');
+        return markdown;
+      }
+
+      console.log(`   Trim cost: $${response.cost.totalCost.toFixed(4)}`);
+    } catch (err) {
+      console.warn(`⚠️  trimLongBullets failed (${err instanceof Error ? err.message : err}), skipping`);
+      return markdown;
+    }
+
+    // Replace originals in markdown (exact string match)
+    let result = markdown;
+    for (let i = 0; i < longBullets.length; i++) {
+      const original = longBullets[i]!;
+      const replacement = rewritten[i]!;
+      // Only replace first occurrence to avoid stomping duplicate bullets
+      result = result.replace(original, replacement);
+    }
+    return result;
   }
 
   /**
