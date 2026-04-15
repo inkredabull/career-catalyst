@@ -190,6 +190,8 @@ export class ParallelResumeOrchestrator {
     console.log('🚀 Parallel Resume Generation');
     console.log('================================\n');
 
+    const wallClockStart = Date.now();
+
     // Load CV content
     if (!fs.existsSync(cvFilePath)) {
       throw new Error(`CV file not found: ${cvFilePath}`);
@@ -403,6 +405,7 @@ export class ParallelResumeOrchestrator {
                 genResult.markdownContent, job, modelConfig.label, comparisonFolder, candidateNameByModel
               );
               existing.cost = (existing.cost ?? 0) + genResult.cost;
+              existing.duration = (existing.duration ?? 0) + genResult.duration;
               existing.pdfPath = pdfPath;
               // Update markdownByModel so next loop iteration critiques the improved version
               markdownByModel.set(modelConfig.label, genResult.markdownContent);
@@ -444,7 +447,8 @@ export class ParallelResumeOrchestrator {
       }
     }
 
-    this.printResultsTable(modelResults, totalCost, openFolder);
+    const wallClockSeconds = (Date.now() - wallClockStart) / 1000;
+    this.printResultsTable(modelResults, totalCost, openFolder, wallClockSeconds);
 
     if (failureCount > 0) {
       console.log(`\n⚠️  ${failureCount} model(s) failed - see metadata for details`);
@@ -629,7 +633,7 @@ export class ParallelResumeOrchestrator {
     return map;
   }
 
-  private printResultsTable(modelResults: ModelResult[], totalCost: number, comparisonFolder: string): void {
+  private printResultsTable(modelResults: ModelResult[], totalCost: number, comparisonFolder: string, wallClockSeconds?: number): void {
     const COL_STATUS = 6;  // '✅' or '❌'
     const COL_RATING = 6;  // '10/10'
     const COL_COST   = 9;  // '$0.0000'
@@ -668,7 +672,8 @@ export class ParallelResumeOrchestrator {
     }
 
     console.log(hr('├', '┼', '┤', '─'));
-    console.log(row('TOTAL', `${modelResults.filter(r => r.success).length}/${modelResults.length}`, null, `$${totalCost.toFixed(4)}`, ''));
+    const wallClockStr = wallClockSeconds !== undefined ? `${wallClockSeconds.toFixed(0)}s` : '';
+    console.log(row('TOTAL', `${modelResults.filter(r => r.success).length}/${modelResults.length}`, null, `$${totalCost.toFixed(4)}`, wallClockStr));
     console.log(hr('└', '┴', '┘', '─'));
     console.log(`📂 ${comparisonFolder}`);
   }
