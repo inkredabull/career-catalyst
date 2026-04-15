@@ -84,8 +84,18 @@ Category names should reflect the specific domain signals in the job description
 
 ### enforcementSection
 **PRE-SUBMIT CHECKLIST — verify before returning output:**
+
+**CRITICAL MARKDOWN AUTHORING RULES (these affect PDF rendering):**
+- Each bullet MUST be written as a **single unbroken line** in the markdown source. NEVER add a newline + spaces inside a bullet (no soft-wrap or 2-space continuation lines). The PDF renderer handles line-wrapping — you do not.
+  - ✅ CORRECT: `- Reduced MTTR 90% via observability strategy and GCP monitoring stack`
+  - ❌ WRONG: `- Reduced MTTR 90% via observability strategy\n  and GCP monitoring stack`
+- After each bold subsection header (`**Theme Name**`), you MUST add a blank line before the first bullet. Without it, pandoc may inline the bullets with the header.
+  - ✅ CORRECT: `**Platform Product**\n\n- bullet`
+  - ❌ WRONG: `**Platform Product**\n- bullet`
+
+**CONTENT CHECKS:**
 1. Total bullet count per role: most recent ≤5, 2nd ≤4, 3rd ≤3, 4th+ ≤2. If subsections used, count ALL bullets across ALL subsections together.
-2. Each bullet is 70-80 characters. Any bullet exceeding 80 chars must be cut down.
+2. Each bullet is 70-80 characters measured in the single unbroken source line. Any bullet exceeding 80 chars must be cut down — not wrapped.
 3. EARLIER CAREER section: only present if company name contains "Global" OR the JD explicitly contains global/international/multilingual signals. If Ava Labs, Anthropic, or any domestic US company — omit Earlier Career entirely.
 4. LANGUAGES section: same condition as Earlier Career. Omit unless global signals exist.
 5. Skills: each line starts with `- **Category**:`. No inline runs, no omitted dashes.

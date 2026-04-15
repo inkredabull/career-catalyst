@@ -122,6 +122,12 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       // Parse JSON response
       const result = this.parseGeneratorResponse(response.text);
 
+      // Post-process: fix hard-wrapped bullets (join 2-space continuation lines)
+      result.markdownContent = this.fixHardWrappedBullets(result.markdownContent);
+
+      // Post-process: warn on long role bullets (skills lines are allowed to be longer)
+      this.warnLongBullets(result.markdownContent);
+
       // Cap changes array to max 5
       if (result.changes.length > 5) {
         result.changes = result.changes.slice(0, 5);
@@ -149,6 +155,45 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       process.stdout.write(`\r⏱️  Generator elapsed: ${duration}s (failed)\n`);
       throw new Error(`Generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Joins hard-wrapped bullet continuation lines (lines starting with 2+ spaces
+   * that follow a bullet) into single unbroken lines. This fixes models that
+   * pre-wrap bullets in source markdown, which causes rendering issues in pandoc PDF.
+   */
+  private fixHardWrappedBullets(markdown: string): string {
+    const lines = markdown.split('\n');
+    const out: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // If this is a continuation line (starts with 2+ spaces, not a list item or code)
+      if (/^  +[^ \-*]/.test(line) && out.length > 0 && /^- /.test(out[out.length - 1])) {
+        // Join onto previous bullet with a space
+        out[out.length - 1] = out[out.length - 1].trimEnd() + ' ' + line.trimStart();
+      } else {
+        out.push(line);
+      }
+    }
+    return out.join('\n');
+  }
+
+  /**
+   * Logs a warning for any role bullet exceeding 90 characters.
+   * Skills lines (bold-prefixed) are skipped since they have a separate 95-char limit.
+   */
+  private warnLongBullets(markdown: string): void {
+    const longBullets: string[] = [];
+    for (const line of markdown.split('\n')) {
+      if (/^- \*\*/.test(line)) continue; // skills category line
+      if (/^- /.test(line) && line.length > 90) {
+        longBullets.push(`  (${line.length}c) ${line.slice(0, 80)}...`);
+      }
+    }
+    if (longBullets.length > 0) {
+      console.log(`⚠️  ${longBullets.length} bullet(s) exceed 90 chars:`);
+      longBullets.forEach(b => console.log(b));
     }
   }
 

@@ -32,6 +32,15 @@ For each relevant role:
 
 **Subsection headers** are permitted within RELEVANT EXPERIENCE roles for Director/VP/CTO/Head of candidates when a role has 2-3 genuinely distinct work streams. Use bold labels only (`**Theme**`), never `###`. Total bullet count per role is unchanged — subsections organize the budget, not expand it. Each subsection: 1-2 bullets max. Do NOT use subsections in RELATED EXPERIENCE.
 
+**MANDATORY subsection formatting** — always add a blank line after the bold header before the first bullet, or pandoc will inline them:
+```
+**Theme Name**
+
+- bullet one
+- bullet two
+```
+Never write `**Theme Name**\n- bullet` (missing blank line).
+
 ### RELATED EXPERIENCE
 
 Include roles that provide supporting context but aren't direct matches. These may include:
