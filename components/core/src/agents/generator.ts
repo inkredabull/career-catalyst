@@ -18,6 +18,7 @@ export interface GeneratorResult {
   roleSelection: RoleSelection;
   cost: number;
   duration: number;
+  bulletViolations?: string[];
 }
 
 /**
@@ -126,7 +127,7 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       result.markdownContent = this.fixHardWrappedBullets(result.markdownContent);
 
       // Post-process: warn on long role bullets (skills lines are allowed to be longer)
-      this.warnLongBullets(result.markdownContent);
+      const bulletViolations = this.warnLongBullets(result.markdownContent);
 
       // Cap changes array to max 5
       if (result.changes.length > 5) {
@@ -148,7 +149,8 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       return {
         ...result,
         cost: response.cost.totalCost,
-        duration: parseFloat(duration)
+        duration: parseFloat(duration),
+        bulletViolations: bulletViolations.length > 0 ? bulletViolations : undefined
       };
     } catch (error) {
       clearInterval(timerInterval);
@@ -180,21 +182,24 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
   }
 
   /**
-   * Logs a warning for any role bullet exceeding 90 characters.
+   * Logs a warning for any role bullet exceeding 90 characters and returns them
+   * as regen feedback strings so the critique→regen loop can inject them.
    * Skills lines (bold-prefixed) are skipped since they have a separate 95-char limit.
    */
-  private warnLongBullets(markdown: string): void {
-    const longBullets: string[] = [];
+  private warnLongBullets(markdown: string): string[] {
+    const violations: string[] = [];
     for (const line of markdown.split('\n')) {
       if (/^- \*\*/.test(line)) continue; // skills category line
       if (/^- /.test(line) && line.length > 90) {
-        longBullets.push(`  (${line.length}c) ${line.slice(0, 80)}...`);
+        const preview = line.slice(2, 62);
+        violations.push(`Bullet too long (${line.length} chars) — rewrite to ≤80 chars: "${preview}..."`);
       }
     }
-    if (longBullets.length > 0) {
-      console.log(`⚠️  ${longBullets.length} bullet(s) exceed 90 chars:`);
-      longBullets.forEach(b => console.log(b));
+    if (violations.length > 0) {
+      console.log(`⚠️  ${violations.length} bullet(s) exceed 90 chars:`);
+      violations.forEach(v => console.log(`  ${v}`));
     }
+    return violations;
   }
 
   private buildClassificationSection(classification: ClassificationResult): string {

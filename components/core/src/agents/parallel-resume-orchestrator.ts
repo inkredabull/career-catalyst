@@ -359,6 +359,19 @@ export class ParallelResumeOrchestrator {
       }
     }
 
+    // Collect bullet violations from first generation to prepend to regen feedback
+    const bulletViolationsMap = new Map<string, string[]>();
+    for (let i = 0; i < generatorResults.length; i++) {
+      const modelConfig = modelsToUse[i];
+      const result = generatorResults[i];
+      if (result.status === 'fulfilled' && result.value.success && result.value.result) {
+        const violations = result.value.result.bulletViolations;
+        if (violations && violations.length > 0) {
+          bulletViolationsMap.set(modelConfig.label, violations);
+        }
+      }
+    }
+
     // Phase 4–6: Critique + Regenerate loop (skipped if --no-critique or nothing succeeded)
     if (!options.skipCritique && markdownByModel.size > 0) {
       const maxAttempts = getCritiqueAndJudgeMaxAttempts();
@@ -377,6 +390,20 @@ export class ParallelResumeOrchestrator {
         for (const [label, data] of critiqueMap) {
           const r = modelResults.find(m => m.model === label);
           if (r) r.critiqueRating = data.rating;
+        }
+
+        // Prepend bullet violations to recommendations so models fix their own overlong bullets
+        if (bulletViolationsMap.size > 0) {
+          for (const [label, violations] of bulletViolationsMap) {
+            const existing = critiqueMap.get(label);
+            if (existing) {
+              existing.recommendations = [...violations, ...existing.recommendations];
+            } else {
+              critiqueMap.set(label, { recommendations: violations, rating: 0 });
+            }
+          }
+          const totalViolations = [...bulletViolationsMap.values()].reduce((n, v) => n + v.length, 0);
+          console.log(`📏 Injected ${totalViolations} bullet-length violation(s) into regen feedback`);
         }
 
         console.log(`\n📝 Step 5: Parallel Regeneration with Recommendations${attemptLabel}`);
@@ -409,6 +436,12 @@ export class ParallelResumeOrchestrator {
               existing.pdfPath = pdfPath;
               // Update markdownByModel so next loop iteration critiques the improved version
               markdownByModel.set(modelConfig.label, genResult.markdownContent);
+              // Refresh bullet violations for next regen pass
+              if (genResult.bulletViolations && genResult.bulletViolations.length > 0) {
+                bulletViolationsMap.set(modelConfig.label, genResult.bulletViolations);
+              } else {
+                bulletViolationsMap.delete(modelConfig.label);
+              }
               console.log(`✅ ${modelConfig.label}: improved PDF saved`);
             } catch (error) {
               console.log(`❌ ${modelConfig.label}: improved PDF generation failed`);
