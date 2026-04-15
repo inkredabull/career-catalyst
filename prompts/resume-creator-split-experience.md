@@ -30,6 +30,8 @@ For each relevant role:
 - **Each bullet MUST be 70-80 characters maximum** (strict upper limit - be concise)
 - **CRITICAL: Each bullet point must be on its own line starting with a dash (-). Do NOT inline bullets.**
 
+**Subsection headers** are permitted within RELEVANT EXPERIENCE roles for Director/VP/CTO/Head of candidates when a role has 2-3 genuinely distinct work streams. Use bold labels only (`**Theme**`), never `###`. Total bullet count per role is unchanged — subsections organize the budget, not expand it. Each subsection: 1-2 bullets max. Do NOT use subsections in RELATED EXPERIENCE.
+
 ### RELATED EXPERIENCE
 
 Include roles that provide supporting context but aren't direct matches. These may include:
