@@ -96,8 +96,8 @@ Category names should reflect the specific domain signals in the job description
 **CONTENT CHECKS:**
 1. Total bullet count per role: most recent ≤5, 2nd ≤4, 3rd ≤3, 4th+ ≤2. If subsections used, count ALL bullets across ALL subsections together.
 2. Each bullet is 70-80 characters measured in the single unbroken source line. Any bullet exceeding 80 chars must be cut down — not wrapped.
-3. EARLIER CAREER section: only present if company name contains "Global" OR the JD explicitly contains global/international/multilingual signals. If Ava Labs, Anthropic, or any domestic US company — omit Earlier Career entirely.
-4. LANGUAGES section: same condition as Earlier Career. Omit unless global signals exist.
+3. EARLIER CAREER section: **MANDATORY when company name contains "Global" AND the candidate has older international/government/NGO roles.** Do NOT omit it when those two conditions are met — this is a differentiator. For domestic companies without global signals — omit entirely.
+4. LANGUAGES section: same trigger as Earlier Career. When included, format as a **single inline line** with ` | ` between each language (e.g. `English (Native) | French (Professional)`). Never use bullet points for languages.
 5. Skills: each line starts with `- **Category**:`. No inline runs, no omitted dashes.
-6. Summary: 500-650 characters. Contains at least one JD-specific term and at least one metric.
+6. Summary: 500-650 characters. Contains at least one JD-specific term and at least one metric. No em dashes (—) or en dashes (–).
 7. Final output fits two pages. If in doubt, cut bullets from oldest roles first.

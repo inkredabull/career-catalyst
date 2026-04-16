@@ -313,6 +313,7 @@ Include a "SUMMARY" section, beginning with a professional summary in the form o
 This is approximately 3-4 sentences maximum. Count characters carefully.
 
 Don't use "I" statements; lead with past-tense verb in the first person instead.
+Do NOT use em dashes (—) or en dashes (–) anywhere in the summary.
 Be concise and high-impact - every word must earn its place.
 Balance high-level positioning with specific, quantified achievements.
 Prefer active verbs and concrete metrics over abstract descriptions.
@@ -416,6 +417,9 @@ Each line of skills should be at maximum 95 characters long.
 
 If Anthropic, a US domestic company with no international scope signals, is the employer — omit this section. When in doubt, omit.
 
+**FORMAT — when included, list languages inline on a single line, separated by ` | ` (space-pipe-space). Do NOT use bullet points.**
+Example: `English (Native) | French (Professional) | Spanish (Conversational)`
+
 ## Education
 
 **MANDATORY**: Include an "EDUCATION" section after the SKILLS section. This section MUST always be included.
@@ -426,8 +430,7 @@ Do not omit this section under any circumstances.
 
 **OPTIONAL**: If the CV includes a "BEYOND WORK" section, include it as the final section of the résumé after EDUCATION.
 This section should contain personal interests and activities that provide insight into the candidate's character and work-life balance.
-Keep the content concise and authentic - typically 1-2 sentences.
-Format as a simple paragraph without bullet points.
+**HARD LIMIT: exactly one sentence.** Format as a simple paragraph without bullet points. Do not exceed one line.
 
 ## Misc
 
