@@ -1688,6 +1688,8 @@ async function handleTrackFromForm() {
         await handleGenerateResume();
         console.log('Career Catalyst: Apply reminder checked — auto-generating third-person blurb');
         await handleGenerateBlurb('third');
+        console.log('Career Catalyst: Apply reminder checked — auto-generating first-person blurb');
+        await handleGenerateBlurb('first');
       }
 
       await updateBlurbSection(extractResponse.jobId, 'third');
