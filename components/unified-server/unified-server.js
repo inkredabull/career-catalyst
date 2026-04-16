@@ -1494,6 +1494,12 @@ app.post('/generate-resume', async (req, res) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] Generate resume request`);
 
+  // Resume generation paused — use CLI directly: npm run dev -- resume <jobId>
+  return res.status(503).json({
+    success: false,
+    error: 'Automatic resume generation is currently paused. Use the CLI to generate resumes manually.'
+  });
+
   try {
     const { jobId } = req.body;
 
