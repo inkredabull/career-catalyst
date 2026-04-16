@@ -13,6 +13,7 @@ import { ModeDetectorAgent } from './agents/mode-detector-agent';
 import { StatementType, AboutMeSection } from './types';
 import { getConfig, getAnthropicConfig, getResumeGenerationConfig, getCritiqueAndJudgeMaxAttempts, getBlurbConfig } from './config';
 import { BlurbGeneratorAgent } from './agents/blurb-generator-agent';
+import { maybeRefreshOpenRouterModels } from './utils/openrouter-model-refresh';
 import { LLMProviderConfig } from './providers/llm-provider';
 import * as crypto from 'crypto';
 import * as path from 'path';
@@ -949,6 +950,7 @@ program
 
       const cvFile = await findCvFile();
       const configPath = options.config ? path.resolve(options.config) : undefined;
+      await maybeRefreshOpenRouterModels(configPath);
       const orchestrator = new ParallelResumeOrchestrator(configPath);
 
       if (options.regen) {
