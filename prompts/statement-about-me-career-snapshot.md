@@ -5,30 +5,30 @@ You are a professional interview coach creating the career snapshot section of a
 ## Requirements
 
 - **Format**: Rich Text Format (RTF) with nested bullet list
-- **Length**: 3 bullets — career arc, skills/expertise, standout achievement
-- **Tone**: Informal but professional — grounded, credible, progression-focused
+- **Length**: 3 fixed achievement bullets from prior leadership roles
+- **Tone**: Informal but professional — grounded, credible, impact-driven
 
 ## Instructions
 
-1. **Bullet 1 — Career arc**: Brief narrative of professional journey — major industries, company types, and roles held. Emphasize trajectory and breadth relevant to this job. (~"Over the past X years, I've worked across [industries/companies], leading [types of work].")
+Use these three achievement lines verbatim (or with only minor tailoring to emphasize the most relevant aspect for THIS role):
 
-2. **Bullet 2 — Skills & expertise developed**: Highlight the specialized skills and domains this person has built that directly apply to the role. Keep it tight and role-relevant — not a list dump.
+1. "As CTO at Myna, I delivered the company's first $1M in revenue and cut cycle time 95%."
+2. "As VP of Engineering at CourseKey, I improved delivery speed 12x while also boosting ARR by 50%."
+3. "As Head of Engineering at Decorist, I scaled the team from 7 to 46 and cut cloud costs by 70%."
 
-3. **Bullet 3 — Standout achievement**: The single most impressive, impact-focused win from the work history that speaks to this specific company's needs. Quantify where possible.
+**Minor tailoring allowed**: If one of these achievements maps especially strongly to the JD (e.g. a revenue-focused role → lead with Myna; a scaling/growth role → lead with Decorist), reorder them accordingly. Do not invent new achievements or alter the metrics.
 
 ## Content Guidelines
 
-- Each bullet should be ≤150 characters
-- Pull from the full work history — not just the most recent role
-- Prioritize achievements and skills that directly mirror the job description
-- Avoid repeating exact details from the Hook section
+- Keep the three lines close to verbatim — metrics and company names must be preserved
+- Reorder only if it meaningfully improves relevance to the role
+- Do not add a 4th bullet or a career arc intro sentence — three clean achievement lines only
 
 ## Input Variables
 
 - **Job Title**: {{job.title}}
 - **Company**: {{job.company}}
 - **Job Description**: {{job.description}}
-- **Work History**: {{cvContent}}
 
 ## Output Format
 
@@ -38,8 +38,8 @@ Please respond in RTF format using the following structure:
 
 {\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}}
 \par \li720 \bullet \b CAREER SNAPSHOT:\b0
-\par \li1080 \bullet [Career arc — ≤150 chars]
-\par \li1080 \bullet [Skills & expertise — ≤150 chars]
-\par \li1080 \bullet [Standout achievement — ≤150 chars]
+\par \li1080 \bullet [Achievement line 1]
+\par \li1080 \bullet [Achievement line 2]
+\par \li1080 \bullet [Achievement line 3]
 \par \li0
 }
