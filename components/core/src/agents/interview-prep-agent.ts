@@ -84,7 +84,7 @@ export class InterviewPrepAgent extends ClaudeBaseAgent {
       }
       
       // Load job data and CV content
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
       
       // Check if we should use cached content or regenerate
@@ -167,7 +167,7 @@ export class InterviewPrepAgent extends ClaudeBaseAgent {
 
   private async generateCompanyRubric(jobId: string): Promise<boolean> {
     try {
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const prepDir = this.getJobPrepDir(jobId);
 
       // Check if company-rubric.txt already exists (unless regenerating)
@@ -236,22 +236,47 @@ Format as:
     }
   }
 
-  private loadJobData(jobId: string): JobListing {
+  private async loadJobData(jobId: string): Promise<JobListing> {
+    // 1. Local cache (fast path)
+    const cacheFile = resolveFromProjectRoot('logs', jobId, 'job-cache.json');
+    if (fs.existsSync(cacheFile)) {
+      return JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    }
+
+    // 2. Legacy job-*.json (backward compat)
     const jobDir = resolveFromProjectRoot('logs', jobId);
-
-    if (!fs.existsSync(jobDir)) {
-      throw new Error(`Job directory not found for ID: ${jobId}`);
+    if (fs.existsSync(jobDir)) {
+      const files = fs.readdirSync(jobDir);
+      const legacyFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
+      if (legacyFile) {
+        const data = JSON.parse(fs.readFileSync(path.join(jobDir, legacyFile), 'utf-8'));
+        // Lazy migration
+        fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2));
+        return data;
+      }
     }
 
-    const files = fs.readdirSync(jobDir);
-    const jobFile = files.find(file => file.startsWith('job-') && file.endsWith('.json'));
-    if (!jobFile) {
-      throw new Error(`Job file not found for ID: ${jobId}`);
+    // 3. Google Sheets fallback
+    const sheetsUrl = process.env.GOOGLE_SHEETS_URL;
+    const sheetName = process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1';
+    if (sheetsUrl) {
+      try {
+        const { GoogleSheetsClient, extractSpreadsheetId, sheetsRowToJobListing } = await import('../utils/google-sheets');
+        const client = new GoogleSheetsClient();
+        const spreadsheetId = extractSpreadsheetId(sheetsUrl);
+        const row = await client.fetchJobById(spreadsheetId, sheetName, jobId);
+        if (row) {
+          const jobData = sheetsRowToJobListing(row);
+          fs.mkdirSync(jobDir, { recursive: true });
+          fs.writeFileSync(cacheFile, JSON.stringify(jobData, null, 2));
+          return jobData;
+        }
+      } catch (sheetsError) {
+        console.warn(`⚠️  Sheets fallback failed: ${sheetsError instanceof Error ? sheetsError.message : 'Unknown'}`);
+      }
     }
 
-    const jobPath = path.join(jobDir, jobFile);
-    const jobData = fs.readFileSync(jobPath, 'utf-8');
-    return JSON.parse(jobData);
+    throw new Error(`Job data not found for ID: ${jobId}`);
   }
 
   private loadPromptTemplate(type: StatementType, person?: 'first' | 'third'): string {
@@ -433,7 +458,7 @@ Format as:
         }
       }
 
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
       const companyValues = await this.loadCompanyValues(jobId, options.companyUrl);
 
@@ -657,7 +682,7 @@ Format as:
 
   async combineSections(jobId: string): Promise<string> {
     try {
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const requiredSections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close'];
       const sectionContents: Partial<Record<AboutMeSection, string>> = {};
 
@@ -731,7 +756,7 @@ ${bodies.join('\n')}
         };
       }
 
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
 
       const sectionNames: Record<AboutMeSection, string> = {
@@ -823,7 +848,7 @@ Respond in JSON format:
     cvFilePath: string
   ): Promise<SectionGenerationResult> {
     try {
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
       const companyValues = await this.loadCompanyValues(jobId);
 
@@ -1262,7 +1287,7 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
   async extractThemes(jobId: string): Promise<ThemeExtractionResult> {
     try {
       // Load job data
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       
       // Extract themes using Claude
       const themes = await this.extractJobThemes(jobData);
@@ -2240,7 +2265,7 @@ ${project.result}`;
       const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
 
       // Determine focal theme from job description
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const theme = await this.determineFocalThemeFromJob(jobData);
 
       // Generate the focus story
@@ -2307,7 +2332,7 @@ ${project.result}`;
   private async researchCompanyValues(jobId: string, providedCompanyUrl?: string): Promise<string | null> {
     try {
       // Load job data to get company name
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const companyName = jobData.company;
 
       console.log(`🔍 Researching company values for: ${companyName}`);
@@ -2419,7 +2444,7 @@ Keep each description concise but specific enough to be actionable for interview
 
   private async createFocusStory(companyValues: string, cvContent: string, jobId: string, theme: string = ''): Promise<string> {
     // Load job data for relevance section
-    const jobData = this.loadJobData(jobId);
+    const jobData = await this.loadJobData(jobId);
     
     const prompt = `You are an expert interview coach helping identify specific line items/bullet points from the candidate's CV roles and reverse-engineering them into compelling STAR method stories that align with company values.
 

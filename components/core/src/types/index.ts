@@ -12,6 +12,10 @@ export interface JobListing {
     max: string;
     currency: string;
   };
+  jobId?: string;
+  titleShorthand?: string;
+  source?: string;
+  companyStage?: string;
 }
 
 export interface AgentConfig {

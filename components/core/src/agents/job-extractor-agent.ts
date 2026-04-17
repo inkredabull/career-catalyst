@@ -4,6 +4,7 @@ import { WebScraper } from '../utils/web-scraper';
 import { JobScorerAgent } from './job-scorer-agent';
 import { ResumeCreatorAgent } from './resume-creator-agent';
 import { LLMProviderConfig } from '../providers/llm-provider';
+import { resolveFromProjectRoot } from '../utils/project-root';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -78,27 +79,33 @@ export class JobExtractorAgent extends BaseAgent {
       
       // Generate unique job ID using timestamp + random for guaranteed uniqueness
       const jobId = this.generateJobId();
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      
+
       // Create job-specific subdirectory
-      const jobDir = path.join('logs', jobId);
+      const jobDir = resolveFromProjectRoot('logs', jobId);
       if (!fs.existsSync(jobDir)) {
         fs.mkdirSync(jobDir, { recursive: true });
       }
-      
-      const logFileName = `job-${timestamp}.json`;
-      const logFilePath = path.join(jobDir, logFileName);
 
-      // Save JSON to log file with jobId included
-      const jobDataWithSource = {
+      // Build job data object with jobId and source
+      const jobDataWithSource: JobListing = {
         ...jobData,
-        jobId,  // Add the jobId to the saved data
+        jobId,
         titleShorthand: this.buildTitleShorthand(jobData.title || ''),
         source: sourceUrl ? "extracted" : "html_parsed"
       };
-      const jsonOutput = JSON.stringify(jobDataWithSource, null, 2);
-      fs.writeFileSync(logFilePath, jsonOutput, 'utf-8');
-      console.log(`✅ Job information logged to ${logFilePath}`);
+
+      // Classify company stage
+      const companyStage = await this.classifyCompanyStage(
+        jobDataWithSource.company,
+        jobDataWithSource.description || '',
+        jobDataWithSource.url
+      );
+      jobDataWithSource.companyStage = companyStage;
+      console.log(`🏢 Company stage: ${companyStage}`);
+
+      const cacheFilePath = path.join(jobDir, 'job-cache.json');
+      fs.writeFileSync(cacheFilePath, JSON.stringify(jobDataWithSource, null, 2), 'utf-8');
+      console.log(`✅ Job cached to ${cacheFilePath}`);
 
       // Create reminder for tracked job (unless --no-reminders flag is set)
       if (!options?.skipReminders) {
@@ -145,26 +152,33 @@ export class JobExtractorAgent extends BaseAgent {
 
       // Generate unique job ID using timestamp + random for guaranteed uniqueness
       const jobId = this.generateJobId();
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      
+
       // Create job-specific subdirectory
-      const jobDir = path.join('logs', jobId);
+      const jobDir = resolveFromProjectRoot('logs', jobId);
       if (!fs.existsSync(jobDir)) {
         fs.mkdirSync(jobDir, { recursive: true });
       }
-      
-      const logFileName = `job-${timestamp}.json`;
-      const logFilePath = path.join(jobDir, logFileName);
 
-      // Save JSON to log file
-      const jobDataWithSource = {
+      // Build job data object with jobId and source
+      const jobDataWithSource: JobListing = {
         ...normalizedJobData,
+        jobId,
         titleShorthand: this.buildTitleShorthand(normalizedJobData.title || ''),
         source: "json_input"
       };
-      const jsonOutput = JSON.stringify(jobDataWithSource, null, 2);
-      fs.writeFileSync(logFilePath, jsonOutput, 'utf-8');
-      console.log(`✅ Job information logged to ${logFilePath}`);
+
+      // Classify company stage
+      const companyStage = await this.classifyCompanyStage(
+        jobDataWithSource.company,
+        jobDataWithSource.description || '',
+        jobDataWithSource.url
+      );
+      jobDataWithSource.companyStage = companyStage;
+      console.log(`🏢 Company stage: ${companyStage}`);
+
+      const cacheFilePath = path.join(jobDir, 'job-cache.json');
+      fs.writeFileSync(cacheFilePath, JSON.stringify(jobDataWithSource, null, 2), 'utf-8');
+      console.log(`✅ Job cached to ${cacheFilePath}`);
 
       // Create reminder for tracked job (unless --no-reminders flag is set)
       if (!options?.skipReminders) {
@@ -1233,6 +1247,19 @@ Response format: ["term1", "term2", "term3", ...]`;
       return { jobId, filePath };
     } catch (error) {
       throw new Error(`Failed to create job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private async classifyCompanyStage(companyName: string, jobDescription: string, companyUrl?: string): Promise<string> {
+    try {
+      const contextHint = companyUrl ? ` (website: ${companyUrl})` : '';
+      const prompt = `What stage is ${companyName}${contextHint}? Use the job description below as context. Choose one answer among the following: Seed, Series A, Series B, Series C, Series D, Series E, Public, Unknown. Respond with only the stage label, nothing else.\n\nJob description excerpt:\n${jobDescription.substring(0, 1000)}`;
+      const response = await this.makeOpenAIRequest(prompt);
+      const stage = response.trim();
+      const valid = ['Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Series E', 'Public', 'Unknown'];
+      return valid.includes(stage) ? stage : 'Unknown';
+    } catch {
+      return 'Unknown';
     }
   }
 

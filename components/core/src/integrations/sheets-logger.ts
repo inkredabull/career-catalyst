@@ -75,7 +75,8 @@ export class SheetsLogger {
     title: string,
     company: string,
     jobUrl: string,
-    origin = 'CLI'
+    origin = 'CLI',
+    jobListing?: JobListing
   ): Promise<void> {
     if (!this.enabled) return;
 
@@ -94,7 +95,16 @@ export class SheetsLogger {
         analysis: '',
         jobUrl,
         resumeUrl: '',
-        jobTitleShorthand: this.generateShorthand(title)
+        jobTitleShorthand: jobListing?.titleShorthand || this.generateShorthand(title),
+        // New fields from JobListing
+        description: jobListing?.description || '',
+        location: jobListing?.location || '',
+        salaryMin: jobListing?.salary?.min || '',
+        salaryMax: jobListing?.salary?.max || '',
+        salaryCurrency: jobListing?.salary?.currency || '',
+        linkedInCompany: jobListing?.linkedInCompany || '',
+        source: jobListing?.source || '',
+        companyStage: jobListing?.companyStage || ''
       };
 
       await this.client.insertRowAtTop(this.spreadsheetId, this.sheetName, jobData);

@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
+import { JobListing } from '../types';
 
 /**
  * Google Sheets utility for managing job tracking spreadsheet
@@ -24,6 +25,14 @@ export interface JobRow {
   whoGotHired?: string;
   jobTitleShorthand?: string;
   control?: string;
+  description?: string;
+  location?: string;
+  salaryMin?: string;
+  salaryMax?: string;
+  salaryCurrency?: string;
+  linkedInCompany?: string;
+  source?: string;
+  companyStage?: string;
 }
 
 export class GoogleSheetsClient {
@@ -64,7 +73,8 @@ export class GoogleSheetsClient {
       // Column order matching the headers:
       // ID, Role, Company, Status, Applied, Updated, Rejection Rationale, Notes, Origin,
       // Score (%), Threshold?, Analysis, Job URL, Resume URL, Critique, Who Got Hired,
-      // JobTitleShorthand, Control?
+      // JobTitleShorthand, Control?, Description, Location, SalaryMin, SalaryMax,
+      // SalaryCurrency, LinkedInCompany, Source, CompanyStage
       const values = [
         row.id || '',
         row.role || '',
@@ -83,7 +93,15 @@ export class GoogleSheetsClient {
         row.critique || '',
         row.whoGotHired || '',
         row.jobTitleShorthand || '',
-        row.control || ''
+        row.control || '',
+        row.description || '',
+        row.location || '',
+        row.salaryMin || '',
+        row.salaryMax || '',
+        row.salaryCurrency || '',
+        row.linkedInCompany || '',
+        row.source || '',
+        row.companyStage || ''
       ];
 
       // First, insert a new row at position 2 (below headers)
@@ -106,7 +124,7 @@ export class GoogleSheetsClient {
       });
 
       // Then populate the new row with data
-      const range = `${sheetName}!A2:R2`; // A2 through R2 (18 columns)
+      const range = `${sheetName}!A2:Z2`; // A2 through Z2 (26 columns)
 
       await this.sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -159,10 +177,18 @@ export class GoogleSheetsClient {
         row.critique || '',
         row.whoGotHired || '',
         row.jobTitleShorthand || '',
-        row.control || ''
+        row.control || '',
+        row.description || '',
+        row.location || '',
+        row.salaryMin || '',
+        row.salaryMax || '',
+        row.salaryCurrency || '',
+        row.linkedInCompany || '',
+        row.source || '',
+        row.companyStage || ''
       ];
 
-      const range = `${sheetName}!A:R`;
+      const range = `${sheetName}!A:Z`;
 
       await this.sheets.spreadsheets.values.append({
         spreadsheetId,
@@ -211,7 +237,7 @@ export class GoogleSheetsClient {
     sheetName: string
   ): Promise<JobRow[]> {
     try {
-      const range = `${sheetName}!A2:R`; // Skip header row
+      const range = `${sheetName}!A2:Z`; // Skip header row
 
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId,
@@ -238,7 +264,15 @@ export class GoogleSheetsClient {
         critique: row[14] || '',
         whoGotHired: row[15] || '',
         jobTitleShorthand: row[16] || '',
-        control: row[17] || ''
+        control: row[17] || '',
+        description: row[18] || '',
+        location: row[19] || '',
+        salaryMin: row[20] || '',
+        salaryMax: row[21] || '',
+        salaryCurrency: row[22] || '',
+        linkedInCompany: row[23] || '',
+        source: row[24] || '',
+        companyStage: row[25] || ''
       }));
 
     } catch (error) {
@@ -286,12 +320,20 @@ export class GoogleSheetsClient {
         updatedRow.critique || '',
         updatedRow.whoGotHired || '',
         updatedRow.jobTitleShorthand || '',
-        updatedRow.control || ''
+        updatedRow.control || '',
+        updatedRow.description || '',
+        updatedRow.location || '',
+        updatedRow.salaryMin || '',
+        updatedRow.salaryMax || '',
+        updatedRow.salaryCurrency || '',
+        updatedRow.linkedInCompany || '',
+        updatedRow.source || '',
+        updatedRow.companyStage || ''
       ];
 
       // Row 2 is index 0 in our data, so actual row is rowIndex + 2
       const actualRow = rowIndex + 2;
-      const range = `${sheetName}!A${actualRow}:R${actualRow}`;
+      const range = `${sheetName}!A${actualRow}:Z${actualRow}`;
 
       await this.sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -307,6 +349,22 @@ export class GoogleSheetsClient {
     } catch (error) {
       console.error('❌ Error updating row:', error);
       throw error;
+    }
+  }
+  /**
+   * Fetch a single job row by ID
+   */
+  async fetchJobById(
+    spreadsheetId: string,
+    sheetName: string,
+    id: string
+  ): Promise<JobRow | null> {
+    try {
+      const rows = await this.readAll(spreadsheetId, sheetName);
+      return rows.find(r => r.id === id) || null;
+    } catch (error) {
+      console.warn(`⚠️  Failed to fetch job from Sheets: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return null;
     }
   }
 }
@@ -327,4 +385,27 @@ export function extractSpreadsheetId(url: string): string {
  */
 export function formatDate(date: Date = new Date()): string {
   return date.toISOString().split('T')[0];
+}
+
+/**
+ * Convert a JobRow to a JobListing for use with agents
+ */
+export function sheetsRowToJobListing(row: JobRow): JobListing {
+  return {
+    title: row.role,
+    company: row.company,
+    location: row.location || '',
+    description: row.description || '',
+    url: row.jobUrl,
+    jobId: row.id,
+    titleShorthand: row.jobTitleShorthand,
+    salary: {
+      min: row.salaryMin || '',
+      max: row.salaryMax || '',
+      currency: row.salaryCurrency || 'USD'
+    },
+    linkedInCompany: row.linkedInCompany,
+    source: row.source || 'extracted',
+    companyStage: row.companyStage
+  };
 }

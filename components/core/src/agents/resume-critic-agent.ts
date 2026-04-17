@@ -43,7 +43,7 @@ export class ResumeCriticAgent {
       }
 
       // Load the job data for context
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
 
       // Load additional context documents
       const themes = this.loadThemes(jobId);
@@ -89,10 +89,20 @@ export class ResumeCriticAgent {
   private findMostRecentResume(jobId: string): string | null {
     const allResumeFiles: Array<{name: string, path: string, mtime: Date}> = [];
 
-    // Load job data to get company and role info for matching
+    // Load job data to get company and role info for matching (sync fast path only)
     let jobData: JobListing | null = null;
     try {
-      jobData = this.loadJobData(jobId);
+      const cacheFile = resolveFromProjectRoot('logs', jobId, 'job-cache.json');
+      const jobDir = resolveFromProjectRoot('logs', jobId);
+      if (fs.existsSync(cacheFile)) {
+        jobData = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+      } else if (fs.existsSync(jobDir)) {
+        const files = fs.readdirSync(jobDir);
+        const legacyFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
+        if (legacyFile) {
+          jobData = JSON.parse(fs.readFileSync(path.join(jobDir, legacyFile), 'utf-8'));
+        }
+      }
     } catch (error) {
       console.warn(`Could not load job data for ${jobId}:`, error);
     }
@@ -163,22 +173,47 @@ export class ResumeCriticAgent {
     return allResumeFiles.length > 0 ? allResumeFiles[0].path : null;
   }
 
-  private loadJobData(jobId: string): JobListing {
+  private async loadJobData(jobId: string): Promise<JobListing> {
+    // 1. Local cache (fast path)
+    const cacheFile = resolveFromProjectRoot('logs', jobId, 'job-cache.json');
+    if (fs.existsSync(cacheFile)) {
+      return JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    }
+
+    // 2. Legacy job-*.json (backward compat)
     const jobDir = resolveFromProjectRoot('logs', jobId);
-
-    if (!fs.existsSync(jobDir)) {
-      throw new Error(`Job directory not found for ID: ${jobId}`);
+    if (fs.existsSync(jobDir)) {
+      const files = fs.readdirSync(jobDir);
+      const legacyFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
+      if (legacyFile) {
+        const data = JSON.parse(fs.readFileSync(path.join(jobDir, legacyFile), 'utf-8'));
+        // Lazy migration
+        fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2));
+        return data;
+      }
     }
 
-    const files = fs.readdirSync(jobDir);
-    const jobFile = files.find(file => file.startsWith('job-') && file.endsWith('.json'));
-    if (!jobFile) {
-      throw new Error(`Job file not found for ID: ${jobId}`);
+    // 3. Google Sheets fallback
+    const sheetsUrl = process.env.GOOGLE_SHEETS_URL;
+    const sheetName = process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1';
+    if (sheetsUrl) {
+      try {
+        const { GoogleSheetsClient, extractSpreadsheetId, sheetsRowToJobListing } = await import('../utils/google-sheets');
+        const client = new GoogleSheetsClient();
+        const spreadsheetId = extractSpreadsheetId(sheetsUrl);
+        const row = await client.fetchJobById(spreadsheetId, sheetName, jobId);
+        if (row) {
+          const jobData = sheetsRowToJobListing(row);
+          fs.mkdirSync(jobDir, { recursive: true });
+          fs.writeFileSync(cacheFile, JSON.stringify(jobData, null, 2));
+          return jobData;
+        }
+      } catch (sheetsError) {
+        console.warn(`⚠️  Sheets fallback failed: ${sheetsError instanceof Error ? sheetsError.message : 'Unknown'}`);
+      }
     }
 
-    const jobPath = path.join(jobDir, jobFile);
-    const jobData = fs.readFileSync(jobPath, 'utf-8');
-    return JSON.parse(jobData);
+    throw new Error(`Job data not found for ID: ${jobId}`);
   }
 
   private loadThemes(jobId: string): string | null {

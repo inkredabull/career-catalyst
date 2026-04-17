@@ -617,13 +617,10 @@ app.post('/extract', async (req, res) => {
         let jobData = null;
         try {
           const jobDir = path.join(projectDir, 'logs', jobId);
-          const files = fs.readdirSync(jobDir);
-          const jobFile = files.find(file => file.startsWith('job-') && file.endsWith('.json'));
-
-          if (jobFile) {
-            const jobFilePath = path.join(jobDir, jobFile);
-            const jobDataRaw = fs.readFileSync(jobFilePath, 'utf-8');
-            jobData = JSON.parse(jobDataRaw);
+          const jobFile = 'job-cache.json';
+          const jobFilePath = path.join(jobDir, jobFile);
+          jobData = fs.existsSync(jobFilePath) ? JSON.parse(fs.readFileSync(jobFilePath, 'utf-8')) : null;
+          if (jobData) {
             console.log(`  -> 📄 Job data saved to: logs/${jobId}/${jobFile}`);
           }
         } catch (error) {
@@ -769,19 +766,16 @@ app.post('/extract', async (req, res) => {
         let jobData = null;
         try {
           const jobDir = path.join(projectDir, 'logs', jobId);
-          const files = fs.readdirSync(jobDir);
-          const jobFile = files.find(file => file.startsWith('job-') && file.endsWith('.json'));
-
-          if (jobFile) {
-            const jobFilePath = path.join(jobDir, jobFile);
-            const jobDataRaw = fs.readFileSync(jobFilePath, 'utf-8');
-            jobData = JSON.parse(jobDataRaw);
+          const jobFile = 'job-cache.json';
+          const jobFilePath = path.join(jobDir, jobFile);
+          jobData = fs.existsSync(jobFilePath) ? JSON.parse(fs.readFileSync(jobFilePath, 'utf-8')) : null;
+          if (jobData) {
             console.log(`  -> 📄 Job data saved to: logs/${jobId}/${jobFile}`);
           }
         } catch (error) {
           console.log(`  -> ⚠️  Could not read processed job data: ${error.message}`);
         }
-        
+
         res.json({
           success: true,
           jobId: jobId,
@@ -932,20 +926,25 @@ app.post('/load-job', async (req, res) => {
       });
     }
 
-    // Find the job JSON file
-    const files = fs.readdirSync(jobDir);
-    const jobFile = files.find(file => file.startsWith('job-') && file.endsWith('.json'));
-
-    if (!jobFile) {
-      console.log(`  -> ❌ No job file found in directory`);
-      return res.status(404).json({
-        success: false,
-        error: `No job data file found for ${jobId}`
-      });
+    // Find the job JSON file (prefer job-cache.json, fall back to legacy job-*.json)
+    const jobCacheFilePath = path.join(jobDir, 'job-cache.json');
+    let jobFile = 'job-cache.json';
+    let jobFilePath = jobCacheFilePath;
+    if (!fs.existsSync(jobCacheFilePath)) {
+      const files = fs.readdirSync(jobDir);
+      const legacyFile = files.find(file => file.startsWith('job-') && file.endsWith('.json'));
+      if (!legacyFile) {
+        console.log(`  -> ❌ No job file found in directory`);
+        return res.status(404).json({
+          success: false,
+          error: `No job data file found for ${jobId}`
+        });
+      }
+      jobFile = legacyFile;
+      jobFilePath = path.join(jobDir, jobFile);
     }
 
     // Read and parse the job data
-    const jobFilePath = path.join(jobDir, jobFile);
     const jobDataRaw = fs.readFileSync(jobFilePath, 'utf-8');
     const jobData = JSON.parse(jobDataRaw);
 

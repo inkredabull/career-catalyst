@@ -456,24 +456,14 @@ program
         process.exit(1);
       }
 
-      // Generate unique job ID using timestamp + random for guaranteed uniqueness
-      const timestampHex = Date.now().toString(16);
-      const random = Math.random().toString(16).substring(2, 6);
-      const combined = timestampHex + random;
-      const jobId = combined.substring(combined.length - 8);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      
-      // Create job-specific subdirectory
+      // Use the job ID returned by the agent (it already wrote job-cache.json)
+      const jobId = result.jobId!;
       const jobDir = resolveFromProjectRoot('logs', jobId);
+      // Ensure directory exists (agent should have created it, but be safe)
       await fs.mkdir(jobDir, { recursive: true });
-      
-      const logFileName = `job-${timestamp}.json`;
-      const logFilePath = path.join(jobDir, logFileName);
 
-      // Save JSON to log file
-      const jsonOutput = JSON.stringify(result.data, null, 2);
-      await fs.writeFile(logFilePath, jsonOutput, 'utf-8');
-      console.log(`✅ Job information logged to ${logFilePath}`);
+      // Agent already wrote job-cache.json; no separate file write needed here
+      console.log(`✅ Job information cached to logs/${jobId}/job-cache.json`);
 
       // Process job description with required terms extraction and index update
       await agent.processJobDescription(jobId, result.data.description);
@@ -485,7 +475,9 @@ program
           jobId,
           result.data.title,
           result.data.company,
-          result.data.url || ''
+          result.data.url || '',
+          'CLI',
+          result.data
         );
       }
 
@@ -589,12 +581,13 @@ program
       }
 
       // Format output for display
+      const jsonOutput = JSON.stringify(result.data, null, 2);
       let output: string;
       if (options.format === 'json') {
         output = jsonOutput;
       } else {
         // output = formatPrettyOutput(result.data);
-        output = `✅ Job extracted and logged to ${logFilePath}\n${jsonOutput}`;
+        output = `✅ Job extracted and cached to logs/${jobId}/job-cache.json\n${jsonOutput}`;
       }
 
       // Output to additional file if specified
@@ -913,24 +906,48 @@ async function loadJobData(jobId: string) {
   const logsDir = resolveFromProjectRoot('logs');
   const jobDir = path.join(logsDir, jobId);
 
-  // Try to find job file in subdirectory first
+  // 1. Local cache (fast path)
+  const cacheFile = path.join(jobDir, 'job-cache.json');
   try {
-    const files = await fs.readdir(jobDir);
-    const jobFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
-    if (jobFile) {
-      const content = await fs.readFile(path.join(jobDir, jobFile), 'utf-8');
-      return JSON.parse(content);
-    }
+    const content = await fs.readFile(cacheFile, 'utf-8');
+    return JSON.parse(content);
   } catch {
-    // Directory doesn't exist, try logs root
+    // Cache not found, try legacy
   }
 
-  // Fallback: search logs root for matching job ID
-  const files = await fs.readdir(logsDir);
-  const jobFile = files.find(f => f.startsWith(`job-${jobId}`) && f.endsWith('.json'));
-  if (jobFile) {
-    const content = await fs.readFile(path.join(logsDir, jobFile), 'utf-8');
-    return JSON.parse(content);
+  // 2. Legacy job-*.json (backward compat)
+  try {
+    const files = await fs.readdir(jobDir);
+    const legacyFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
+    if (legacyFile) {
+      const content = await fs.readFile(path.join(jobDir, legacyFile), 'utf-8');
+      const data = JSON.parse(content);
+      // Lazy migration: write cache file
+      await fs.writeFile(cacheFile, JSON.stringify(data, null, 2), 'utf-8');
+      return data;
+    }
+  } catch {
+    // Directory doesn't exist or no legacy file
+  }
+
+  // 3. Google Sheets fallback
+  const sheetsUrl = process.env.GOOGLE_SHEETS_URL;
+  const sheetName = process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1';
+  if (sheetsUrl) {
+    try {
+      const { GoogleSheetsClient, extractSpreadsheetId, sheetsRowToJobListing } = await import('./utils/google-sheets');
+      const client = new GoogleSheetsClient();
+      const spreadsheetId = extractSpreadsheetId(sheetsUrl);
+      const row = await client.fetchJobById(spreadsheetId, sheetName, jobId);
+      if (row) {
+        const jobData = sheetsRowToJobListing(row);
+        await fs.mkdir(jobDir, { recursive: true });
+        await fs.writeFile(cacheFile, JSON.stringify(jobData, null, 2), 'utf-8');
+        return jobData;
+      }
+    } catch (sheetsError) {
+      console.warn(`⚠️  Sheets fallback failed: ${sheetsError instanceof Error ? sheetsError.message : 'Unknown'}`);
+    }
   }
 
   throw new Error(`Job data not found for job ID: ${jobId}`);

@@ -59,7 +59,7 @@ export class ResumeCreatorAgent {
       this.precomputedClassification = classification;
 
       // Load job data
-      let jobData = this.loadJobData(jobId);
+      let jobData = await this.loadJobData(jobId);
 
       // If generate flag is provided, check if we need to generate job description
       if (generate !== false && (!jobData.description || jobData.description.trim() === '' || this.isGenericDescription(jobData.description))) {
@@ -159,22 +159,47 @@ export class ResumeCreatorAgent {
     }
   }
 
-  private loadJobData(jobId: string): JobListing {
-    const jobDir = resolveFromProjectRoot('logs', jobId);
-    
-    if (!fs.existsSync(jobDir)) {
-      throw new Error(`Job directory not found for ID: ${jobId}`);
-    }
-    
-    const files = fs.readdirSync(jobDir);
-    const jobFile = files.find(file => file.startsWith('job-') && file.endsWith('.json'));
-    if (!jobFile) {
-      throw new Error(`Job file not found for ID: ${jobId}`);
+  private async loadJobData(jobId: string): Promise<JobListing> {
+    // 1. Local cache (fast path)
+    const cacheFile = resolveFromProjectRoot('logs', jobId, 'job-cache.json');
+    if (fs.existsSync(cacheFile)) {
+      return JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
     }
 
-    const jobPath = path.join(jobDir, jobFile);
-    const jobData = fs.readFileSync(jobPath, 'utf-8');
-    return JSON.parse(jobData);
+    // 2. Legacy job-*.json (backward compat)
+    const jobDir = resolveFromProjectRoot('logs', jobId);
+    if (fs.existsSync(jobDir)) {
+      const files = fs.readdirSync(jobDir);
+      const legacyFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
+      if (legacyFile) {
+        const data = JSON.parse(fs.readFileSync(path.join(jobDir, legacyFile), 'utf-8'));
+        // Lazy migration
+        fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2));
+        return data;
+      }
+    }
+
+    // 3. Google Sheets fallback
+    const sheetsUrl = process.env.GOOGLE_SHEETS_URL;
+    const sheetName = process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1';
+    if (sheetsUrl) {
+      try {
+        const { GoogleSheetsClient, extractSpreadsheetId, sheetsRowToJobListing } = await import('../utils/google-sheets');
+        const client = new GoogleSheetsClient();
+        const spreadsheetId = extractSpreadsheetId(sheetsUrl);
+        const row = await client.fetchJobById(spreadsheetId, sheetName, jobId);
+        if (row) {
+          const jobData = sheetsRowToJobListing(row);
+          fs.mkdirSync(jobDir, { recursive: true });
+          fs.writeFileSync(cacheFile, JSON.stringify(jobData, null, 2));
+          return jobData;
+        }
+      } catch (sheetsError) {
+        console.warn(`⚠️  Sheets fallback failed: ${sheetsError instanceof Error ? sheetsError.message : 'Unknown'}`);
+      }
+    }
+
+    throw new Error(`Job data not found for ID: ${jobId}`);
   }
 
   private isFirstGeneration(jobId: string): boolean {
@@ -189,7 +214,14 @@ export class ResumeCreatorAgent {
       const resumeOutputDir = this.getResumeOutputDir();
       if (fs.existsSync(resumeOutputDir)) {
         const files = fs.readdirSync(resumeOutputDir);
-        const jobData = this.loadJobData(jobId);
+        const jobCacheFile = resolveFromProjectRoot('logs', jobId, 'job-cache.json');
+        const jobLogDir = resolveFromProjectRoot('logs', jobId);
+        const jobLogFiles = fs.existsSync(jobLogDir) ? fs.readdirSync(jobLogDir) : [];
+        const legacyJobFile = jobLogFiles.find(f => f.startsWith('job-') && f.endsWith('.json'));
+        const jobDataRaw = fs.existsSync(jobCacheFile)
+          ? fs.readFileSync(jobCacheFile, 'utf-8')
+          : (legacyJobFile ? fs.readFileSync(path.join(jobLogDir, legacyJobFile), 'utf-8') : null);
+        const jobData = jobDataRaw ? JSON.parse(jobDataRaw) : { company: '', title: '' };
         const candidateName = 'Resume'; // We'll extract this properly in the actual generation
         
         // Look for any PDF files that might be for this job
@@ -218,7 +250,7 @@ export class ResumeCreatorAgent {
   }
 
   private async generateInitialResume(jobId: string, cvFilePath: string, outputPath?: string, jobData?: JobListing, forceRegenerate: boolean = false): Promise<ResumeResult> {
-    const job = jobData || this.loadJobData(jobId);
+    const job = jobData || await this.loadJobData(jobId);
 
     let tailoredContent: {
       markdownContent: string;
@@ -336,7 +368,7 @@ export class ResumeCreatorAgent {
     jobData?: JobListing,
     skipJudge: boolean = false
   ): Promise<ResumeResult> {
-    const job = jobData || this.loadJobData(jobId);
+    const job = jobData || await this.loadJobData(jobId);
 
     console.log(`🔄 Generating improved resume for job ${jobId} with critique recommendations`);
     const cvContent = fs.readFileSync(cvFilePath, 'utf-8');

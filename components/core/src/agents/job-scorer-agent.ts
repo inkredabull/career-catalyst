@@ -24,7 +24,7 @@ export class JobScorerAgent extends BaseAgent {
 
   async scoreJob(jobId: string): Promise<JobScore> {
     try {
-      const jobData = this.loadJobData(jobId);
+      const jobData = await this.loadJobData(jobId);
       const score = await this.calculateScore(jobData);
 
       const jobScore: JobScore = {
@@ -51,7 +51,7 @@ export class JobScorerAgent extends BaseAgent {
         timestamp: new Date().toISOString(),
       };
 
-      this.logScore(jobScore);
+      await this.logScore(jobScore);
       
       // Automatically generate resume if score is above threshold and CV path is provided
       if (jobScore.overallScore >= this.autoResumeConfig.threshold && this.autoResumeConfig.cvPath) {
@@ -74,22 +74,47 @@ export class JobScorerAgent extends BaseAgent {
     return JSON.parse(criteriaData);
   }
 
-  private loadJobData(jobId: string): JobListing {
-    const jobDir = resolveFromProjectRoot('logs', jobId);
-    
-    if (!fs.existsSync(jobDir)) {
-      throw new Error(`Job directory not found for ID: ${jobId}`);
-    }
-    
-    const files = fs.readdirSync(jobDir);
-    const jobFile = files.find(file => file.startsWith('job-') && file.endsWith('.json'));
-    if (!jobFile) {
-      throw new Error(`Job file not found for ID: ${jobId}`);
+  private async loadJobData(jobId: string): Promise<JobListing> {
+    // 1. Local cache (fast path)
+    const cacheFile = resolveFromProjectRoot('logs', jobId, 'job-cache.json');
+    if (fs.existsSync(cacheFile)) {
+      return JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
     }
 
-    const jobPath = path.join(jobDir, jobFile);
-    const jobData = fs.readFileSync(jobPath, 'utf-8');
-    return JSON.parse(jobData);
+    // 2. Legacy job-*.json (backward compat)
+    const jobDir = resolveFromProjectRoot('logs', jobId);
+    if (fs.existsSync(jobDir)) {
+      const files = fs.readdirSync(jobDir);
+      const legacyFile = files.find(f => f.startsWith('job-') && f.endsWith('.json'));
+      if (legacyFile) {
+        const data = JSON.parse(fs.readFileSync(path.join(jobDir, legacyFile), 'utf-8'));
+        // Lazy migration
+        fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2));
+        return data;
+      }
+    }
+
+    // 3. Google Sheets fallback
+    const sheetsUrl = process.env.GOOGLE_SHEETS_URL;
+    const sheetName = process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1';
+    if (sheetsUrl) {
+      try {
+        const { GoogleSheetsClient, extractSpreadsheetId, sheetsRowToJobListing } = await import('../utils/google-sheets');
+        const client = new GoogleSheetsClient();
+        const spreadsheetId = extractSpreadsheetId(sheetsUrl);
+        const row = await client.fetchJobById(spreadsheetId, sheetName, jobId);
+        if (row) {
+          const jobData = sheetsRowToJobListing(row);
+          fs.mkdirSync(jobDir, { recursive: true });
+          fs.writeFileSync(cacheFile, JSON.stringify(jobData, null, 2));
+          return jobData;
+        }
+      } catch (sheetsError) {
+        console.warn(`⚠️  Sheets fallback failed: ${sheetsError instanceof Error ? sheetsError.message : 'Unknown'}`);
+      }
+    }
+
+    throw new Error(`Job data not found for ID: ${jobId}`);
   }
 
   private async calculateScore(job: JobListing): Promise<{
@@ -498,7 +523,7 @@ Return your response as a JSON object with keys: problem_solving, hiring_archety
     }
   }
 
-  private logScore(jobScore: JobScore): void {
+  private async logScore(jobScore: JobScore): Promise<void> {
     const logEntry = {
       timestamp: jobScore.timestamp,
       jobId: jobScore.jobId,
@@ -522,7 +547,7 @@ Return your response as a JSON object with keys: problem_solving, hiring_archety
 
     // Generate and save HTML report
     try {
-      const jobData = this.loadJobData(jobScore.jobId);
+      const jobData = await this.loadJobData(jobScore.jobId);
       const htmlReport = generateScoringReportHTML(jobData, jobScore);
       const htmlPath = path.join(jobDir, `score-report-${new Date().toISOString().replace(/[:.]/g, '-')}.html`);
       fs.writeFileSync(htmlPath, htmlReport);
