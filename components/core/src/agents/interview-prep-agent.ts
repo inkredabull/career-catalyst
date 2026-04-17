@@ -321,7 +321,7 @@ Format as:
   ): Promise<string> {
     // Check if all sections already exist
     const existingSections = this.listSections(this.currentJobId);
-    const allSections: AboutMeSection[] = ['opener', 'focus-story', 'themes', 'why'];
+    const allSections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close'];
     const missingSections = allSections.filter(s => !existingSections.includes(s));
 
     // If all sections exist, combine them
@@ -338,9 +338,13 @@ Format as:
       console.log(`📝 Generating ${section} section...`);
       
       switch (section) {
-        case 'opener':
-          const openerContent = await this.generateOpener(job, cvContent, options);
-          this.saveSection(this.currentJobId, 'opener', openerContent);
+        case 'hook':
+          const hookContent = await this.generateHook(job, cvContent, options);
+          this.saveSection(this.currentJobId, 'hook', hookContent);
+          break;
+        case 'career-snapshot':
+          const snapshotContent = await this.generateCareerSnapshot(job, cvContent, options);
+          this.saveSection(this.currentJobId, 'career-snapshot', snapshotContent);
           break;
         case 'focus-story':
           const userTheme = await this.determineFocalThemeFromJob(job);
@@ -354,6 +358,10 @@ Format as:
         case 'why':
           const whyContent = await this.generateWhyCompany(job, cvContent, companyValues, options);
           this.saveSection(this.currentJobId, 'why', whyContent);
+          break;
+        case 'close':
+          const closeContent = await this.generateClose(job, cvContent, options);
+          this.saveSection(this.currentJobId, 'close', closeContent);
           break;
       }
     }
@@ -375,16 +383,22 @@ Format as:
 
   private getFallbackSectionPrompt(section: AboutMeSection): string {
     const basePrompt = `You are a professional interview coach creating ${section} section for a "Tell me about yourself" response.`;
-    
+
     switch (section) {
-      case 'opener':
-        return `${basePrompt}\n\nCreate the opener and 3 professional summary bullets in RTF format.`;
+      case 'hook':
+        return `${basePrompt}\n\nCreate 3 RTF bullets: professional identity, power statement, and unique differentiator. Dynamic and role-specific — do not use a hardcoded opener.`;
+      case 'career-snapshot':
+        return `${basePrompt}\n\nCreate 3 RTF bullets covering career arc, key skills, and standout achievement.`;
       case 'focus-story':
         return `${basePrompt}\n\nCreate a detailed STAR method focus story in RTF format.`;
       case 'themes':
         return `${basePrompt}\n\nCreate key themes with examples in RTF format.`;
       case 'why':
-        return `${basePrompt}\n\nCreate the company fit section in RTF format.`;
+        return `${basePrompt}\n\nCreate 4 RTF bullets: why this company/role, why now & why you, transition framing (confident/positive), gap addressing or confidence close.`;
+      case 'close':
+        return `${basePrompt}\n\nCreate 2 RTF bullets: what you bring + unique positioning, and your energy/mindset stepping into the role.`;
+      case 'personal-touch':
+        return `${basePrompt}\n\nCreate 1 RTF bullet with a personal passion or hobby that connects authentically to professional life.`;
       default:
         return basePrompt;
     }
@@ -419,8 +433,11 @@ Format as:
 
       let content: string;
       switch (section) {
-        case 'opener':
-          content = await this.generateOpener(jobData, cvContent, options);
+        case 'hook':
+          content = await this.generateHook(jobData, cvContent, options);
+          break;
+        case 'career-snapshot':
+          content = await this.generateCareerSnapshot(jobData, cvContent, options);
           break;
         case 'focus-story':
           const userTheme = await this.determineFocalThemeFromJob(jobData);
@@ -432,6 +449,12 @@ Format as:
           break;
         case 'why':
           content = await this.generateWhyCompany(jobData, cvContent, companyValues, options);
+          break;
+        case 'close':
+          content = await this.generateClose(jobData, cvContent, options);
+          break;
+        case 'personal-touch':
+          content = await this.generatePersonalTouch(jobData, cvContent, options);
           break;
         default:
           return { success: false, section, error: `Unknown section: ${section}` };
@@ -448,17 +471,62 @@ Format as:
     }
   }
 
-  private async generateOpener(
+  private async generateHook(
     job: JobListing,
     cvContent: string,
     options: StatementOptions
   ): Promise<string> {
-    const promptTemplate = this.loadSectionPrompt('opener');
-    const prompt = this.buildSectionPrompt(promptTemplate, 'opener', job, cvContent, options);
-    
-    this.logPromptToFile(prompt, 'about-me-opener');
-    console.log('📝 Generating opener section...');
-    
+    const promptTemplate = this.loadSectionPrompt('hook');
+    const prompt = this.buildSectionPrompt(promptTemplate, 'hook', job, cvContent, options);
+
+    this.logPromptToFile(prompt, 'about-me-hook');
+    console.log('📝 Generating hook section...');
+
+    const response = await this.makeClaudeRequest(prompt);
+    return this.cleanResponse(response, 'about-me');
+  }
+
+  private async generateCareerSnapshot(
+    job: JobListing,
+    cvContent: string,
+    options: StatementOptions
+  ): Promise<string> {
+    const promptTemplate = this.loadSectionPrompt('career-snapshot');
+    const prompt = this.buildSectionPrompt(promptTemplate, 'career-snapshot', job, cvContent, options);
+
+    this.logPromptToFile(prompt, 'about-me-career-snapshot');
+    console.log('📝 Generating career snapshot section...');
+
+    const response = await this.makeClaudeRequest(prompt);
+    return this.cleanResponse(response, 'about-me');
+  }
+
+  private async generateClose(
+    job: JobListing,
+    cvContent: string,
+    options: StatementOptions
+  ): Promise<string> {
+    const promptTemplate = this.loadSectionPrompt('close');
+    const prompt = this.buildSectionPrompt(promptTemplate, 'close', job, cvContent, options);
+
+    this.logPromptToFile(prompt, 'about-me-close');
+    console.log('📝 Generating close section...');
+
+    const response = await this.makeClaudeRequest(prompt);
+    return this.cleanResponse(response, 'about-me');
+  }
+
+  private async generatePersonalTouch(
+    job: JobListing,
+    cvContent: string,
+    options: StatementOptions
+  ): Promise<string> {
+    const promptTemplate = this.loadSectionPrompt('personal-touch');
+    const prompt = this.buildSectionPrompt(promptTemplate, 'personal-touch', job, cvContent, options);
+
+    this.logPromptToFile(prompt, 'about-me-personal-touch');
+    console.log('📝 Generating personal touch section...');
+
     const response = await this.makeClaudeRequest(prompt);
     return this.cleanResponse(response, 'about-me');
   }
@@ -584,17 +652,23 @@ Format as:
   async combineSections(jobId: string): Promise<string> {
     try {
       const jobData = this.loadJobData(jobId);
-      const sections: AboutMeSection[] = ['opener', 'focus-story', 'themes', 'why'];
-      const sectionContents: Record<AboutMeSection, string> = {} as Record<AboutMeSection, string>;
-      
-      // Load all sections
-      for (const section of sections) {
+      const requiredSections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close'];
+      const sectionContents: Partial<Record<AboutMeSection, string>> = {};
+
+      // Load required sections
+      for (const section of requiredSections) {
         const sectionData = this.loadSection(jobId, section);
         if (sectionData) {
           sectionContents[section] = sectionData.content;
         } else {
           throw new Error(`Missing section: ${section}. Please generate all sections first.`);
         }
+      }
+
+      // Load optional personal-touch section if it exists
+      const personalTouchData = this.loadSection(jobId, 'personal-touch');
+      if (personalTouchData) {
+        sectionContents['personal-touch'] = personalTouchData.content;
       }
 
       // Extract RTF content from each section (remove RTF header/footer if present)
@@ -612,19 +686,16 @@ Format as:
         return rtfContent.trim();
       };
 
-      // Combine sections in order: opener, themes, why, focus-story
-      const openerBody = extractRTFBody(sectionContents.opener);
-      const themesBody = extractRTFBody(sectionContents.themes);
-      const whyBody = extractRTFBody(sectionContents.why);
-      const focusStoryBody = extractRTFBody(sectionContents['focus-story']);
+      // Combine sections in order: hook, career-snapshot, themes, why, focus-story, close, [personal-touch]
+      const bodies = requiredSections.map(s => extractRTFBody(sectionContents[s]!));
+      if (sectionContents['personal-touch']) {
+        bodies.push(extractRTFBody(sectionContents['personal-touch']));
+      }
 
       // Combine into final RTF document with proper font selection and formatting
       const combinedRTF = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}
 \\f0\\fs24
-${openerBody}
-${themesBody}
-${whyBody}
-${focusStoryBody}
+${bodies.join('\n')}
 }`;
 
       // Save combined output as RTF
@@ -659,10 +730,13 @@ ${focusStoryBody}
       const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
 
       const sectionNames: Record<AboutMeSection, string> = {
-        'opener': 'Opener and Professional Summary',
+        'hook': 'Hook (identity, power statement, differentiator)',
+        'career-snapshot': 'Career Snapshot (arc, skills, standout achievement)',
         'focus-story': 'Focus Story (STAR method)',
         'themes': 'Key Themes with Examples',
-        'why': 'Why Company section'
+        'why': 'Why This Role & Company',
+        'close': 'Close with Confidence',
+        'personal-touch': 'Personal Touch'
       };
 
       const prompt = `You are an expert interview coach critiquing the ${sectionNames[section]} section of a "Tell me about yourself" interview response.
@@ -749,10 +823,13 @@ Respond in JSON format:
       const companyValues = await this.loadCompanyValues(jobId);
 
       const sectionNames: Record<AboutMeSection, string> = {
-        'opener': 'Opener and Professional Summary',
+        'hook': 'Hook (identity, power statement, differentiator)',
+        'career-snapshot': 'Career Snapshot (arc, skills, standout achievement)',
         'focus-story': 'Focus Story (STAR method)',
         'themes': 'Key Themes with Examples',
-        'why': 'Why Company section'
+        'why': 'Why This Role & Company',
+        'close': 'Close with Confidence',
+        'personal-touch': 'Personal Touch'
       };
 
       const prompt = `You are an expert interview coach refining the ${sectionNames[section]} section of a "Tell me about yourself" interview response.
@@ -1097,7 +1174,7 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
       const files = fs.readdirSync(jobDir);
       const sections: AboutMeSection[] = [];
       
-      const sectionTypes: AboutMeSection[] = ['opener', 'focus-story', 'themes', 'why'];
+      const sectionTypes: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close', 'personal-touch'];
       for (const section of sectionTypes) {
         const sectionFile = `about-me-${section}.json`;
         if (files.includes(sectionFile)) {

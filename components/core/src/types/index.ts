@@ -194,7 +194,7 @@ export interface ResumeCritique {
   cost?: number;
 }
 
-export type StatementType = 'cover-letter' | 'endorsement' | 'about-me' | 'general' | 'about-me-opener' | 'about-me-focus-story' | 'about-me-themes' | 'about-me-why';
+export type StatementType = 'cover-letter' | 'endorsement' | 'about-me' | 'general' | 'about-me-hook' | 'about-me-career-snapshot' | 'about-me-focus-story' | 'about-me-themes' | 'about-me-why' | 'about-me-close' | 'about-me-personal-touch';
 
 export interface StatementOptions {
   emphasis?: string;
@@ -333,7 +333,7 @@ export interface ApplicationResult {
   submitted?: boolean;
 }
 
-export type AboutMeSection = 'opener' | 'focus-story' | 'themes' | 'why';
+export type AboutMeSection = 'hook' | 'career-snapshot' | 'themes' | 'why' | 'focus-story' | 'close' | 'personal-touch';
 
 export interface AboutMeSectionData {
   content: string;

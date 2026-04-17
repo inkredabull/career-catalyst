@@ -174,10 +174,13 @@ async function interactiveAboutMeGeneration(jobId: string, options: any): Promis
     };
 
     const sectionNames: Record<AboutMeSection, string> = {
-      'opener': 'Opener & Professional Summary',
-      'focus-story': 'Focus Story (STAR)',
+      'hook': 'Hook (identity, power statement, differentiator)',
+      'career-snapshot': 'Career Snapshot (arc, skills, achievement)',
       'themes': 'Key Themes with Examples',
-      'why': 'Why Company'
+      'why': 'Why This Role & Company',
+      'focus-story': 'Focus Story (STAR)',
+      'close': 'Close with Confidence',
+      'personal-touch': 'Personal Touch (optional)'
     };
 
     while (true) {
@@ -188,7 +191,7 @@ async function interactiveAboutMeGeneration(jobId: string, options: any): Promis
       console.log('');
 
       // Show section status
-      const sections: AboutMeSection[] = ['opener', 'focus-story', 'themes', 'why'];
+      const sections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close', 'personal-touch'];
       console.log('Section Status:');
       for (const section of sections) {
         // Check if section exists
@@ -1728,10 +1731,13 @@ program
 
 // Individual section commands for granular about-me management
 const sectionCommands: Record<string, AboutMeSection> = {
-  'about-me-opener': 'opener',
-  'about-me-focus-story': 'focus-story',
+  'about-me-hook': 'hook',
+  'about-me-career-snapshot': 'career-snapshot',
   'about-me-themes': 'themes',
-  'about-me-why': 'why'
+  'about-me-why': 'why',
+  'about-me-focus-story': 'focus-story',
+  'about-me-close': 'close',
+  'about-me-personal-touch': 'personal-touch'
 };
 
 for (const [commandName, section] of Object.entries(sectionCommands)) {
