@@ -1682,10 +1682,9 @@ async function handleTrackFromForm() {
       await updateScoringSection(extractResponse.jobId);
       await updateResumeSection(extractResponse.jobId);
 
-      // Auto-generate résumé and third-person blurb if Apply reminder is checked
+      // Auto-generate blurbs if Apply reminder is checked
+      // Note: resume generation is intentionally not auto-triggered — use CLI: npm run dev -- resume <jobId>
       if (selectedReminders.includes('apply')) {
-        console.log('Career Catalyst: Apply reminder checked — auto-generating résumé');
-        await handleGenerateResume();
         console.log('Career Catalyst: Apply reminder checked — auto-generating third-person blurb');
         await handleGenerateBlurb('third');
         console.log('Career Catalyst: Apply reminder checked — auto-generating first-person blurb');
