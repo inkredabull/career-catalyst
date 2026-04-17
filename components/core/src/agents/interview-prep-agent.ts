@@ -1052,9 +1052,10 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
       const parsedData = JSON.parse(cacheData);
       
       // Validate cache structure - ensure it has the cache key and correct type
-      if (parsedData.content && 
-          parsedData.type === type && 
+      if (parsedData.content &&
+          parsedData.type === type &&
           parsedData.cacheKey === cacheKey) {
+        console.log(`📋 Cache hit: ${cachePath}`);
         return parsedData.content;
       }
       
