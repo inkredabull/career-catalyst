@@ -208,7 +208,7 @@ export class ParallelResumeOrchestrator {
 
     // Preview: print pipeline plan and return early without any LLM calls or file I/O
     if (options.preview) {
-      const classificationCachePath = path.resolve('logs', jobId, 'classification.json');
+      const classificationCachePath = path.resolve('logs', jobId, 'resume', 'classification.json');
       const classifyStep = fs.existsSync(classificationCachePath)
         ? '🔍 Step 1:  Classify (Haiku 4.5) — load from cache'
         : '🔍 Step 1:  Classify (Haiku 4.5) — fresh classification';
@@ -239,7 +239,7 @@ export class ParallelResumeOrchestrator {
     // Step 1: Classification (shared across all models, cached per job)
     console.log('📍 Step 1: Classification (shared)');
     console.log('──────────────────────────────────');
-    const classificationCachePath = path.resolve('logs', jobId, 'classification.json');
+    const classificationCachePath = path.resolve('logs', jobId, 'resume', 'classification.json');
     let classification: Awaited<ReturnType<ResumeClassifierAgent['classify']>>;
     let classificationCost: number;
 

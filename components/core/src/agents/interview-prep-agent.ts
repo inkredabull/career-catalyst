@@ -23,6 +23,12 @@ export class InterviewPrepAgent extends ClaudeBaseAgent {
     super(claudeApiKey, model, maxTokens);
   }
 
+  private getJobPrepDir(jobId: string): string {
+    const dir = resolveFromProjectRoot('logs', jobId, 'prep');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
   private getMinSalary(): number {
     const envSalary = process.env.MIN_SALARY;
     if (envSalary) {
@@ -162,10 +168,10 @@ export class InterviewPrepAgent extends ClaudeBaseAgent {
   private async generateCompanyRubric(jobId: string): Promise<boolean> {
     try {
       const jobData = this.loadJobData(jobId);
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
+      const prepDir = this.getJobPrepDir(jobId);
+
       // Check if company-rubric.txt already exists (unless regenerating)
-      const rubricPath = path.join(jobDir, 'company-rubric.txt');
+      const rubricPath = path.join(prepDir, 'company-rubric.txt');
       if (fs.existsSync(rubricPath)) {
         console.log('📊 Company rubric already exists, skipping generation');
         return true;
@@ -173,9 +179,9 @@ export class InterviewPrepAgent extends ClaudeBaseAgent {
 
       // Load or extract themes
       const themes = await this.getOrExtractThemes(jobData);
-      
+
       // Load company values if they exist
-      const companyValuesPath = path.join(jobDir, 'company-values.txt');
+      const companyValuesPath = path.join(prepDir, 'company-values.txt');
       let companyValues = '';
       if (fs.existsSync(companyValuesPath)) {
         companyValues = fs.readFileSync(companyValuesPath, 'utf-8');
@@ -219,10 +225,10 @@ Format as:
 [Brief summary of how these criteria work together]`;
 
       const response = await this.makeClaudeRequest(prompt);
-      
+
       // Save the rubric to file
       fs.writeFileSync(rubricPath, response.trim(), 'utf-8');
-      
+
       return true;
     } catch (error) {
       console.warn(`⚠️  Failed to generate company rubric: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -699,8 +705,7 @@ ${bodies.join('\n')}
 }`;
 
       // Save combined output as RTF
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      const rtfPath = path.join(jobDir, 'about-me-combined.rtf');
+      const rtfPath = path.join(this.getJobPrepDir(jobId), 'about-me-combined.rtf');
 
       fs.writeFileSync(rtfPath, combinedRTF, 'utf-8');
       console.log(`📝 Combined sections saved to: ${rtfPath}`);
@@ -975,13 +980,13 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
 
   private loadMostRecentMaterial(jobId: string, type: StatementType, options: StatementOptions = {}): string | null {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      if (!fs.existsSync(jobDir)) {
+      const prepDir = resolveFromProjectRoot('logs', jobId, 'prep');
+
+      if (!fs.existsSync(prepDir)) {
         return null;
       }
-      
-      const files = fs.readdirSync(jobDir);
+
+      const files = fs.readdirSync(prepDir);
       
       // Find all interview prep files for this type and person, get the most recent one
       const person = options.person || 'first';
@@ -994,12 +999,12 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
         .reverse(); // Most recent first
       
       const mostRecentFile = materialFiles[0];
-      
+
       if (!mostRecentFile) {
         return null;
       }
-      
-      const filePath = path.join(jobDir, mostRecentFile);
+
+      const filePath = path.join(prepDir, mostRecentFile);
       const fileData = fs.readFileSync(filePath, 'utf-8');
       const parsedData = JSON.parse(fileData);
       
@@ -1022,14 +1027,14 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
     options: StatementOptions
   ): string | null {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      if (!fs.existsSync(jobDir)) {
+      const prepDir = resolveFromProjectRoot('logs', jobId, 'prep');
+
+      if (!fs.existsSync(prepDir)) {
         return null;
       }
-      
+
       const cacheKey = this.generateCacheKey(type, cvFilePath, options);
-      const files = fs.readdirSync(jobDir);
+      const files = fs.readdirSync(prepDir);
       
       // Look for cached interview prep files and get the most recent one
       const person = options.person || 'first';
@@ -1042,12 +1047,12 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
         .reverse(); // Most recent first
       
       const cacheFile = cacheFiles[0];
-      
+
       if (!cacheFile) {
         return null;
       }
-      
-      const cachePath = path.join(jobDir, cacheFile);
+
+      const cachePath = path.join(prepDir, cacheFile);
       const cacheData = fs.readFileSync(cachePath, 'utf-8');
       const parsedData = JSON.parse(cacheData);
       
@@ -1074,10 +1079,7 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
     options: StatementOptions
   ): void {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
+      const prepDir = this.getJobPrepDir(jobId);
 
       const cacheKey = this.generateCacheKey(type, cvFilePath, options);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1094,13 +1096,13 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
       };
 
       const person = options.person || 'first';
-      const cachePath = path.join(jobDir, `interview-prep-${type}-${person}-${cacheKey}-${timestamp}.json`);
+      const cachePath = path.join(prepDir, `interview-prep-${type}-${person}-${cacheKey}-${timestamp}.json`);
       fs.writeFileSync(cachePath, JSON.stringify(cacheData, null, 2));
       console.log(`📝 Interview material cached to: ${cachePath}`);
 
       // For cover-letter type, also save as a .txt file for easy access
       if (type === 'cover-letter') {
-        const txtPath = path.join(jobDir, `blurb-${person}-${timestamp}.txt`);
+        const txtPath = path.join(prepDir, `blurb-${person}-${timestamp}.txt`);
         fs.writeFileSync(txtPath, content, 'utf-8');
         console.log(`📄 Blurb saved to: ${txtPath}`);
       }
@@ -1111,11 +1113,7 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
 
   // Section-based storage methods for granular about-me generation
   getSectionFilePath(jobId: string, section: AboutMeSection): string {
-    const jobDir = resolveFromProjectRoot('logs', jobId);
-    if (!fs.existsSync(jobDir)) {
-      fs.mkdirSync(jobDir, { recursive: true });
-    }
-    return path.join(jobDir, `about-me-${section}.json`);
+    return path.join(this.getJobPrepDir(jobId), `about-me-${section}.json`);
   }
 
   saveSection(jobId: string, section: AboutMeSection, content: string, metadata?: Record<string, any>): void {
@@ -1151,7 +1149,9 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
 
   loadSection(jobId: string, section: AboutMeSection): AboutMeSectionData | null {
     try {
-      const filePath = this.getSectionFilePath(jobId, section);
+      const prepPath = this.getSectionFilePath(jobId, section);
+      const legacyPath = path.join(resolveFromProjectRoot('logs', jobId), `about-me-${section}.json`);
+      const filePath = fs.existsSync(prepPath) ? prepPath : legacyPath;
       if (!fs.existsSync(filePath)) {
         return null;
       }
@@ -1167,14 +1167,16 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
 
   listSections(jobId: string): AboutMeSection[] {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      if (!fs.existsSync(jobDir)) {
+      const prepDir = resolveFromProjectRoot('logs', jobId, 'prep');
+      const legacyDir = resolveFromProjectRoot('logs', jobId);
+      const searchDir = fs.existsSync(prepDir) ? prepDir : legacyDir;
+      if (!fs.existsSync(searchDir)) {
         return [];
       }
 
-      const files = fs.readdirSync(jobDir);
+      const files = fs.readdirSync(searchDir);
       const sections: AboutMeSection[] = [];
-      
+
       const sectionTypes: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close', 'personal-touch'];
       for (const section of sectionTypes) {
         const sectionFile = `about-me-${section}.json`;
@@ -1353,10 +1355,7 @@ Please respond in the following JSON format:
 
   private logThemes(jobId: string, themes: JobTheme[]): void {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
+      const prepDir = this.getJobPrepDir(jobId);
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const themeData = {
@@ -1366,7 +1365,7 @@ Please respond in the following JSON format:
         extractedAt: new Date().toISOString()
       };
 
-      const themesPath = path.join(jobDir, `themes-${timestamp}.json`);
+      const themesPath = path.join(prepDir, `themes-${timestamp}.json`);
       fs.writeFileSync(themesPath, JSON.stringify(themeData, null, 2));
       console.log(`📝 Themes logged to: ${themesPath}`);
     } catch (error) {
@@ -1412,13 +1411,16 @@ Please respond in the following JSON format:
       }
 
       const jobDirs = fs.readdirSync(logsDir);
-      
+
       for (const jobDir of jobDirs) {
         const jobDirPath = path.join(logsDir, jobDir);
         if (!fs.statSync(jobDirPath).isDirectory()) continue;
 
+        const prepDirPath = path.join(jobDirPath, 'prep');
+        const searchDir = fs.existsSync(prepDirPath) ? prepDirPath : jobDirPath;
+
         // Check if this directory has theme files
-        const files = fs.readdirSync(jobDirPath);
+        const files = fs.readdirSync(searchDir);
         const themeFiles = files
           .filter(file => file.startsWith('themes-') && file.endsWith('.json'))
           .sort()
@@ -1426,15 +1428,16 @@ Please respond in the following JSON format:
 
         if (themeFiles.length > 0) {
           // Load the most recent theme file and check if it matches this job
-          const themeFilePath = path.join(jobDirPath, themeFiles[0]);
+          const themeFilePath = path.join(searchDir, themeFiles[0]);
           const themeData = JSON.parse(fs.readFileSync(themeFilePath, 'utf-8'));
-          
-          // Check if we can find a job file in the same directory to compare
-          const jobFiles = files.filter(file => file.startsWith('job-') && file.endsWith('.json'));
+
+          // Check if we can find a job file in the job root directory to compare
+          const rootFiles = fs.readdirSync(jobDirPath);
+          const jobFiles = rootFiles.filter(file => file.startsWith('job-') && file.endsWith('.json'));
           if (jobFiles.length > 0) {
             const jobFilePath = path.join(jobDirPath, jobFiles[0]);
             const jobData = JSON.parse(fs.readFileSync(jobFilePath, 'utf-8'));
-            
+
             // If title and company match, use these themes
             if (jobData.title === jobTitle && jobData.company === jobCompany) {
               return themeData.themes;
@@ -1538,14 +1541,10 @@ Respond in this JSON format:
   private async updateThemesWithExamples(job: JobListing, themesWithExamples: JobTheme[], actualJobId?: string): Promise<void> {
     try {
       const jobId = actualJobId || this.currentJobId;
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
+      const prepDir = this.getJobPrepDir(jobId);
 
       // Find the most recent themes file
-      const files = fs.readdirSync(jobDir);
+      const files = fs.readdirSync(prepDir);
       const themeFiles = files
         .filter(file => file.startsWith('themes-') && file.endsWith('.json'))
         .sort()
@@ -1553,9 +1552,9 @@ Respond in this JSON format:
 
       if (themeFiles.length > 0) {
         // Update the most recent themes file
-        const themeFilePath = path.join(jobDir, themeFiles[0]);
+        const themeFilePath = path.join(prepDir, themeFiles[0]);
         const existingData = JSON.parse(fs.readFileSync(themeFilePath, 'utf-8'));
-        
+
         const updatedData = {
           ...existingData,
           themes: themesWithExamples,
@@ -1563,7 +1562,7 @@ Respond in this JSON format:
           interviewStories: this.tempInterviewStories,
           lastEnrichedAt: new Date().toISOString()
         };
-        
+
         fs.writeFileSync(themeFilePath, JSON.stringify(updatedData, null, 2));
         console.log(`📝 Updated themes file with examples: ${themeFilePath}`);
       } else {
@@ -1578,7 +1577,7 @@ Respond in this JSON format:
           extractedAt: new Date().toISOString()
         };
 
-        const themesPath = path.join(jobDir, `themes-${timestamp}.json`);
+        const themesPath = path.join(prepDir, `themes-${timestamp}.json`);
         fs.writeFileSync(themesPath, JSON.stringify(themeData, null, 2));
         console.log(`📝 Created themes file with examples: ${themesPath}`);
       }
@@ -1623,13 +1622,9 @@ Respond in this JSON format:
 
   async getInterviewStories(jobId: string): Promise<{ success: boolean; stories?: string[]; highlightedExamples?: ThemeExample[]; error?: string }> {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      if (!fs.existsSync(jobDir)) {
-        return { success: false, error: 'Job directory not found' };
-      }
+      const prepDir = this.getJobPrepDir(jobId);
 
-      const files = fs.readdirSync(jobDir);
+      const files = fs.readdirSync(prepDir);
       const themeFiles = files
         .filter(file => file.startsWith('themes-') && file.endsWith('.json'))
         .sort()
@@ -1639,7 +1634,7 @@ Respond in this JSON format:
         return { success: false, error: 'No themes file found. Run theme extraction first.' };
       }
 
-      const themeFilePath = path.join(jobDir, themeFiles[0]);
+      const themeFilePath = path.join(prepDir, themeFiles[0]);
       const themeData = JSON.parse(fs.readFileSync(themeFilePath, 'utf-8'));
 
       if (!themeData.interviewStories && !themeData.highlightedExamples) {
@@ -1836,13 +1831,9 @@ function cmf2() {
 
   private loadThemesData(jobId: string): any {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      if (!fs.existsSync(jobDir)) {
-        return null;
-      }
+      const prepDir = this.getJobPrepDir(jobId);
 
-      const files = fs.readdirSync(jobDir);
+      const files = fs.readdirSync(prepDir);
       const themeFiles = files
         .filter(file => file.startsWith('themes-') && file.endsWith('.json'))
         .sort()
@@ -1852,7 +1843,7 @@ function cmf2() {
         return null;
       }
 
-      const themeFilePath = path.join(jobDir, themeFiles[0]);
+      const themeFilePath = path.join(prepDir, themeFiles[0]);
       const themeData = JSON.parse(fs.readFileSync(themeFilePath, 'utf-8'));
 
       return themeData;
@@ -2277,20 +2268,27 @@ ${project.result}`;
 
   private async loadCompanyValues(jobId: string, providedCompanyUrl?: string): Promise<string | null> {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      const valuesPath = path.join(jobDir, 'company-values.txt');
-      
-      if (fs.existsSync(valuesPath)) {
-        const content = fs.readFileSync(valuesPath, 'utf-8').trim();
-        if (content.length > 0) {
-          return content;
+      const prepDir = this.getJobPrepDir(jobId);
+      const valuesPath = path.join(prepDir, 'company-values.txt');
+      // Legacy fallback: check flat jobDir for pre-migration files
+      const legacyValuesPath = resolveFromProjectRoot('logs', jobId, 'company-values.txt');
+
+      for (const p of [valuesPath, legacyValuesPath]) {
+        if (fs.existsSync(p)) {
+          const content = fs.readFileSync(p, 'utf-8').trim();
+          if (content.length > 0) {
+            // Migrate to prepDir if reading from legacy path
+            if (p === legacyValuesPath && p !== valuesPath) {
+              fs.writeFileSync(valuesPath, content);
+              console.log(`📋 Migrated company-values.txt to prep/`);
+            }
+            return content;
+          }
         }
-        // File exists but is empty - treat as non-existent
-        console.log('📋 Found empty company-values.txt file. Researching company values...');
-      } else {
-        // Company values file doesn't exist - research and create it
-        console.log('📋 No company-values.txt found. Researching company values...');
       }
+
+      // Not found - research and create it
+      console.log('📋 No company-values.txt found. Researching company values...');
       const companyValues = await this.researchCompanyValues(jobId, providedCompanyUrl);
 
       if (companyValues) {
@@ -2559,13 +2557,9 @@ IMPORTANT: Structure the story to lead with impact (key results), tell the compl
 
   private loadCachedFocusStory(jobId: string, cvFilePath: string): string | null {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      if (!fs.existsSync(jobDir)) {
-        return null;
-      }
+      const prepDir = this.getJobPrepDir(jobId);
 
-      const files = fs.readdirSync(jobDir);
+      const files = fs.readdirSync(prepDir);
       const focusFiles = files
         .filter(file => file.startsWith('focus-story-') && file.endsWith('.json'))
         .sort()
@@ -2576,7 +2570,7 @@ IMPORTANT: Structure the story to lead with impact (key results), tell the compl
       }
 
       const focusFile = focusFiles[0];
-      const focusPath = path.join(jobDir, focusFile);
+      const focusPath = path.join(prepDir, focusFile);
       const focusData = JSON.parse(fs.readFileSync(focusPath, 'utf-8'));
 
       // Validate the cache is still valid (CV hasn't changed)
@@ -2594,14 +2588,11 @@ IMPORTANT: Structure the story to lead with impact (key results), tell the compl
 
   private cacheFocusStory(jobId: string, content: string, cvFilePath: string): void {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
+      const prepDir = this.getJobPrepDir(jobId);
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const cvStats = fs.statSync(cvFilePath);
-      
+
       const focusData = {
         timestamp: new Date().toISOString(),
         jobId,
@@ -2611,7 +2602,7 @@ IMPORTANT: Structure the story to lead with impact (key results), tell the compl
         cvTimestamp: cvStats.mtime.toISOString()
       };
 
-      const focusPath = path.join(jobDir, `focus-story-${timestamp}.json`);
+      const focusPath = path.join(prepDir, `focus-story-${timestamp}.json`);
       fs.writeFileSync(focusPath, JSON.stringify(focusData, null, 2));
       console.log(`📝 Focus story cached to: ${focusPath}`);
     } catch (error) {
@@ -2621,10 +2612,7 @@ IMPORTANT: Structure the story to lead with impact (key results), tell the compl
 
   private logFocusStoryGeneration(jobId: string, response: string): void {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
+      const prepDir = this.getJobPrepDir(jobId);
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const logContent = [
@@ -2637,7 +2625,7 @@ IMPORTANT: Structure the story to lead with impact (key results), tell the compl
         `Generated at: ${new Date().toISOString()}`
       ].join('\n');
 
-      const logPath = path.join(jobDir, `focus-story-log-${timestamp}.txt`);
+      const logPath = path.join(prepDir, `focus-story-log-${timestamp}.txt`);
       fs.writeFileSync(logPath, logContent, 'utf-8');
       console.log(`📄 Focus story response logged to: ${logPath}`);
     } catch (error) {
@@ -2652,19 +2640,10 @@ IMPORTANT: Structure the story to lead with impact (key results), tell the compl
         return;
       }
 
-      const logsDir = resolveFromProjectRoot('logs');
-      const jobDir = path.resolve(logsDir, this.currentJobId);
-      
-      // Create logs and job directories if they don't exist
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
-      
+      const prepDir = this.getJobPrepDir(this.currentJobId);
+
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const promptLogFile = path.join(jobDir, `prompt-${type}-${timestamp}.md`);
+      const promptLogFile = path.join(prepDir, `prompt-${type}-${timestamp}.md`);
 
       const logContent = [
         `# ${type.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())} Prompt`,

@@ -36,6 +36,12 @@ export class ResumeCreatorAgent {
     this.maxTokens = resumeProviderConfig.maxTokens || 4000;
   }
 
+  private getJobResumeDir(jobId: string): string {
+    const dir = resolveFromProjectRoot('logs', jobId, 'resume');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
   async createResume(
     jobId: string,
     cvFilePath: string,
@@ -197,12 +203,13 @@ export class ResumeCreatorAgent {
         }
       }
       
-      // Check for existing tailored content files
-      const files = fs.readdirSync(jobDir);
-      const hasTailoredContent = files.some(file => 
+      // Check for existing tailored content files in the resume subfolder
+      const resumeDir = this.getJobResumeDir(jobId);
+      const files = fs.readdirSync(resumeDir);
+      const hasTailoredContent = files.some(file =>
         file.startsWith('tailored-') && (file.endsWith('.json') || file.endsWith('.md'))
       );
-      
+
       return !hasTailoredContent;
     } catch (error) {
       // If we can't determine, assume it's first generation
@@ -267,7 +274,7 @@ export class ResumeCreatorAgent {
     job: JobListing,
     outputPath: string | undefined
   ): Promise<{ pdfPath: string; tailoredContent: { markdownContent: string; changes: string[] } }> {
-    const jobDir = resolveFromProjectRoot('logs', jobId);
+    const resumeDir = this.getJobResumeDir(jobId);
     const maxAttempts = getCritiqueAndJudgeMaxAttempts();
 
     const guidance: PDFValidationGuidance = {
@@ -277,7 +284,7 @@ export class ResumeCreatorAgent {
         : ['Summary', 'Experience', 'Skills', 'Technologies']
     };
 
-    const judge = new ResumePDFJudgeAgent(jobDir);
+    const judge = new ResumePDFJudgeAgent(resumeDir);
     let previousSuggestions: string[] = [];
     let currentPdfPath = pdfPath;
     let currentContent = tailoredContent;
@@ -439,19 +446,15 @@ export class ResumeCreatorAgent {
 
   private cleanupTailoredFiles(jobId: string): void {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      if (!fs.existsSync(jobDir)) {
-        return;
-      }
-      
-      const files = fs.readdirSync(jobDir);
-      const tailoredFiles = files.filter(file => 
+      const resumeDir = this.getJobResumeDir(jobId);
+
+      const files = fs.readdirSync(resumeDir);
+      const tailoredFiles = files.filter(file =>
         file.startsWith('tailored-') && (file.endsWith('.json') || file.endsWith('.md'))
       );
-      
+
       for (const file of tailoredFiles) {
-        const filePath = path.join(jobDir, file);
+        const filePath = path.join(resumeDir, file);
         fs.unlinkSync(filePath);
         console.log(`🗑️  Deleted ${file} to prepare for regeneration`);
       }
@@ -462,66 +465,65 @@ export class ResumeCreatorAgent {
 
   private loadMostRecentTailoredContent(jobId: string): { markdownContent: string; changes: string[] } | null {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      // Check if job directory exists
-      if (!fs.existsSync(jobDir)) {
+      const resumeDir = this.getJobResumeDir(jobId);
+
+      if (!fs.existsSync(resumeDir)) {
         return null;
       }
-      
-      const files = fs.readdirSync(jobDir);
-      
+
+      const files = fs.readdirSync(resumeDir);
+
       // Find all tailored content JSON files and sort by timestamp (most recent first)
       const tailoredJsonFiles = files
         .filter(file => file.startsWith('tailored-') && file.endsWith('.json'))
         .sort()
         .reverse(); // Most recent first
-      
+
       // If no JSON files found, look for markdown files directly as fallback
       if (tailoredJsonFiles.length === 0) {
         const tailoredMdFiles = files
           .filter(file => file.startsWith('tailored-') && file.endsWith('.md'))
           .sort()
           .reverse(); // Most recent first
-        
+
         if (tailoredMdFiles.length === 0) {
           return null;
         }
-        
+
         // Use the most recent .md file directly
         const mostRecentMdFile = tailoredMdFiles[0];
-        const markdownPath = path.join(jobDir, mostRecentMdFile);
+        const markdownPath = path.join(resumeDir, mostRecentMdFile);
         const markdownContent = fs.readFileSync(markdownPath, 'utf-8');
-        
+
         console.log(`📋 Found tailored markdown file: ${mostRecentMdFile}`);
         return {
           markdownContent,
           changes: [] // No change info available when using .md directly
         };
       }
-      
+
       const tailoredFiles = tailoredJsonFiles;
-      
+
       // Load the most recent tailored content
       const mostRecentFile = tailoredFiles[0];
-      const cachePath = path.join(jobDir, mostRecentFile);
+      const cachePath = path.join(resumeDir, mostRecentFile);
       const cacheData = fs.readFileSync(cachePath, 'utf-8');
       const parsedData = JSON.parse(cacheData);
-      
+
       // Extract markdown filename from JSON metadata
       const markdownFilename = parsedData.markdownFilename;
       if (!markdownFilename) {
         return null;
       }
-      
+
       // Load markdown content from separate .md file
-      const markdownPath = path.join(jobDir, markdownFilename);
+      const markdownPath = path.join(resumeDir, markdownFilename);
       if (!fs.existsSync(markdownPath)) {
         return null;
       }
-      
+
       const markdownContent = fs.readFileSync(markdownPath, 'utf-8');
-      
+
       // Validate cache structure
       if (markdownContent && Array.isArray(parsedData.changes)) {
         return {
@@ -529,7 +531,7 @@ export class ResumeCreatorAgent {
           changes: parsedData.changes
         };
       }
-      
+
       return null;
     } catch (error) {
       // If any error occurs in cache loading, return null to generate fresh content
@@ -539,45 +541,45 @@ export class ResumeCreatorAgent {
 
   private loadCachedTailoredContent(jobId: string, cvFilePath: string): { markdownContent: string; changes: string[] } | null {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      
-      // Check if job directory exists
-      if (!fs.existsSync(jobDir)) {
+      const resumeDir = this.getJobResumeDir(jobId);
+
+      // Check if resume directory exists
+      if (!fs.existsSync(resumeDir)) {
         return null;
       }
-      
+
       const cvHash = this.generateCVHash(cvFilePath);
-      const files = fs.readdirSync(jobDir);
-      
-      // Look for cached tailored content metadata file in job directory
-      const cacheFile = files.find(file => 
-        file.startsWith(`tailored-${cvHash}-`) && 
+      const files = fs.readdirSync(resumeDir);
+
+      // Look for cached tailored content metadata file in resume directory
+      const cacheFile = files.find(file =>
+        file.startsWith(`tailored-${cvHash}-`) &&
         file.endsWith('.json')
       );
-      
+
       if (!cacheFile) {
         return null;
       }
-      
+
       // Load metadata from JSON file
-      const cachePath = path.join(jobDir, cacheFile);
+      const cachePath = path.join(resumeDir, cacheFile);
       const cacheData = fs.readFileSync(cachePath, 'utf-8');
       const parsedData = JSON.parse(cacheData);
-      
+
       // Extract markdown filename from JSON metadata
       const markdownFilename = parsedData.markdownFilename;
       if (!markdownFilename) {
         return null;
       }
-      
+
       // Load markdown content from separate .md file
-      const markdownPath = path.join(jobDir, markdownFilename);
+      const markdownPath = path.join(resumeDir, markdownFilename);
       if (!fs.existsSync(markdownPath)) {
         return null;
       }
-      
+
       const markdownContent = fs.readFileSync(markdownPath, 'utf-8');
-      
+
       // Validate cache structure
       if (markdownContent && Array.isArray(parsedData.changes)) {
         return {
@@ -585,7 +587,7 @@ export class ResumeCreatorAgent {
           changes: parsedData.changes
         };
       }
-      
+
       return null;
     } catch (error) {
       // If any error occurs in cache loading, return null to generate fresh content
@@ -595,31 +597,20 @@ export class ResumeCreatorAgent {
 
   private saveTailoredContent(jobId: string, cvFilePath: string, content: { markdownContent: string; changes: string[] }): void {
     try {
-      const logsDir = resolveFromProjectRoot('logs');
-      const jobDir = path.resolve(logsDir, jobId);
-      
-      // Create logs directory if it doesn't exist
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
-      
-      // Create job-specific subdirectory if it doesn't exist
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
-      
+      const resumeDir = this.getJobResumeDir(jobId);
+
       const cvHash = this.generateCVHash(cvFilePath);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      
+
       // Save markdown content to separate .md file
       const markdownFileName = `tailored-${cvHash}-${timestamp}.md`;
-      const markdownPath = path.join(jobDir, markdownFileName);
+      const markdownPath = path.join(resumeDir, markdownFileName);
       fs.writeFileSync(markdownPath, content.markdownContent, 'utf-8');
-      
+
       // Save metadata to JSON file (without markdown content)
       const cacheFileName = `tailored-${cvHash}-${timestamp}.json`;
-      const cachePath = path.join(jobDir, cacheFileName);
-      
+      const cachePath = path.join(resumeDir, cacheFileName);
+
       const cacheData = {
         jobId,
         cvFilePath: path.basename(cvFilePath),
@@ -627,7 +618,7 @@ export class ResumeCreatorAgent {
         markdownFilename: markdownFileName,
         changes: content.changes
       };
-      
+
       fs.writeFileSync(cachePath, JSON.stringify(cacheData, null, 2), 'utf-8');
       console.log(`📋 Tailored content cached to: ${cachePath}`);
       console.log(`📝 Editable markdown saved to: ${markdownPath}`);
@@ -784,20 +775,20 @@ export class ResumeCreatorAgent {
     if (!jobId) return recommendations;
     
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
+      const resumeDir = this.getJobResumeDir(jobId);
 
       // Load ONLY from the most recent critique JSON to avoid confusing the LLM
       // with stale recommendations from earlier runs. recommendations.txt is
       // retained as a human-readable history log.
-      if (fs.existsSync(jobDir)) {
-        const files = fs.readdirSync(jobDir);
+      if (fs.existsSync(resumeDir)) {
+        const files = fs.readdirSync(resumeDir);
         const critiqueFiles = files
           .filter(file => file.startsWith('critique-') && file.endsWith('.json'))
           .sort()
           .reverse(); // Most recent first
 
         if (critiqueFiles.length > 0) {
-          const latestCritiqueFile = path.join(jobDir, critiqueFiles[0]);
+          const latestCritiqueFile = path.join(resumeDir, critiqueFiles[0]);
           const critiqueData = JSON.parse(fs.readFileSync(latestCritiqueFile, 'utf-8'));
 
           if (critiqueData.recommendations && Array.isArray(critiqueData.recommendations)) {
@@ -817,14 +808,16 @@ export class ResumeCreatorAgent {
     if (!jobId) return null;
 
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      const companyValuesFile = path.join(jobDir, 'company-values.txt');
-
-      if (fs.existsSync(companyValuesFile)) {
-        const content = fs.readFileSync(companyValuesFile, 'utf-8').trim();
-        if (content.length > 0) {
-          console.log(`📋 Loaded company values from company-values.txt`);
-          return content;
+      const prepDir = resolveFromProjectRoot('logs', jobId, 'prep');
+      const legacyDir = resolveFromProjectRoot('logs', jobId);
+      for (const dir of [prepDir, legacyDir]) {
+        const f = path.join(dir, 'company-values.txt');
+        if (fs.existsSync(f)) {
+          const content = fs.readFileSync(f, 'utf-8').trim();
+          if (content.length > 0) {
+            console.log(`📋 Loaded company values from company-values.txt`);
+            return content;
+          }
         }
       }
     } catch (error) {
@@ -838,19 +831,19 @@ export class ResumeCreatorAgent {
     if (!jobId) return null;
 
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      if (!fs.existsSync(jobDir)) {
-        return null;
-      }
+      const prepDir = resolveFromProjectRoot('logs', jobId, 'prep');
+      const legacyDir = resolveFromProjectRoot('logs', jobId);
+      const searchDir = fs.existsSync(prepDir) ? prepDir : legacyDir;
+      if (!fs.existsSync(searchDir)) return null;
 
-      const files = fs.readdirSync(jobDir);
+      const files = fs.readdirSync(searchDir);
       const themesFile = files.find(file => file.startsWith('themes-') && file.endsWith('.json'));
 
       if (!themesFile) {
         return null;
       }
 
-      const themesPath = path.join(jobDir, themesFile);
+      const themesPath = path.join(searchDir, themesFile);
       const themesData = JSON.parse(fs.readFileSync(themesPath, 'utf-8'));
 
       if (themesData.themes && Array.isArray(themesData.themes)) {
@@ -1223,22 +1216,13 @@ Instructions: Use the pre-classified domain above. Skip the domain detection ste
       skipDomainDetection: !!classification
     });
 
-    // Write prompt to log file in job subdirectory
+    // Write prompt to log file in resume subdirectory
     if (jobId) {
       try {
-        const logsDir = resolveFromProjectRoot('logs');
-        const jobDir = path.resolve(logsDir, jobId);
-
-        // Create logs and job directories if they don't exist
-        if (!fs.existsSync(logsDir)) {
-          fs.mkdirSync(logsDir, { recursive: true });
-        }
-        if (!fs.existsSync(jobDir)) {
-          fs.mkdirSync(jobDir, { recursive: true });
-        }
+        const resumeDir = this.getJobResumeDir(jobId);
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const promptLogFile = path.join(jobDir, `prompt-${timestamp}.md`);
+        const promptLogFile = path.join(resumeDir, `prompt-${timestamp}.md`);
 
         const promptForLog = this.loadPromptTemplate({
           job,
@@ -1320,11 +1304,8 @@ Instructions: Use the pre-classified domain above. Skip the domain detection ste
       jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         // Save the raw response for debugging
-        const jobDir = path.join(process.cwd(), 'logs', jobId || 'unknown');
-        if (!fs.existsSync(jobDir)) {
-          fs.mkdirSync(jobDir, { recursive: true });
-        }
-        const debugPath = path.join(jobDir, `debug-no-json-${Date.now()}.txt`);
+        const debugDir = this.getJobResumeDir(jobId || 'unknown');
+        const debugPath = path.join(debugDir, `debug-no-json-${Date.now()}.txt`);
         fs.writeFileSync(debugPath, response.text);
         console.error(`❌ No JSON found in response. Raw response saved to: ${debugPath}`);
         console.error(`📊 Response length: ${response.text.length} characters`);
@@ -1408,11 +1389,8 @@ Instructions: Use the pre-classified domain above. Skip the domain detection ste
     } catch (error) {
       // On parse error, save the problematic JSON for debugging
       if (error instanceof SyntaxError && jsonMatch) {
-        const jobDir = path.join(process.cwd(), 'logs', jobId || 'unknown');
-        if (!fs.existsSync(jobDir)) {
-          fs.mkdirSync(jobDir, { recursive: true });
-        }
-        const debugPath = path.join(jobDir, `debug-json-error-${new Date().toISOString()}.txt`);
+        const debugDir = this.getJobResumeDir(jobId || 'unknown');
+        const debugPath = path.join(debugDir, `debug-json-error-${new Date().toISOString()}.txt`);
         fs.writeFileSync(debugPath, jsonMatch[0]);
         throw new Error(`Failed to parse JSON (saved to ${debugPath}): ${error.message}`);
       }

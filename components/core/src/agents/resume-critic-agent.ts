@@ -13,6 +13,16 @@ export class ResumeCriticAgent {
     this.provider = provider;
   }
 
+  private getJobResumeDir(jobId: string): string {
+    const dir = resolveFromProjectRoot('logs', jobId, 'resume');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  private getJobPrepDir(jobId: string): string {
+    return resolveFromProjectRoot('logs', jobId, 'prep');
+  }
+
   async critiqueResume(jobId: string): Promise<ResumeCritique> {
     try {
       // Find the most recent resume for this job ID
@@ -87,10 +97,10 @@ export class ResumeCriticAgent {
       console.warn(`Could not load job data for ${jobId}:`, error);
     }
 
-    // Search in logs directory (legacy location)
-    const jobDir = resolveFromProjectRoot('logs', jobId);
-    if (fs.existsSync(jobDir)) {
-      const files = fs.readdirSync(jobDir);
+    // Search in resume subfolder
+    const resumeDir = this.getJobResumeDir(jobId);
+    if (fs.existsSync(resumeDir)) {
+      const files = fs.readdirSync(resumeDir);
       const logResumeFiles = files
         .filter(file => {
           return file.endsWith('.pdf') && (
@@ -99,7 +109,7 @@ export class ResumeCriticAgent {
           );
         })
         .map(file => {
-          const fullPath = path.join(jobDir, file);
+          const fullPath = path.join(resumeDir, file);
           const stats = fs.statSync(fullPath);
           return {
             name: file,
@@ -173,19 +183,19 @@ export class ResumeCriticAgent {
 
   private loadThemes(jobId: string): string | null {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      if (!fs.existsSync(jobDir)) {
-        return null;
-      }
+      const prepDir = this.getJobPrepDir(jobId);
+      const legacyDir = resolveFromProjectRoot('logs', jobId);
+      const searchDir = fs.existsSync(prepDir) ? prepDir : legacyDir;
+      if (!fs.existsSync(searchDir)) return null;
 
-      const files = fs.readdirSync(jobDir);
+      const files = fs.readdirSync(searchDir);
       const themesFile = files.find(file => file.startsWith('themes-') && file.endsWith('.json'));
 
       if (!themesFile) {
         return null;
       }
 
-      const themesPath = path.join(jobDir, themesFile);
+      const themesPath = path.join(searchDir, themesFile);
       const themesData = JSON.parse(fs.readFileSync(themesPath, 'utf-8'));
 
       if (themesData.themes && Array.isArray(themesData.themes)) {
@@ -207,8 +217,8 @@ export class ResumeCriticAgent {
 
   private loadRecommendations(jobId: string): string | null {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      const recommendationsPath = path.join(jobDir, 'recommendations.txt');
+      const resumeDir = this.getJobResumeDir(jobId);
+      const recommendationsPath = path.join(resumeDir, 'recommendations.txt');
 
       if (!fs.existsSync(recommendationsPath)) {
         return null;
@@ -225,27 +235,14 @@ export class ResumeCriticAgent {
 
   private loadCompanyValues(jobId: string): string | null {
     try {
-      const jobDir = resolveFromProjectRoot('logs', jobId);
-      if (!fs.existsSync(jobDir)) {
-        return null;
-      }
-
-      const files = fs.readdirSync(jobDir);
-      const valuesFile = files.find(file => file.startsWith('company-values-') && file.endsWith('.json'));
-
-      if (!valuesFile) {
-        return null;
-      }
-
-      const valuesPath = path.join(jobDir, valuesFile);
-      const valuesData = JSON.parse(fs.readFileSync(valuesPath, 'utf-8'));
-
-      if (valuesData.values && Array.isArray(valuesData.values)) {
-        const formattedValues = valuesData.values
-          .map((value: any) => `- **${value.name}**: ${value.description}`)
-          .join('\n');
-
-        return formattedValues;
+      const prepDir = this.getJobPrepDir(jobId);
+      const legacyDir = resolveFromProjectRoot('logs', jobId);
+      for (const dir of [prepDir, legacyDir]) {
+        const f = path.join(dir, 'company-values.txt');
+        if (fs.existsSync(f)) {
+          const content = fs.readFileSync(f, 'utf-8').trim();
+          if (content.length > 0) return content;
+        }
       }
     } catch (error) {
       console.warn(`⚠️  Failed to load company values: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -728,20 +725,17 @@ REMEMBER: Response must be valid JSON only. No markdown, no code blocks, no addi
       detailedAnalysis: critique.detailedAnalysis
     };
 
-    // Create job-specific subdirectory if it doesn't exist
-    const jobDir = path.resolve('logs', critique.jobId);
-    if (!fs.existsSync(jobDir)) {
-      fs.mkdirSync(jobDir, { recursive: true });
-    }
+    // Write critique artifacts to the resume subfolder
+    const resumeDir = this.getJobResumeDir(critique.jobId);
 
     // Log the full critique as JSON
-    const logPath = path.join(jobDir, `critique-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    const logPath = path.join(resumeDir, `critique-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
     fs.writeFileSync(logPath, JSON.stringify(logEntry, null, 2));
     console.log(`✅ Resume critique logged to: ${logPath}`);
 
     // Also append recommendations to recommendations.txt file
     if (critique.recommendations && critique.recommendations.length > 0) {
-      const recommendationsFile = path.join(jobDir, 'recommendations.txt');
+      const recommendationsFile = path.join(resumeDir, 'recommendations.txt');
       const timestamp = new Date().toISOString();
       
       // Create header with timestamp for this critique session
