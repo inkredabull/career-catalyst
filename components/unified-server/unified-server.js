@@ -1369,17 +1369,22 @@ app.get('/check-resume/:jobId', (req, res) => {
       });
     }
 
-    // Look for tailored resume files
-    const files = fs.readdirSync(jobDir);
-    const resumeFiles = files.filter(f => f.startsWith('tailored-') && f.endsWith('.md'));
+    // Look for tailored resume files — check resume/ subdir first, then flat dir for legacy
+    const resumeSubDir = path.join(jobDir, 'resume');
+    const resumeScanDir = fs.existsSync(resumeSubDir) ? resumeSubDir : jobDir;
+    const resumeScanFiles = fs.readdirSync(resumeScanDir);
+    const resumeFiles = resumeScanFiles.filter(f => f.startsWith('tailored-') && f.endsWith('.md'));
+    const resumeRelBase = fs.existsSync(resumeSubDir) ? `logs/${jobId}/resume` : `logs/${jobId}`;
 
-    // Check for Google Drive URL in job JSON (independent of whether local resume exists)
+    // Check for Google Drive URL in job cache or legacy job JSON
     let driveUrl = null;
-    const jobFiles = files.filter(f => f.startsWith('job-') && f.endsWith('.json'));
-    if (jobFiles.length > 0) {
-      const jobFile = path.join(jobDir, jobFiles.sort().reverse()[0]);
+    const cacheFile = path.join(jobDir, 'job-cache.json');
+    const legacyFiles = fs.readdirSync(jobDir).filter(f => f.startsWith('job-') && f.endsWith('.json'));
+    const jobFileToRead = fs.existsSync(cacheFile) ? cacheFile
+      : (legacyFiles.length > 0 ? path.join(jobDir, legacyFiles.sort().reverse()[0]) : null);
+    if (jobFileToRead) {
       try {
-        const jobData = JSON.parse(fs.readFileSync(jobFile, 'utf-8'));
+        const jobData = JSON.parse(fs.readFileSync(jobFileToRead, 'utf-8'));
         const candidate = jobData.resumeUrl || jobData.resumeGoogleDriveUrl || null;
         driveUrl = (candidate && candidate.includes('drive.google.com')) ? candidate : null;
         console.log(`  -> Drive URL from job JSON: ${driveUrl || 'not set'}`);
@@ -1401,7 +1406,7 @@ app.get('/check-resume/:jobId', (req, res) => {
 
     // Get the most recent resume file
     const mostRecentResume = resumeFiles.sort().reverse()[0];
-    const relativePath = `logs/${jobId}/${mostRecentResume}`;
+    const relativePath = `${resumeRelBase}/${mostRecentResume}`;
 
     console.log(`  -> Resume found: ${relativePath}`);
 
@@ -1454,9 +1459,11 @@ app.get('/check-blurb/:jobId/:person', (req, res) => {
       });
     }
 
-    // Look for blurb files for the specified person
-    const files = fs.readdirSync(jobDir);
-    const blurbFiles = files.filter(f => f.startsWith(`blurb-${person}-`) && f.endsWith('.txt'));
+    // Look for blurb files — check prep/ subdir first, then flat dir for legacy
+    const blurbPrepDir = path.join(jobDir, 'prep');
+    const blurbScanDir = fs.existsSync(blurbPrepDir) ? blurbPrepDir : jobDir;
+    const blurbScanFiles = fs.readdirSync(blurbScanDir);
+    const blurbFiles = blurbScanFiles.filter(f => f.startsWith(`blurb-${person}-`) && f.endsWith('.txt'));
 
     if (blurbFiles.length === 0) {
       return res.json({
@@ -1468,7 +1475,7 @@ app.get('/check-blurb/:jobId/:person', (req, res) => {
 
     // Get the most recent blurb file
     const mostRecentBlurb = blurbFiles.sort().reverse()[0];
-    const blurbPath = path.join(jobDir, mostRecentBlurb);
+    const blurbPath = path.join(blurbScanDir, mostRecentBlurb);
     const blurbContent = fs.readFileSync(blurbPath, 'utf-8');
 
     console.log(`  -> Blurb found: ${mostRecentBlurb} (${blurbContent.length} characters)`);
@@ -1690,21 +1697,21 @@ app.all('/llm', (req, res) => {
 
     const files = fs.readdirSync(jobDir);
 
-    // --- Read job JSON (most recent job-*.json) ---
-    const jobFiles = files
-      .filter(f => f.startsWith('job-') && f.endsWith('.json'))
-      .sort()
-      .reverse();
+    // --- Read job data (job-cache.json first, then legacy job-*.json) ---
+    const reportCacheFile = path.join(jobDir, 'job-cache.json');
+    const reportLegacyFiles = files.filter(f => f.startsWith('job-') && f.endsWith('.json')).sort().reverse();
+    const reportJobFile = fs.existsSync(reportCacheFile) ? reportCacheFile
+      : (reportLegacyFiles.length > 0 ? path.join(jobDir, reportLegacyFiles[0]) : null);
 
-    if (jobFiles.length === 0) {
+    if (!reportJobFile) {
       return res.status(404).json({
         success: false,
-        error: `No job-*.json file found in logs/${jobId}`
+        error: `No job data found in logs/${jobId}`
       });
     }
 
-    const jobData = JSON.parse(fs.readFileSync(path.join(jobDir, jobFiles[0]), 'utf-8'));
-    console.log(`  -> Read job file: ${jobFiles[0]}`);
+    const jobData = JSON.parse(fs.readFileSync(reportJobFile, 'utf-8'));
+    console.log(`  -> Read job file: ${path.basename(reportJobFile)}`);
 
     const jobTitle = jobData.title || jobData.job_title || jobData.position || jobData.role || '';
     const company  = jobData.company || jobData.company_name || jobData.employer || '';
@@ -1719,16 +1726,18 @@ app.all('/llm', (req, res) => {
       console.log(`  -> No titleShorthand found in job data`);
     }
 
-    // --- Read most recent third-person blurb ---
-    const blurbFiles = files
+    // --- Read most recent third-person blurb (check prep/ subdir first) ---
+    const reportPrepDir = path.join(jobDir, 'prep');
+    const reportBlurbScanDir = fs.existsSync(reportPrepDir) ? reportPrepDir : jobDir;
+    const reportBlurbFiles = fs.readdirSync(reportBlurbScanDir)
       .filter(f => f.startsWith('blurb-third-') && f.endsWith('.txt'))
       .sort()
       .reverse();
 
     let thirdPersonBlurb = null;
-    if (blurbFiles.length > 0) {
-      thirdPersonBlurb = fs.readFileSync(path.join(jobDir, blurbFiles[0]), 'utf-8').trim();
-      console.log(`  -> Read blurb file: ${blurbFiles[0]} (${thirdPersonBlurb.length} chars)`);
+    if (reportBlurbFiles.length > 0) {
+      thirdPersonBlurb = fs.readFileSync(path.join(reportBlurbScanDir, reportBlurbFiles[0]), 'utf-8').trim();
+      console.log(`  -> Read blurb file: ${reportBlurbFiles[0]} (${thirdPersonBlurb.length} chars)`);
     } else {
       console.log('  -> No third-person blurb file found');
     }
