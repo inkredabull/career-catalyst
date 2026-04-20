@@ -741,11 +741,11 @@ app.post('/extract', async (req, res) => {
             }
           });
 
-          // Set timeout
+          // Set timeout — 120s to accommodate LLM classification + AppleScript reminder creation
           setTimeout(() => {
             child.kill();
-            reject(new Error('Command timed out after 60 seconds'));
-          }, 60000);
+            reject(new Error('Command timed out after 120 seconds'));
+          }, 120000);
         });
         
         // Parse the output to extract job ID
