@@ -696,7 +696,7 @@ async function handleGenerateBlurb(request, sendResponse) {
     }
 
     // Call unified server to generate blurb
-    const blurbResponse = await callUnifiedServerGenerateBlurb(request.jobId, request.companyWebsite, request.person);
+    const blurbResponse = await callUnifiedServerGenerateBlurb(request.jobId, request.companyWebsite, request.person, request.fromBlurb);
 
     sendResponse({
       success: true,
@@ -715,7 +715,7 @@ async function handleGenerateBlurb(request, sendResponse) {
 }
 
 // Call unified server to generate blurb
-async function callUnifiedServerGenerateBlurb(jobId, companyWebsite = '', person = 'third') {
+async function callUnifiedServerGenerateBlurb(jobId, companyWebsite = '', person = 'third', fromBlurb = null) {
   try {
     console.log('Career Catalyst Background: Calling unified server for blurb generation');
 
@@ -726,6 +726,10 @@ async function callUnifiedServerGenerateBlurb(jobId, companyWebsite = '', person
 
     if (companyWebsite) {
       requestBody.companyWebsite = companyWebsite;
+    }
+
+    if (fromBlurb) {
+      requestBody.fromBlurb = fromBlurb;
     }
 
     const response = await fetch('http://localhost:3000/generate-blurb', {

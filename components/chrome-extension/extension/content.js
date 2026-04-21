@@ -1682,13 +1682,13 @@ async function handleTrackFromForm() {
       await updateScoringSection(extractResponse.jobId);
       await updateResumeSection(extractResponse.jobId);
 
-      // Auto-generate blurbs if Apply reminder is checked
+      // Auto-generate blurbs if Apply reminder is checked (chained: third → first)
       // Note: resume generation is intentionally not auto-triggered — use CLI: npm run dev -- resume <jobId>
       if (selectedReminders.includes('apply')) {
         console.log('Career Catalyst: Apply reminder checked — auto-generating third-person blurb');
-        await handleGenerateBlurb('third');
-        console.log('Career Catalyst: Apply reminder checked — auto-generating first-person blurb');
-        await handleGenerateBlurb('first');
+        const thirdBlurb = await handleGenerateBlurb('third');
+        console.log('Career Catalyst: Apply reminder checked — converting to first-person blurb');
+        await handleGenerateBlurb('first', thirdBlurb);
       }
 
       await updateBlurbSection(extractResponse.jobId, 'third');
@@ -2073,7 +2073,9 @@ function handleEditResumeDriveUrl() {
 }
 
 // Handle generate blurb functionality
-async function handleGenerateBlurb(person) {
+// fromBlurb: optional third-person text to convert (skips full LLM generation for first-person)
+// Returns the generated blurb text on success, null on failure
+async function handleGenerateBlurb(person, fromBlurb = null) {
   const blurbBtn = document.getElementById(`generate-${person}-person-blurb`);
   const blurbDisplay = document.getElementById(`${person}-person-blurb-display`);
   const blurbContent = document.getElementById(`${person}-person-blurb-content`);
@@ -2090,7 +2092,7 @@ async function handleGenerateBlurb(person) {
 
     if (!jobId) {
       alert('No Job ID found. Please track a job first or enter a Job ID manually.');
-      return;
+      return null;
     }
 
     // Get the company website URL from the form field (optional)
@@ -2099,7 +2101,9 @@ async function handleGenerateBlurb(person) {
 
     console.log('Career Catalyst: Generating blurb for job ID:', jobId);
     console.log('Career Catalyst: Perspective:', person);
-    if (companyWebsite) {
+    if (fromBlurb) {
+      console.log('Career Catalyst: Using chained third-person input for first-person conversion');
+    } else if (companyWebsite) {
       console.log('Career Catalyst: Using company website:', companyWebsite);
     }
 
@@ -2108,7 +2112,8 @@ async function handleGenerateBlurb(person) {
       action: 'generateBlurb',
       jobId: jobId,
       companyWebsite: companyWebsite,
-      person: person
+      person: person,
+      fromBlurb: fromBlurb || undefined
     });
 
     if (response.success) {
@@ -2123,14 +2128,17 @@ async function handleGenerateBlurb(person) {
       blurbContent.textContent = response.blurb;
       blurbContent.setAttribute('data-character-count', response.characterCount);
 
+      return response.blurb;
     } else {
       console.error(`❌ Failed to generate ${person}-person blurb:`, response.error);
       alert(`Failed to generate blurb: ${response.error}`);
+      return null;
     }
 
   } catch (error) {
     console.error('Career Catalyst: Generate blurb failed', error);
     alert(`Error generating blurb: ${error.message}`);
+    return null;
   } finally {
     // Reset button state
     blurbBtn.disabled = false;

@@ -1073,7 +1073,7 @@ app.post('/linkedin-reminder', async (req, res) => {
 app.post('/generate-blurb', async (req, res) => {
   console.log(`[${new Date().toISOString()}] Generate blurb request`);
   try {
-    const { jobId, companyWebsite, person } = req.body;
+    const { jobId, companyWebsite, person, fromBlurb } = req.body;
 
     if (!jobId) {
       return res.status(400).json({
@@ -1086,6 +1086,36 @@ app.post('/generate-blurb', async (req, res) => {
     console.log(`  -> Generating ${perspective}-person blurb for job: ${jobId}`);
     if (companyWebsite) {
       console.log(`  -> Using company website: ${companyWebsite}`);
+    }
+
+    // Fast-path: convert existing third-person blurb to first-person via direct LLM call
+    if (perspective === 'first' && fromBlurb) {
+      console.log(`  -> Converting third-person blurb to first-person (${fromBlurb.length} chars)`);
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const conversionPrompt = `Convert the following third-person professional blurb into first-person by replacing all third-person references (Anthony, he, his, him) with first-person equivalents (I, my, me) and updating verbs accordingly. Preserve the exact meaning, tone, and structure. Output ONLY the converted text — no explanation, no quotes, no preamble.
+
+Third-person blurb:
+${fromBlurb}`;
+
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: conversionPrompt }]
+      });
+
+      let blurb = message.content[0].text.trim();
+      blurb = blurb.replace(/—/g, '-').replace(/\s+--\s+/g, ' - ');
+
+      // Save to prep dir
+      const projectDir = path.resolve(__dirname, '..', '..');
+      const jobDir = path.join(projectDir, 'logs', jobId);
+      const prepDir = path.join(jobDir, 'prep');
+      if (!fs.existsSync(prepDir)) fs.mkdirSync(prepDir, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      fs.writeFileSync(path.join(prepDir, `blurb-first-${timestamp}.txt`), blurb, 'utf-8');
+      console.log(`  -> ✅ First-person blurb converted (${blurb.length} characters)`);
+
+      return res.json({ success: true, jobId, blurb, characterCount: blurb.length });
     }
 
     // Change to the main project directory
