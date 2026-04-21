@@ -284,9 +284,9 @@ If using split format:
 ## General Structure
 
 The general structure MUST be (in this exact order):
-* Heading
+* Heading (name + tagline on one line)
 * Contact Information
-* Opening paragraph (tagline + summary, no section label)
+* Opening paragraph (unlabeled summary prose)
 * Roles (with optional Technologies lines per role)
 * Earlier Career (OPTIONAL — condensed older roles, max 3 entries)
 * "Complete work history available upon request." (in italics)
@@ -297,7 +297,17 @@ The general structure MUST be (in this exact order):
 
 ## Heading
 
-Lead with the candidate's full name as extracted from the CV (name only, no title or role after name).
+The heading line is the candidate's full name followed by a dash and a tagline:
+
+```
+# Anthony Bull - Engineering Leader | Correctness-First Systems | AI Automation
+```
+
+**Tagline rules:**
+- Appended to the name with ` - ` (space-dash-space)
+- 2–4 pipe-separated phrases; no trailing pipe
+- Match vocabulary from the job title and description
+- Do NOT repeat the exact job title from the posting
 
 ## Contact Information
 
@@ -305,26 +315,12 @@ Format as: City | Phone | Email | LinkedIn URL — all extracted from the CV.
 
 ## Opening Paragraph
 
-Immediately after the contact line, include a single unlabeled paragraph — no `## SUMMARY` heading, no `## HEADLINE` heading.
-
-The paragraph opens with a **bold tagline** (2–4 pipe-separated phrases, max 80 characters) followed immediately — on the same line, after a period and a space — by the summary prose. The result is one seamless visual block:
-
-```
-**Engineering Leader | Correctness-First Systems | AI Automation.** Built and scaled...
-```
-
-**Tagline rules:**
-- 2–4 pipe-separated phrases; no trailing pipe
-- Match vocabulary from the job title and description
-- Do NOT repeat the exact job title from the posting
-- End with a period so it flows into the prose
-
-**Prose rules (the part after the bold tagline):**
+Immediately after the contact line, include a single unlabeled paragraph of summary prose — no section heading of any kind.
 
 {{summaryGuidance}}
 
-**CRITICAL: The prose (after the bold tagline) must be between 500 and 650 characters.**
-This is approximately 3-4 sentences. Count characters in the prose only — exclude the bold tagline from the count.
+**CRITICAL: The opening paragraph must be between 500 and 650 characters.**
+This is approximately 3-4 sentences. Count characters carefully.
 
 Don't use "I" statements; lead with past-tense verb in the first person instead.
 Do NOT use em dashes (—) or en dashes (–) anywhere.
@@ -454,7 +450,7 @@ Return output as Markdown in the format of a reverse chronological resume.
 Final output should print to no more than two pages as a PDF.
 
 **MANDATORY heading levels — use these exactly, no exceptions:**
-- Candidate name: `#` (h1), e.g. `# Anthony Bull`
+- Candidate name + tagline: `#` (h1), e.g. `# Anthony Bull - Engineering Leader | AI Systems | 0→1 Builder`
 - Every section heading: `##` (h2), ALL CAPS — e.g. `## SKILLS`, `## EXPERIENCE`, `## RELEVANT EXPERIENCE`, `## RELATED EXPERIENCE`, `## EDUCATION`, `## BEYOND WORK`
 - The opening paragraph (tagline + summary prose) has NO section heading — it appears directly after the contact line
 - Never use `###`, `####`, bold text, or any other pattern as a section heading
