@@ -1142,6 +1142,12 @@ header-includes: |
     return header + markdownContent;
   }
 
+  private ensurePagebreakBeforeRelatedExperience(markdownContent: string): string {
+    // Normalise: strip any existing \pagebreak before the heading, then re-insert exactly one
+    const withoutExisting = markdownContent.replace(/\\pagebreak\s*\n(## RELATED EXPERIENCE)/g, '$1');
+    return withoutExisting.replace(/(## RELATED EXPERIENCE)/g, '\\pagebreak\n$1');
+  }
+
   private async generateTailoredContent(
     job: JobListing,
     cvContent: string,
@@ -1414,7 +1420,7 @@ Instructions: Use the pre-classified domain above. Skip the domain detection ste
       }
 
       return {
-        markdownContent: this.addHeaderToMarkdown(result.markdownContent),
+        markdownContent: this.ensurePagebreakBeforeRelatedExperience(this.addHeaderToMarkdown(result.markdownContent)),
         changes: Array.isArray(result.changes) ? result.changes.slice(0, 5) : result.changes,
         roleSelection: result.roleSelection
       };
