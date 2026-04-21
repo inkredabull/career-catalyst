@@ -129,8 +129,8 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       // Post-process: ensure \pagebreak before RELATED EXPERIENCE (split format)
       result.markdownContent = this.ensurePagebreakBeforeRelatedExperience(result.markdownContent);
 
-      // Post-process: indent subsection headers so bullets align in pandoc PDF
-      result.markdownContent = this.indentSubsectionHeaders(result.markdownContent);
+      // NOTE: indentSubsectionHeaders(\hspace{1.5em}) removed — causes vertical gap in pandoc
+      // instead of horizontal left-indent. Headers render as plain bold lines.
 
       // Post-process: trim bullets that still exceed 80 chars via a targeted LLM rewrite
       result.markdownContent = await this.trimLongBullets(result.markdownContent);
