@@ -129,8 +129,8 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       // Post-process: ensure \pagebreak before RELATED EXPERIENCE (split format)
       result.markdownContent = this.ensurePagebreakBeforeRelatedExperience(result.markdownContent);
 
-      // NOTE: indentSubsectionHeaders(\hspace{1.5em}) removed — causes vertical gap in pandoc
-      // instead of horizontal left-indent. Headers render as plain bold lines.
+      // Post-process: indent subsection headers to align with bullet left margin
+      result.markdownContent = this.indentSubsectionHeaders(result.markdownContent);
 
       // Post-process: trim bullets that still exceed 80 chars via a targeted LLM rewrite
       result.markdownContent = await this.trimLongBullets(result.markdownContent);
@@ -191,12 +191,14 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
   }
 
   /**
-   * Prepends \hspace{1.5em} to standalone bold subsection headers so they render
-   * flush with list item bullets in pandoc PDF output.
+   * Indents standalone bold subsection headers to align with bullet left margin.
+   * Uses pandoc inline raw LaTeX (`\hspace*{1.5em}`{=latex}) so the space is:
+   *   - Actually applied at line start (\hspace* is non-discardable, unlike \hspace)
+   *   - Not interpreted as a block command (avoids the vertical gap issue)
    * Matches lines that are exactly **Theme Name** with no @ (avoids role title lines).
    */
   private indentSubsectionHeaders(markdown: string): string {
-    return markdown.replace(/^(\*\*[^*\n@]+\*\*)$/gm, '\\hspace{1.5em}$1');
+    return markdown.replace(/^(\*\*[^*\n@]+\*\*)$/gm, '`\\hspace*{1.5em}`{=latex}$1');
   }
 
   /**
