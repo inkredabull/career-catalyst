@@ -286,6 +286,7 @@ If using split format:
 The general structure MUST be (in this exact order):
 * Heading
 * Contact Information
+* Headline
 * Summary
 * Roles (with optional Technologies lines per role)
 * Earlier Career (OPTIONAL — condensed older roles, max 3 entries)
@@ -302,6 +303,19 @@ Lead with the candidate's full name as extracted from the CV (name only, no titl
 ## Contact Information
 
 Format as: City | Phone | Email | LinkedIn URL — all extracted from the CV.
+
+## Headline
+
+Include a "HEADLINE" section immediately after contact information and before the summary.
+
+The headline is a single short line (max 80 characters) that captures the candidate's professional identity and signals fit for this specific role. Use pipe-separated phrases, e.g.:
+`Engineering Executive | AI Systems | 0→1 Product Builder`
+
+Rules:
+- 2–4 pipe-separated phrases; no trailing pipe
+- Match language from the job title and description — mirror their vocabulary
+- Do NOT use a full sentence or punctuation other than pipes
+- Do NOT repeat the exact job title from the posting
 
 ## Summary
 
@@ -441,7 +455,7 @@ Final output should print to no more than two pages as a PDF.
 
 **MANDATORY heading levels — use these exactly, no exceptions:**
 - Candidate name: `#` (h1), e.g. `# Anthony Bull`
-- Every section heading: `##` (h2), ALL CAPS — e.g. `## SUMMARY`, `## SKILLS`, `## EXPERIENCE`, `## RELEVANT EXPERIENCE`, `## RELATED EXPERIENCE`, `## EDUCATION`, `## BEYOND WORK`
+- Every section heading: `##` (h2), ALL CAPS — e.g. `## HEADLINE`, `## SUMMARY`, `## SKILLS`, `## EXPERIENCE`, `## RELEVANT EXPERIENCE`, `## RELATED EXPERIENCE`, `## EDUCATION`, `## BEYOND WORK`
 - Never use `###`, `####`, bold text, or any other pattern as a section heading
 
 {{enforcementSection}}
