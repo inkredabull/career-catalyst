@@ -126,6 +126,9 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       // Post-process: fix hard-wrapped bullets (join 2-space continuation lines)
       result.markdownContent = this.fixHardWrappedBullets(result.markdownContent);
 
+      // Post-process: ensure \pagebreak before RELATED EXPERIENCE (split format)
+      result.markdownContent = this.ensurePagebreakBeforeRelatedExperience(result.markdownContent);
+
       // Post-process: trim bullets that still exceed 80 chars via a targeted LLM rewrite
       result.markdownContent = await this.trimLongBullets(result.markdownContent);
 
@@ -182,6 +185,15 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       }
     }
     return out.join('\n');
+  }
+
+  /**
+   * Ensures exactly one \pagebreak immediately before ## RELATED EXPERIENCE
+   * so the section always starts on page 2 in the pandoc PDF output.
+   */
+  private ensurePagebreakBeforeRelatedExperience(markdown: string): string {
+    const withoutExisting = markdown.replace(/\\pagebreak\s*\n(## RELATED EXPERIENCE)/g, '$1');
+    return withoutExisting.replace(/(## RELATED EXPERIENCE)/g, '\\pagebreak\n$1');
   }
 
   /**
