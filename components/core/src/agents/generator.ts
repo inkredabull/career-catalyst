@@ -129,8 +129,9 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       // Post-process: ensure \pagebreak before RELATED EXPERIENCE (split format)
       result.markdownContent = this.ensurePagebreakBeforeRelatedExperience(result.markdownContent);
 
-      // Post-process: indent subsection headers to align with bullet left margin
+      // Post-process: indent subsection headers and Technologies lines to align with bullet left margin
       result.markdownContent = this.indentSubsectionHeaders(result.markdownContent);
+      result.markdownContent = this.indentTechnologiesLines(result.markdownContent);
 
       // Post-process: trim bullets that still exceed 80 chars via a targeted LLM rewrite
       result.markdownContent = await this.trimLongBullets(result.markdownContent);
@@ -199,6 +200,14 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
    */
   private indentSubsectionHeaders(markdown: string): string {
     return markdown.replace(/^(\*\*[^*\n@]+\*\*)$/gm, '`\\hspace*{1.5em}`{=latex}$1');
+  }
+
+  /**
+   * Indents Technologies: lines to align with bullet left margin, same mechanism
+   * as subsection headers — pandoc inline raw LaTeX with \hspace* (non-discardable).
+   */
+  private indentTechnologiesLines(markdown: string): string {
+    return markdown.replace(/^(\*\*Technologies:\*\*.+)$/gm, '`\\hspace*{1.5em}`{=latex}$1');
   }
 
   /**
