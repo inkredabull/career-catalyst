@@ -36,8 +36,8 @@ For leadership roles, ensure bullets demonstrate both technical delivery AND tea
 - Use phrases like: "Led team of X engineers to...", "Mentored senior engineers on...", "Built hiring pipeline resulting in..."
 - Balance between "I delivered" (technical contributions) and "Led team to deliver" (leadership impact)
 
-**OPTIONAL ROLE SUBSECTIONS (for Director/VP/CTO/Head of roles in split format only):**
-When a role has 2-3 genuinely distinct work streams (e.g., platform strategy, stakeholder enablement, execution), you MAY group bullets under bold thematic subsection headers:
+**ROLE SUBSECTIONS (for Director/VP/CTO/Head of roles in split format — default ON):**
+When this is a Director/VP/CTO/Head of candidate in split format, you SHOULD group bullets under thematic subsection headers for the most recent 1-2 RELEVANT roles. Skip subsections only when a role's work is genuinely homogeneous (e.g. pure IC execution with no distinct streams).
 
 **[Theme Name]**
 - bullet (70-80 chars)
@@ -51,7 +51,6 @@ Rules:
   - ❌ WRONG: 2 subsections × 4 bullets each = 8 bullets total (too many)
   - ❌ WRONG: 4 subsections × 3 bullets each = 12 bullets total (way too many)
 - Each subsection gets 1-2 bullets maximum; never more than 2 per subsection
-- Only use subsections when the role genuinely has distinct themes worth separating; do NOT force them on roles with homogeneous work
 - Subsection labels use bold formatting (`**Label**`) only — NOT `###` heading level
 - Do NOT use subsections for RELATED EXPERIENCE roles — flat bullets only
 
