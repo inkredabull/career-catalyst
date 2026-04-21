@@ -1148,6 +1148,13 @@ header-includes: |
     return withoutExisting.replace(/(## RELATED EXPERIENCE)/g, '\\pagebreak\n$1');
   }
 
+  private indentSubsectionHeaders(markdownContent: string): string {
+    // Subsection headers are standalone bold lines: **Theme Name**
+    // (role headers always have more text after, e.g. "**Title** @ Company (dates)")
+    // Prepend \hspace so they render flush with list item bullets in pandoc PDF output.
+    return markdownContent.replace(/^(\*\*[^*\n@]+\*\*)$/gm, '\\hspace{1.5em}$1');
+  }
+
   private async generateTailoredContent(
     job: JobListing,
     cvContent: string,
@@ -1420,7 +1427,7 @@ Instructions: Use the pre-classified domain above. Skip the domain detection ste
       }
 
       return {
-        markdownContent: this.ensurePagebreakBeforeRelatedExperience(this.addHeaderToMarkdown(result.markdownContent)),
+        markdownContent: this.indentSubsectionHeaders(this.ensurePagebreakBeforeRelatedExperience(this.addHeaderToMarkdown(result.markdownContent))),
         changes: Array.isArray(result.changes) ? result.changes.slice(0, 5) : result.changes,
         roleSelection: result.roleSelection
       };
