@@ -33,14 +33,21 @@ Generate 3–5 questions the candidate should ask the interviewer. Each question
 
 ## Output Format
 
-**IMPORTANT**: Always respond directly in Rich Text Format (RTF) code. Do not use markdown formatting.
+Each question uses a two-level structure: a bold topic label on the first line, followed by the full question as a plain paragraph indented one level deeper.
+
+**IMPORTANT**: Respond ONLY with the RTF block below — no title, no heading, no preamble text before or after the RTF. Do not add a document title like "Questions to Ask the Interviewer". Do not use markdown formatting. Do not add color tables, extra fonts, or paper size declarations.
 
 {\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}}
 \par \li720 \bullet \b QUESTIONS TO ASK:\b0
-\par \li1080 \bullet [Question 1 — specific to role/company]
-\par \li1080 \bullet [Question 2 — different angle]
-\par \li1080 \bullet [Question 3 — different angle]
-\par \li1080 \bullet [Question 4 — optional, different angle]
-\par \li1080 \bullet [Question 5 — optional, different angle]
+\par \li720 \bullet \b [Topic label for question 1 — 3-6 words]\b0
+\par \li1080 [Full question 1 — detailed, conversational, role-specific]
+\par \li720 \bullet \b [Topic label for question 2]\b0
+\par \li1080 [Full question 2]
+\par \li720 \bullet \b [Topic label for question 3]\b0
+\par \li1080 [Full question 3]
+\par \li720 \bullet \b [Topic label for question 4 — optional]\b0
+\par \li1080 [Full question 4 — optional]
+\par \li720 \bullet \b [Topic label for question 5 — optional]\b0
+\par \li1080 [Full question 5 — optional]
 \par \li0
 }
