@@ -192,7 +192,7 @@ async function interactiveAboutMeGeneration(jobId: string, options: any): Promis
       console.log('');
 
       // Show section status
-      const sections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close', 'personal-touch'];
+      const sections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close', 'personal-touch', 'questions'];
       console.log('Section Status:');
       for (const section of sections) {
         // Check if section exists
@@ -1755,7 +1755,8 @@ const sectionCommands: Record<string, AboutMeSection> = {
   'about-me-why': 'why',
   'about-me-focus-story': 'focus-story',
   'about-me-close': 'close',
-  'about-me-personal-touch': 'personal-touch'
+  'about-me-personal-touch': 'personal-touch',
+  'about-me-questions': 'questions'
 };
 
 for (const [commandName, section] of Object.entries(sectionCommands)) {
