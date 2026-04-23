@@ -352,7 +352,7 @@ Format as:
   ): Promise<string> {
     // Check if all sections already exist
     const existingSections = this.listSections(this.currentJobId);
-    const allSections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close'];
+    const allSections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close', 'questions'];
     const missingSections = allSections.filter(s => !existingSections.includes(s));
 
     // If all sections exist, combine them
@@ -394,6 +394,10 @@ Format as:
           const closeContent = await this.generateClose(job, cvContent, options);
           this.saveSection(this.currentJobId, 'close', closeContent);
           break;
+        case 'questions':
+          const questionsContent = await this.generateQuestions(job, cvContent, options);
+          this.saveSection(this.currentJobId, 'questions', questionsContent);
+          break;
       }
     }
 
@@ -430,6 +434,8 @@ Format as:
         return `${basePrompt}\n\nCreate 2 RTF bullets: what you bring + unique positioning, and your energy/mindset stepping into the role.`;
       case 'personal-touch':
         return `${basePrompt}\n\nCreate 1 RTF bullet with a personal passion or hobby that connects authentically to professional life.`;
+      case 'questions':
+        return `${basePrompt}\n\nCreate 3-5 RTF bullets with sharp, specific questions to ask the interviewer — role/company-specific, not generic.`;
       default:
         return basePrompt;
     }
@@ -486,6 +492,9 @@ Format as:
           break;
         case 'personal-touch':
           content = await this.generatePersonalTouch(jobData, cvContent, options);
+          break;
+        case 'questions':
+          content = await this.generateQuestions(jobData, cvContent, options);
           break;
         default:
           return { success: false, section, error: `Unknown section: ${section}` };
@@ -557,6 +566,21 @@ Format as:
 
     this.logPromptToFile(prompt, 'about-me-personal-touch');
     console.log('📝 Generating personal touch section...');
+
+    const response = await this.makeClaudeRequest(prompt);
+    return this.cleanResponse(response, 'about-me');
+  }
+
+  private async generateQuestions(
+    job: JobListing,
+    cvContent: string,
+    options: StatementOptions
+  ): Promise<string> {
+    const promptTemplate = this.loadSectionPrompt('questions');
+    const prompt = this.buildSectionPrompt(promptTemplate, 'questions', job, cvContent, options);
+
+    this.logPromptToFile(prompt, 'about-me-questions');
+    console.log('📝 Generating questions section...');
 
     const response = await this.makeClaudeRequest(prompt);
     return this.cleanResponse(response, 'about-me');
@@ -717,10 +741,19 @@ Format as:
         return rtfContent.trim();
       };
 
-      // Combine sections in order: hook, career-snapshot, themes, why, focus-story, close, [personal-touch]
+      // Load optional questions section if it exists
+      const questionsData = this.loadSection(jobId, 'questions');
+      if (questionsData) {
+        sectionContents['questions'] = questionsData.content;
+      }
+
+      // Combine sections in order: hook, career-snapshot, themes, why, focus-story, close, [personal-touch], [questions]
       const bodies = requiredSections.map(s => extractRTFBody(sectionContents[s]!));
       if (sectionContents['personal-touch']) {
         bodies.push(extractRTFBody(sectionContents['personal-touch']));
+      }
+      if (sectionContents['questions']) {
+        bodies.push(extractRTFBody(sectionContents['questions']));
       }
 
       // Combine into final RTF document with proper font selection and formatting
@@ -766,7 +799,8 @@ ${bodies.join('\n')}
         'themes': 'Key Themes with Examples',
         'why': 'Why This Role & Company',
         'close': 'Close with Confidence',
-        'personal-touch': 'Personal Touch'
+        'personal-touch': 'Personal Touch',
+        'questions': 'Questions to Ask the Interviewer'
       };
 
       const prompt = `You are an expert interview coach critiquing the ${sectionNames[section]} section of a "Tell me about yourself" interview response.
@@ -859,7 +893,8 @@ Respond in JSON format:
         'themes': 'Key Themes with Examples',
         'why': 'Why This Role & Company',
         'close': 'Close with Confidence',
-        'personal-touch': 'Personal Touch'
+        'personal-touch': 'Personal Touch',
+        'questions': 'Questions to Ask the Interviewer'
       };
 
       const prompt = `You are an expert interview coach refining the ${sectionNames[section]} section of a "Tell me about yourself" interview response.

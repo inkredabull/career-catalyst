@@ -180,7 +180,8 @@ async function interactiveAboutMeGeneration(jobId: string, options: any): Promis
       'why': 'Why This Role & Company',
       'focus-story': 'Focus Story (STAR)',
       'close': 'Close with Confidence',
-      'personal-touch': 'Personal Touch (optional)'
+      'personal-touch': 'Personal Touch (optional)',
+      'questions': 'Questions to Ask the Interviewer'
     };
 
     while (true) {
