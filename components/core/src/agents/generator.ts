@@ -129,6 +129,9 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       // Post-process: ensure \pagebreak before RELATED EXPERIENCE (split format)
       result.markdownContent = this.ensurePagebreakBeforeRelatedExperience(result.markdownContent);
 
+      // Post-process: fix Gemini/model quirk of using **SECTION NAME** bold instead of ## heading
+      result.markdownContent = this.normalizeSectionHeadings(result.markdownContent);
+
       // Post-process: indent subsection headers and Technologies lines to align with bullet left margin
       result.markdownContent = this.indentSubsectionHeaders(result.markdownContent);
       result.markdownContent = this.indentTechnologiesLines(result.markdownContent);
@@ -189,6 +192,19 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
       }
     }
     return out.join('\n');
+  }
+
+  /**
+   * Fixes model quirk (most common with Gemini) of emitting section headings as
+   * **SECTION NAME** bold lines instead of ## SECTION NAME markdown headings.
+   * Must run before indentSubsectionHeaders, which would otherwise indent them.
+   */
+  private normalizeSectionHeadings(markdown: string): string {
+    const sectionNames = ['RELEVANT EXPERIENCE', 'RELATED EXPERIENCE', 'SKILLS', 'EDUCATION', 'BEYOND WORK', 'EARLIER CAREER'];
+    for (const name of sectionNames) {
+      markdown = markdown.replace(new RegExp(`^\\*\\*${name}\\*\\*$`, 'gm'), `## ${name}`);
+    }
+    return markdown;
   }
 
   /**
