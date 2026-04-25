@@ -916,10 +916,49 @@ function extractCompanyName() {
   return '';
 }
 
+/**
+ * Generic label→value reader for structured ATS sidebars (Ashby, Greenhouse, etc.).
+ * Finds a leaf element whose trimmed text exactly matches labelText, then returns
+ * the text of the nearest sibling or parent-sibling value element.
+ */
+function readStructuredLabelValue(labelText) {
+  const candidates = Array.from(document.querySelectorAll('span, dt, th, strong, p, div, li'))
+    .filter(el => el.textContent.trim() === labelText && el.children.length === 0);
+
+  for (const labelEl of candidates) {
+    // Try immediate next sibling
+    const nextSibling = labelEl.nextElementSibling;
+    if (nextSibling && nextSibling.textContent.trim()) {
+      return nextSibling.textContent.trim();
+    }
+    // Try other children of parent (when label + value share a container)
+    const parent = labelEl.parentElement;
+    if (parent) {
+      const otherChildren = Array.from(parent.children).filter(c => c !== labelEl);
+      if (otherChildren.length === 1 && otherChildren[0].textContent.trim()) {
+        return otherChildren[0].textContent.trim();
+      }
+      // Try parent's next sibling
+      const parentNext = parent.nextElementSibling;
+      if (parentNext && parentNext.textContent.trim()) {
+        return parentNext.textContent.trim();
+      }
+    }
+  }
+  return null;
+}
+
 // Extract job location from the current page
 function extractJobLocation() {
   console.log('Career Catalyst: Extracting job location from page');
-  
+
+  // Priority 0: Structured label-value sidebar (Ashby, Greenhouse, Lever, etc.)
+  const structuredLocation = readStructuredLabelValue('Location');
+  if (structuredLocation && structuredLocation.length > 0 && structuredLocation.length < 100) {
+    console.log(`Career Catalyst: Found location via structured label: "${structuredLocation}"`);
+    return cleanText(structuredLocation);
+  }
+
   // Priority 1: Try specific location selectors first
   const locationSelectors = [
     '[data-testid*="location"]',
@@ -1065,7 +1104,34 @@ function extractJobLocation() {
 // Extract salary range from the current page
 function extractSalaryRange() {
   console.log('🔍 Career Catalyst: Extracting salary range');
-  
+
+  // Priority 0: Structured label-value sidebar (Ashby "Compensation", etc.)
+  const compensationLabels = ['Compensation', 'Salary', 'Pay Range', 'Salary Range'];
+  for (const label of compensationLabels) {
+    const compensationText = readStructuredLabelValue(label);
+    if (compensationText) {
+      console.log(`🔍 Found structured compensation text: "${compensationText}"`);
+      const rangeMatch = compensationText.match(/\$(\d+(?:\.\d+)?[kK]?)\s*[-–—]\s*\$?(\d+(?:\.\d+)?[kK]?)/);
+      if (rangeMatch) {
+        const min = parseSalaryValue(rangeMatch[1]);
+        const max = parseSalaryValue(rangeMatch[2]);
+        if (min > 0 && max > 0 && min < max && min >= 20000 && max <= 2000000) {
+          console.log(`🔍 Parsed structured salary: $${min.toLocaleString()} - $${max.toLocaleString()}`);
+          return { min: min.toString(), max: max.toString() };
+        }
+      }
+      // Single value in structured field
+      const singleMatch = compensationText.match(/\$(\d+(?:\.\d+)?[kK]?)/);
+      if (singleMatch) {
+        const salary = parseSalaryValue(singleMatch[1]);
+        if (salary >= 50000 && salary <= 2000000) {
+          console.log(`🔍 Parsed single structured salary: $${salary.toLocaleString()}`);
+          return { min: Math.round(salary * 0.9).toString(), max: Math.round(salary * 1.1).toString() };
+        }
+      }
+    }
+  }
+
   // Get all text content to search for salary patterns
   const pageText = document.body.innerText || '';
   const descText = extractedJobDescription || '';
