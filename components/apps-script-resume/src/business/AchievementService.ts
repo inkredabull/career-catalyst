@@ -95,7 +95,9 @@ export class AchievementService {
     targetAudience: string
   ): string {
     const carBlock = this._formatCAR(challenge, actions, result);
-    const basePrompt = `${CONFIG.PROMPTS.ACHIEVEMENT_SIMPLIFIED}
+    const howAddendum =
+      targetAudience === 'linkedin' ? `\n${CONFIG.PROMPTS.ACHIEVEMENT_LINKEDIN_HOW}` : '';
+    const basePrompt = `${CONFIG.PROMPTS.ACHIEVEMENT_SIMPLIFIED}${howAddendum}
 
 ${CONFIG.PROMPTS.SPECIFICS}
 ${CONFIG.PROMPTS.MARKS}

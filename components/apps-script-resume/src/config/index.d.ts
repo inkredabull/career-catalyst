@@ -33,6 +33,8 @@ export interface StoryBankColumns {
     ID: string;
     TEAL_ID: string;
     TIMING: string;
+    CV: string;
+    LINKEDIN: string;
 }
 export interface CompaniesColumns {
     COMPANY: string;
@@ -107,6 +109,7 @@ export interface Prompts {
     NORMALIZE: string;
     IS_IMPACTFUL: string;
     ACHIEVEMENT_SIMPLIFIED: string;
+    ACHIEVEMENT_LINKEDIN_HOW: string;
     BEST_EFFORT: string;
 }
 export interface ContactInfo {

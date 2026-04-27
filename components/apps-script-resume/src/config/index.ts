@@ -35,6 +35,8 @@ export interface StoryBankColumns {
   ID: string;
   TEAL_ID: string;
   TIMING: string;
+  CV: string;
+  LINKEDIN: string;
 }
 
 export interface CompaniesColumns {
@@ -119,6 +121,7 @@ export interface Prompts {
   NORMALIZE: string;
   IS_IMPACTFUL: string;
   ACHIEVEMENT_SIMPLIFIED: string;
+  ACHIEVEMENT_LINKEDIN_HOW: string;
   BEST_EFFORT: string;
 }
 
@@ -187,6 +190,8 @@ export const CONFIG: Config = {
       ID: 'ID',
       TEAL_ID: 'TealHQ ID',
       TIMING: 'Timing',
+      CV: 'CV',
+      LINKEDIN: 'LinkedIn',
     },
     COMPANIES: {
       COMPANY: 'Company',
@@ -343,9 +348,13 @@ Return TRUE only if all 6 = YES. Otherwise return FALSE. Return only TRUE or FAL
     ACHIEVEMENT_SIMPLIFIED: `
 Given the following CHALLENGE, ACTIONS, and RESULT, summarize into a single achievement which:
 
-* follows the format of: "ACTION_VERB_IN_ACTIVE_VOICE WHAT_WAS_DONE WITH_WHOM_LIKE_PEER_LEADER_FUNCTION_TEAM to ACHEIVED_PREFERABLY_QUANTIFIABLE_RESULT"
+* follows the format: "ACTION_VERB_IN_ACTIVE_VOICE WHAT_WAS_DONE [using/via/with HOW_IT_WAS_DONE] to ACHIEVED_PREFERABLY_QUANTIFIABLE_RESULT"
 * is approximately maxOuputSizeInChars characters
-* attempts to incorporate any technologies mentioned in ACTIONS`,
+* MUST incorporate HOW the achievement was delivered — extract specific technologies, tools, platforms, methods, and approaches from ACTIONS and include them explicitly (e.g., "using Claude Code in Plan mode with background agents", "via RAG pipeline", "leveraging React dashboard")
+* use technical verbiage verbatim from ACTIONS — do not omit named AI frameworks, coding tools, delivery patterns, or specific technologies
+* if ACTIONS mentions cutting-edge or novel tools, ensure these appear in the summary`,
+
+    ACHIEVEMENT_LINKEDIN_HOW: `Given the shorter length limit, include the single most distinctive technology or approach (e.g., "using AI agents" or "via RAG") — do not omit the HOW entirely just because space is limited.`,
 
     BEST_EFFORT: `If any of the Challenge, Actions, or Result contains the following, make a best effort to incorporate it/them in the summary:
 

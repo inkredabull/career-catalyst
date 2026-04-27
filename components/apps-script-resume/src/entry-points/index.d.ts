@@ -11,6 +11,7 @@ export declare function onOpen(_e?: GoogleAppsScript.Events.SheetsOnOpen): void;
 /**
  * Generate achievement from current row
  * Menu item: "Generate summary"
+ * Generates CV version first, then LinkedIn version, writing to each column automatically.
  */
 export declare function fetch(): void;
 /**

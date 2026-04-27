@@ -90,44 +90,62 @@ export function onOpen(_e?: GoogleAppsScript.Events.SheetsOnOpen): void {
 /**
  * Generate achievement from current row
  * Menu item: "Generate summary"
+ * Generates CV version first, then LinkedIn version, writing to each column automatically.
  */
 export function fetch(): void {
   try {
     const services = initializeServices();
-    const { row, headers } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
+    const { row, headers, rowIndex } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
 
-    // Get the active cell to determine target audience from column header
-    const currentCell = services.sheet.getActiveCell();
-    const columnIndex = currentCell.getColumn();
-    const columnHeader = headers[columnIndex - 1]; // Convert 1-indexed to 0-indexed
+    const cvColIndex = headers.findIndex((h) => h && String(h).toLowerCase().includes('cv'));
+    const linkedinColIndex = headers.findIndex(
+      (h) => h && String(h).toLowerCase().includes('linkedin')
+    );
 
-    // Determine target audience based on column header
-    let targetAudience = 'cv'; // default
-    if (columnHeader) {
-      const headerLower = columnHeader.toLowerCase();
-      if (headerLower.includes('linkedin')) {
-        targetAudience = 'linkedin';
-      } else if (headerLower.includes('cv')) {
-        targetAudience = 'cv';
-      }
+    if (cvColIndex < 0 && linkedinColIndex < 0) {
+      DialogService.showAlert('Could not find CV or LinkedIn columns in sheet headers.');
+      return;
     }
-
-    Logger.log(`Column header: "${columnHeader}" -> Target audience: ${targetAudience}`);
 
     const challenge = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE)] as string;
     const actions = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.ACTIONS)] as string;
     const result = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.RESULT)] as string;
     const client = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CLIENT)] as boolean;
 
-    const summary = services.achievement.generateAchievement(
-      challenge,
-      actions,
-      result,
-      client,
-      targetAudience
-    );
+    if (cvColIndex >= 0) {
+      Logger.log(`Generating CV summary for row ${rowIndex}, col ${cvColIndex + 1}`);
+      const cvSummary = services.achievement.generateAchievement(
+        challenge,
+        actions,
+        result,
+        client,
+        'cv'
+      );
+      services.sheet.setCellValue(CONFIG.SHEETS.STORY_BANK, rowIndex, cvColIndex + 1, cvSummary);
+      Logger.log(`CV summary written: ${cvSummary.length} chars`);
+    } else {
+      Logger.warn('CV column not found — skipping CV generation');
+    }
 
-    currentCell.setValue(summary);
+    if (linkedinColIndex >= 0) {
+      Logger.log(`Generating LinkedIn summary for row ${rowIndex}, col ${linkedinColIndex + 1}`);
+      const linkedinSummary = services.achievement.generateAchievement(
+        challenge,
+        actions,
+        result,
+        client,
+        'linkedin'
+      );
+      services.sheet.setCellValue(
+        CONFIG.SHEETS.STORY_BANK,
+        rowIndex,
+        linkedinColIndex + 1,
+        linkedinSummary
+      );
+      Logger.log(`LinkedIn summary written: ${linkedinSummary.length} chars`);
+    } else {
+      Logger.warn('LinkedIn column not found — skipping LinkedIn generation');
+    }
   } catch (error) {
     Logger.error('Error in fetch', error as Error);
     DialogService.showAlert(`Error generating achievement: ${(error as Error).message}`);
@@ -382,32 +400,11 @@ export function createCustomization(): void {
 export function fetchWithModel(modelName: string): void {
   try {
     const services = initializeServices();
-    const { row, headers } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
+    const { row, headers, rowIndex } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
 
-    // Get the active cell to determine target audience from column header
-    const currentCell = services.sheet.getActiveCell();
-    const columnIndex = currentCell.getColumn();
-    const columnHeader = headers[columnIndex - 1]; // Convert 1-indexed to 0-indexed
-
-    // Determine target audience based on column header
-    let targetAudience = 'cv'; // default
-    if (columnHeader) {
-      const headerLower = columnHeader.toLowerCase();
-      if (headerLower.includes('linkedin')) {
-        targetAudience = 'linkedin';
-      } else if (headerLower.includes('cv')) {
-        targetAudience = 'cv';
-      }
-    }
-
-    // Select appropriate max_tokens based on target audience
-    const maxTokens =
-      targetAudience === 'linkedin'
-        ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_LINKEDIN
-        : CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
-
-    Logger.log(
-      `fetchWithModel: column="${columnHeader}" -> audience=${targetAudience}, maxTokens=${maxTokens}`
+    const cvColIndex = headers.findIndex((h) => h && String(h).toLowerCase().includes('cv'));
+    const linkedinColIndex = headers.findIndex(
+      (h) => h && String(h).toLowerCase().includes('linkedin')
     );
 
     const challenge = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE)] as string;
@@ -415,21 +412,28 @@ export function fetchWithModel(modelName: string): void {
     const result = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.RESULT)] as string;
     const client = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CLIENT)] as boolean;
 
-    const prompt = services.achievement.buildPrompt(
-      challenge,
-      actions,
-      result,
-      client,
-      targetAudience
-    );
-    const response = services.ai.query(prompt, {
-      provider: modelName,
-      maxTokens: maxTokens,
-    });
+    for (const [audience, colIndex] of [
+      ['cv', cvColIndex],
+      ['linkedin', linkedinColIndex],
+    ] as [string, number][]) {
+      if (colIndex < 0) {
+        Logger.warn(`fetchWithModel: ${audience} column not found — skipping`);
+        continue;
+      }
+      const maxTokens =
+        audience === 'linkedin'
+          ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_LINKEDIN
+          : CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
 
-    currentCell.setValue(response);
+      Logger.log(
+        `fetchWithModel(${modelName}): generating ${audience}, col ${colIndex + 1}, maxTokens=${maxTokens}`
+      );
 
-    Logger.log(`Generated achievement using ${modelName}: ${response.length} chars`);
+      const prompt = services.achievement.buildPrompt(challenge, actions, result, client, audience);
+      const response = services.ai.query(prompt, { provider: modelName, maxTokens });
+      services.sheet.setCellValue(CONFIG.SHEETS.STORY_BANK, rowIndex, colIndex + 1, response);
+      Logger.log(`fetchWithModel(${modelName}): ${audience} written, ${response.length} chars`);
+    }
   } catch (error) {
     Logger.error(`Error in fetchWithModel with ${modelName}`, error as Error);
     throw new Error(`Failed to generate with ${modelName}: ${(error as Error).message}`);
@@ -464,25 +468,9 @@ export function generateAchievementWithModel(modelName: string): ModelGeneration
     const services = initializeServices();
     const { row, headers } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
 
-    // Get the active cell to determine target audience from column header
-    const currentCell = services.sheet.getActiveCell();
-    const columnIndex = currentCell.getColumn();
-    const columnHeader = headers[columnIndex - 1]; // Convert 1-indexed to 0-indexed
+    const targetAudience = 'cv';
 
-    // Determine target audience based on column header
-    let targetAudience = 'cv'; // default
-    if (columnHeader) {
-      const headerLower = columnHeader.toLowerCase();
-      if (headerLower.includes('linkedin')) {
-        targetAudience = 'linkedin';
-      } else if (headerLower.includes('cv')) {
-        targetAudience = 'cv';
-      }
-    }
-
-    Logger.log(
-      `Column header: "${columnHeader}" -> Target audience: ${targetAudience} for model: ${modelName}`
-    );
+    Logger.log(`generateAchievementWithModel(${modelName}): audience=${targetAudience}`);
 
     const challenge = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE)] as string;
     const actions = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.ACTIONS)] as string;
@@ -497,11 +485,7 @@ export function generateAchievementWithModel(modelName: string): ModelGeneration
       targetAudience
     );
 
-    // Select appropriate max_tokens based on target audience
-    let maxTokens =
-      targetAudience === 'linkedin'
-        ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_LINKEDIN
-        : CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
+    let maxTokens = CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
 
     // Reasoning models (DeepSeek) need more tokens for internal thinking process
     const modelId = services.ai['modelMap'][modelName];
@@ -515,17 +499,14 @@ export function generateAchievementWithModel(modelName: string): ModelGeneration
       );
     }
 
-    Logger.log(
-      `generateAchievementWithModel: using maxTokens=${maxTokens} for audience=${targetAudience}`
-    );
+    Logger.log(`generateAchievementWithModel: maxTokens=${maxTokens}`);
 
-    // Configuration used for this request
     const config = {
       provider: modelName,
       model: services.ai['modelMap'][modelName] || '',
       maxTokens: maxTokens,
       targetAudience: targetAudience,
-      columnHeader: columnHeader || '',
+      columnHeader: CONFIG.COLUMNS.STORY_BANK.CV,
     };
 
     const response = services.ai.query(prompt, {
