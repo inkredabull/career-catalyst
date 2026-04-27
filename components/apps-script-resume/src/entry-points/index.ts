@@ -128,21 +128,28 @@ export function fetch(): void {
     }
 
     if (linkedinColIndex >= 0) {
-      Logger.log(`Generating LinkedIn summary for row ${rowIndex}, col ${linkedinColIndex + 1}`);
-      const linkedinSummary = services.achievement.generateAchievement(
-        challenge,
-        actions,
-        result,
-        client,
-        'linkedin'
-      );
-      services.sheet.setCellValue(
-        CONFIG.SHEETS.STORY_BANK,
-        rowIndex,
-        linkedinColIndex + 1,
-        linkedinSummary
-      );
-      Logger.log(`LinkedIn summary written: ${linkedinSummary.length} chars`);
+      try {
+        Logger.log(`Generating LinkedIn summary for row ${rowIndex}, col ${linkedinColIndex + 1}`);
+        const linkedinSummary = services.achievement.generateAchievement(
+          challenge,
+          actions,
+          result,
+          client,
+          'linkedin'
+        );
+        services.sheet.setCellValue(
+          CONFIG.SHEETS.STORY_BANK,
+          rowIndex,
+          linkedinColIndex + 1,
+          linkedinSummary
+        );
+        Logger.log(`LinkedIn summary written: ${linkedinSummary.length} chars`);
+      } catch (linkedinError) {
+        Logger.warn(`LinkedIn generation failed: ${(linkedinError as Error).message}`);
+        DialogService.showAlert(
+          `CV saved. LinkedIn generation failed: ${(linkedinError as Error).message}`
+        );
+      }
     } else {
       Logger.warn('LinkedIn column not found — skipping LinkedIn generation');
     }
