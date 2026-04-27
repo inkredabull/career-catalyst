@@ -248,6 +248,7 @@ export class ModelDiscoveryService {
         id.includes('sonnet') ||
         id.includes('opus') ||
         id.includes('gpt-4') ||
+        id.includes('gpt-5') ||
         id.includes('flash') ||
         id.includes('large') ||
         id.includes('v3')
