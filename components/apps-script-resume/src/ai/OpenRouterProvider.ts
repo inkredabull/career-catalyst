@@ -63,9 +63,10 @@ export class OpenRouterProvider extends AIProviderBase {
    */
   parseResponse(response: GoogleAppsScript.URL_Fetch.HTTPResponse): string {
     const json = JSON.parse(response.getContentText()) as {
+      error?: { message?: string; code?: string | number };
       choices?: Array<{
         message?: {
-          content?: string;
+          content?: string | Array<{ type: string; text?: string }> | null;
           reasoning?: string;
         };
         finish_reason?: string;
@@ -75,25 +76,42 @@ export class OpenRouterProvider extends AIProviderBase {
     // Log full response for debugging
     Logger.log('OpenRouter response JSON:', JSON.stringify(json));
 
+    // Surface provider-level errors returned with HTTP 200
+    if (json.error) {
+      const msg = json.error.message || JSON.stringify(json.error);
+      Logger.error('OpenRouter provider error:', msg);
+      throw new Error(`Provider error: ${msg}`);
+    }
+
     // Check if response has expected structure
     if (!json.choices || json.choices.length === 0) {
       Logger.error('No choices in response:', JSON.stringify(json));
       throw new Error('Invalid response: no choices array');
     }
 
-    const message = json.choices[0]?.message;
-    const content = message?.content || '';
-    const reasoning = message?.reasoning || '';
-    const finishReason = json.choices[0]?.finish_reason;
+    const choice = json.choices[0];
+    const message = choice?.message;
+    const finishReason = choice?.finish_reason;
 
-    // Log reasoning if present (for debugging)
+    // Normalise content — newer models may return an array of content blocks
+    const rawContent = message?.content;
+    let content = '';
+    if (Array.isArray(rawContent)) {
+      content = rawContent
+        .filter((b) => b.type === 'text' && b.text)
+        .map((b) => b.text)
+        .join('');
+    } else {
+      content = rawContent || '';
+    }
+
+    const reasoning = message?.reasoning || '';
+
     if (reasoning) {
       Logger.log(`Model reasoning detected (${reasoning.length} chars)`);
     }
 
-    // Content is the final answer - reasoning is just the thought process
     if (!content || content.trim().length === 0) {
-      // If model hit token limit during reasoning, it never produced the answer
       if (finishReason === 'length' && reasoning) {
         Logger.error('Reasoning model hit token limit before producing final answer');
         Logger.error(`Reasoning length: ${reasoning.length} chars`);
@@ -104,12 +122,14 @@ export class OpenRouterProvider extends AIProviderBase {
         Logger.error('Model produced reasoning but no final content');
         throw new Error('Model produced reasoning but no final answer in content field');
       } else {
-        Logger.error('Both content and reasoning are empty:', JSON.stringify(message));
-        throw new Error('Invalid response: no content or reasoning');
+        Logger.error('Empty content, finish_reason=' + finishReason, JSON.stringify(message));
+        throw new Error(
+          `Invalid response: no content (finish_reason=${finishReason ?? 'unknown'})`
+        );
       }
     }
 
-    return String(content).trim();
+    return content.trim();
   }
 
   /**
