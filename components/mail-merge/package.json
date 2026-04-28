@@ -1,7 +1,7 @@
 {
-  "name": "@inkredabull/career-catalyst-outreach",
+  "name": "@inkredabull/career-catalyst-mail-merge",
   "version": "1.0.0",
-  "description": "LLM-powered outreach message generation via Google Sheets",
+  "description": "LLM-powered mail merge and outreach message generation via Google Sheets",
   "main": "dist/Code.js",
   "scripts": {
     "build": "webpack --mode production",
