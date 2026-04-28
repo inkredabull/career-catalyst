@@ -409,9 +409,20 @@ STRENGTHS
 // Initialize CV response engine
 const cvEngine = new CVResponseEngine(process.argv.includes('--llm'));
 
-// Enable CORS for Chrome extension and AMA app
+// Enable CORS for Chrome extension, AMA app, and LinkedIn content scripts
 app.use(cors({
-  origin: ['chrome-extension://*', 'http://localhost:*', 'http://localhost:3001', 'http://localhost:3002'],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // same-origin / curl
+    if (
+      origin.startsWith('chrome-extension://') ||
+      origin.startsWith('http://localhost:') ||
+      origin === 'https://www.linkedin.com' ||
+      origin === 'https://linkedin.com'
+    ) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS: origin not allowed — ${origin}`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
