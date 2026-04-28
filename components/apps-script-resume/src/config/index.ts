@@ -176,7 +176,7 @@ export const CONFIG: Config = {
       COMPANY: 'Company',
       SEQUENCE: 'Seq',
       CHALLENGE: 'Challenge',
-      ACTIONS: 'Actions',
+      ACTIONS: 'Action',
       RESULT: 'Result',
       CLIENT: 'Client',
       ACHIEVEMENT: 'Achievement',
