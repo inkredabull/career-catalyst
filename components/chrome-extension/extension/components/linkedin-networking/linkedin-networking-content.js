@@ -626,10 +626,6 @@ function detectLinkedInFeed() {
 }
 
 function initLinkedInFeedMonitoring() {
-  if (!linkedInNetworkingEnabled) {
-    console.log('LinkedIn Feed: Monitoring disabled in settings');
-    return;
-  }
 
   if (!detectLinkedInFeed()) {
     console.log('LinkedIn Feed: Not on feed page, skipping monitoring');
