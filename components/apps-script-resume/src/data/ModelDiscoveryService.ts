@@ -195,7 +195,9 @@ export class ModelDiscoveryService {
 
       // Skip reasoning models — they consume excessive tokens for short text generation tasks
       const isReasoningModel =
-        modelId.includes('gpt-5.5') || modelId.includes('deepseek-r') || /\/o\d/.test(modelId); // o1, o3, o4, etc.
+        /openai\/gpt-5/.test(modelId) || // entire gpt-5 family are reasoning models
+        modelId.includes('deepseek-r') ||
+        /\/o\d/.test(modelId); // o1, o3, o4, etc.
       if (isReasoningModel) {
         return;
       }
