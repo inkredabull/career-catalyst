@@ -239,7 +239,7 @@ export const CONFIG: Config = {
     SHORT_SCALE: 2.2,
     LONG_SCALE: 1.33,
     SCALE_FACTOR: 1.33, // Use LONG_SCALE as default
-    REASONING_MULTIPLIER: 5, // For reasoning models (DeepSeek, GPT-5.5, o-series) that need tokens for thinking
+    REASONING_MULTIPLIER: 10, // For reasoning models (DeepSeek, GPT-5.5, o-series) that need tokens for thinking
   },
 
   // Document generation settings

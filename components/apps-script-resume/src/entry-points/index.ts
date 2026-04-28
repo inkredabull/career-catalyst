@@ -738,7 +738,7 @@ export function compareModels(): void {
       modelResults={};
       var completed=0;
       var TIMEOUT_MS=60000;
-      var STAGGER_MS=1000;
+      var STAGGER_MS=1500;
       MODELS.forEach(function(m,i){
         setTimeout(function(){
           document.getElementById(m.contentId).innerHTML='<div class="loading">Generating...</div>';
