@@ -819,6 +819,7 @@ export function compareModels(): void {
         }
       }
     }
+    window.addEventListener('load', startComparison);
   </script>
 </body>
 </html>`;
