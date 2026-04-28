@@ -18,8 +18,20 @@ let paginationState = {
   currentPage: 1,
   targetProfileUrl: '',
   targetFirstName: '',
+  targetJobId: '',
   searchDoc: null   // cached once on first page, reused for all subsequent pages
 };
+
+// Strip query params from a LinkedIn /in/ URL
+function cleanLinkedInUrl(url) {
+  try {
+    const u = new URL(url);
+    // Keep only the /in/<slug> path, no query string or hash
+    return u.origin + u.pathname.replace(/\/$/, '');
+  } catch {
+    return url;
+  }
+}
 
 // Mutual connections is always-on; use the right-click context menu to trigger.
 
@@ -124,7 +136,7 @@ function detectLinkedInProfile() {
 
 function getProfilePersonName() {
   try {
-    // Try multiple selectors for the profile name
+    // Try specific h1 selectors first, then h2 fallback for profiles where LinkedIn uses h2
     const selectors = [
       'h1.text-heading-xlarge',
       'h1.inline.t-24.v-align-middle.break-words',
@@ -137,6 +149,16 @@ function getProfilePersonName() {
       const element = document.querySelector(selector);
       if (element && element.innerText && element.innerText.trim().length > 0) {
         return element.innerText.trim();
+      }
+    }
+
+    // Broad h1/h2 scan: find shortest element whose text looks like a person's name
+    // (2+ words, not a nav/title label, under 60 chars)
+    const nameRe = /^[A-ZÀ-Ö][a-zA-ZÀ-öø-ÿ'\-]+(?: [A-ZÀ-Ö][a-zA-ZÀ-öø-ÿ'\-]+)+$/;
+    for (const el of document.querySelectorAll('h1, h2')) {
+      const text = (el.innerText || '').trim();
+      if (text.length > 0 && text.length < 60 && nameRe.test(text)) {
+        return text;
       }
     }
 
@@ -232,9 +254,13 @@ function findAndClickMutualConnections() {
       }
     }
 
+    // Prompt for Job ID before navigating away
+    var jobIdInput = window.prompt('Job ID for these mutual connections? (leave blank to skip)') || '';
+
     // Store in localStorage for mutual connections extraction
-    localStorage.setItem('linkedin_target_profile_url', currentUrl);
+    localStorage.setItem('linkedin_target_profile_url', cleanLinkedInUrl(currentUrl));
     localStorage.setItem('linkedin_target_profile_name', nameToStore);
+    localStorage.setItem('linkedin_target_job_id', jobIdInput.trim());
     localStorage.setItem('linkedin_extraction_timestamp', Date.now().toString());
     // Set flag to indicate we're expecting a mutual connections page load
     localStorage.setItem('linkedin_awaiting_mutual_connections', 'true');
@@ -252,29 +278,31 @@ async function extractMutualConnectionNames() {
   console.log('Extracting mutual connection names...');
 
   try {
-    // Get the target profile URL from localStorage
+    // Get the target profile URL and stored metadata from localStorage
     var targetProfileUrl = localStorage.getItem('linkedin_target_profile_url') || '';
     console.log(`Target profile URL: "${targetProfileUrl}"`);
 
-    // Extract first name directly from the URL
+    var targetJobId = localStorage.getItem('linkedin_target_job_id') || '';
+
+    // Prefer the stored full name; fall back to parsing the URL slug
+    var storedName = localStorage.getItem('linkedin_target_profile_name') || '';
     var targetFirstName = 'Unknown';
-    if (targetProfileUrl) {
+
+    if (storedName && storedName !== 'Unknown Profile') {
+      // Use the first word of the stored full name
+      targetFirstName = storedName.split(/\s+/)[0];
+    } else if (targetProfileUrl) {
       var urlMatch = targetProfileUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
       if (urlMatch) {
         var urlSlug = urlMatch[1];
-        // Convert URL slug to first name: "samuel-bigio-42918b128" -> "Samuel"
-        var firstName = urlSlug
-          .split('-')[0]
-          .replace(/\d+/g, '')
-          .trim();
-
+        var firstName = urlSlug.split('-')[0].replace(/\d+/g, '').trim();
         if (firstName.length > 0) {
           targetFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
         }
       }
     }
 
-    console.log(`Extracted first name from URL: "${targetFirstName}"`);
+    console.log(`Target first name: "${targetFirstName}", Job ID: "${targetJobId}"`);
 
     // Initialize pagination state — restore from localStorage if resuming after URL navigation
     if (!paginationState.isExtracting) {
@@ -288,6 +316,7 @@ async function extractMutualConnectionNames() {
           paginationState.currentPage = s.currentPage || 1;
           paginationState.targetProfileUrl = s.targetProfileUrl || targetProfileUrl;
           paginationState.targetFirstName = s.targetFirstName || targetFirstName;
+          paginationState.targetJobId = s.targetJobId || targetJobId;
           paginationState.searchDoc = null;
           localStorage.removeItem('linkedin_pagination_state');
           console.log(`Resuming pagination: page ${paginationState.currentPage}, ${paginationState.allResults.length} results so far`);
@@ -300,6 +329,7 @@ async function extractMutualConnectionNames() {
         paginationState.currentPage = 1;
         paginationState.targetProfileUrl = targetProfileUrl;
         paginationState.targetFirstName = targetFirstName;
+        paginationState.targetJobId = targetJobId;
         paginationState.searchDoc = null;
       }
     }
@@ -469,8 +499,9 @@ async function outputAccumulatedResults() {
   const rows = paginationState.allResults.map(r => ({
     fullName:   r.name,
     personName: paginationState.targetFirstName,
-    personUrl:  paginationState.targetProfileUrl,
-    linkedInUrl: r.linkedInUrl || ''
+    personUrl:  cleanLinkedInUrl(paginationState.targetProfileUrl),
+    linkedInUrl: r.linkedInUrl ? cleanLinkedInUrl(r.linkedInUrl) : '',
+    jobId:      paginationState.targetJobId || ''
   }));
 
   // Fallback CSV still logged to console
