@@ -97,6 +97,14 @@ export declare function generateAchievementWithModel(modelName: string): ModelGe
  */
 export declare function setActiveCellValue(content: string): void;
 /**
+ * Log model choice and all outputs to "AI Feedback" sheet for RLHF
+ * Called fire-and-forget from sidebar after user clicks "Choose This"
+ * @param chosenModelId - Key of chosen model (e.g. 'claude')
+ * @param rationale - Optional notes from user
+ * @param allOutputs - Map of model key → generated text for all models
+ */
+export declare function logModelChoice(chosenModelId: string, rationale: string, allOutputs: Record<string, string>): void;
+/**
  * Choose model for single generation
  * Menu item: "Choose Model"
  */

@@ -70,6 +70,7 @@ export interface MaxTokens {
     ACHIEVEMENT_CV: number;
     ACHIEVEMENT_LINKEDIN: number;
     ACHIEVEMENT: number;
+    ACHIEVEMENT_REASONING: number;
     RESUME: number;
     CATEGORIZATION: number;
     ARCHETYPE: number;
