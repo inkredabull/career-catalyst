@@ -574,6 +574,60 @@ export function setActiveCellValue(content: string): void {
 }
 
 /**
+ * Log model choice and all outputs to "AI Feedback" sheet for RLHF
+ * Called fire-and-forget from sidebar after user clicks "Choose This"
+ * @param chosenModelId - Key of chosen model (e.g. 'claude')
+ * @param rationale - Optional notes from user
+ * @param allOutputs - Map of model key → generated text for all models
+ */
+export function logModelChoice(
+  chosenModelId: string,
+  rationale: string,
+  allOutputs: Record<string, string>
+): void {
+  try {
+    const services = initializeServices();
+    const { rowIndex } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
+
+    const FEEDBACK_SHEET = 'AI Feedback';
+    const HEADERS = [
+      'Timestamp',
+      'Story Row',
+      'Chosen Model',
+      'Rationale',
+      'Claude',
+      'Gemini',
+      'GPT',
+      'Mistral',
+      'Cohere',
+    ];
+
+    const sheet = services.sheet.ensureSheet(FEEDBACK_SHEET);
+
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(HEADERS);
+    }
+
+    const row = [
+      new Date().toISOString(),
+      rowIndex,
+      chosenModelId,
+      rationale || '',
+      allOutputs['claude'] || '',
+      allOutputs['gemini'] || '',
+      allOutputs['openai'] || '',
+      allOutputs['mistral'] || '',
+      allOutputs['cohere'] || '',
+    ];
+
+    sheet.appendRow(row);
+    Logger.log(`logModelChoice: ${chosenModelId} row=${rowIndex}`);
+  } catch (error) {
+    Logger.error('Error in logModelChoice', error as Error);
+  }
+}
+
+/**
  * Choose model for single generation
  * Menu item: "Choose Model"
  */
@@ -644,6 +698,7 @@ export function compareModels(): void {
     .choose-btn:hover{background:#1557b0}
     .choose-btn:disabled{background:#ccc;cursor:not-allowed}
     .choose-btn.success{background:#28a745}
+    .notes-input{width:100%;box-sizing:border-box;margin-top:8px;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:12px;font-family:Arial,sans-serif;resize:vertical;min-height:48px;display:none}
     .run-btn{padding:10px 28px;background:#1a73e8;color:white;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:10px}
     .run-btn:hover{background:#1557b0}
     .run-btn:disabled{background:#ccc;cursor:not-allowed}
@@ -667,6 +722,7 @@ export function compareModels(): void {
         <div class="result-content" id="contentClaude"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countClaude"></div>
         <div class="metadata" id="metadataClaude"></div>
+        <textarea class="notes-input" id="notesClaude" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseClaude" onclick="chooseModel('claude')">✓ Choose This</button>
       </div>
       <div class="result-card" id="resultGemini">
@@ -675,6 +731,7 @@ export function compareModels(): void {
         <div class="result-content" id="contentGemini"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countGemini"></div>
         <div class="metadata" id="metadataGemini"></div>
+        <textarea class="notes-input" id="notesGemini" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseGemini" onclick="chooseModel('gemini')">✓ Choose This</button>
       </div>
       <div class="result-card" id="resultOpenAI">
@@ -683,6 +740,7 @@ export function compareModels(): void {
         <div class="result-content" id="contentOpenAI"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countOpenAI"></div>
         <div class="metadata" id="metadataOpenAI"></div>
+        <textarea class="notes-input" id="notesOpenAI" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseOpenAI" onclick="chooseModel('openai')">✓ Choose This</button>
       </div>
       <div class="result-card" id="resultMistral">
@@ -691,6 +749,7 @@ export function compareModels(): void {
         <div class="result-content" id="contentMistral"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countMistral"></div>
         <div class="metadata" id="metadataMistral"></div>
+        <textarea class="notes-input" id="notesMistral" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseMistral" onclick="chooseModel('mistral')">✓ Choose This</button>
       </div>
       <div class="result-card" id="resultCohere">
@@ -699,17 +758,18 @@ export function compareModels(): void {
         <div class="result-content" id="contentCohere"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countCohere"></div>
         <div class="metadata" id="metadataCohere"></div>
+        <textarea class="notes-input" id="notesCohere" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseCohere" onclick="chooseModel('cohere')">✓ Choose This</button>
       </div>
     </div>
   </div>
   <script>
     const MODELS=[
-      {key:'claude',contentId:'contentClaude',countId:'countClaude',cardId:'resultClaude',buttonId:'chooseClaude',metadataId:'metadataClaude'},
-      {key:'gemini',contentId:'contentGemini',countId:'countGemini',cardId:'resultGemini',buttonId:'chooseGemini',metadataId:'metadataGemini'},
-      {key:'openai',contentId:'contentOpenAI',countId:'countOpenAI',cardId:'resultOpenAI',buttonId:'chooseOpenAI',metadataId:'metadataOpenAI'},
-      {key:'mistral',contentId:'contentMistral',countId:'countMistral',cardId:'resultMistral',buttonId:'chooseMistral',metadataId:'metadataMistral'},
-      {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere'}
+      {key:'claude',contentId:'contentClaude',countId:'countClaude',cardId:'resultClaude',buttonId:'chooseClaude',metadataId:'metadataClaude',notesId:'notesClaude'},
+      {key:'gemini',contentId:'contentGemini',countId:'countGemini',cardId:'resultGemini',buttonId:'chooseGemini',metadataId:'metadataGemini',notesId:'notesGemini'},
+      {key:'openai',contentId:'contentOpenAI',countId:'countOpenAI',cardId:'resultOpenAI',buttonId:'chooseOpenAI',metadataId:'metadataOpenAI',notesId:'notesOpenAI'},
+      {key:'mistral',contentId:'contentMistral',countId:'countMistral',cardId:'resultMistral',buttonId:'chooseMistral',metadataId:'metadataMistral',notesId:'notesMistral'},
+      {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere',notesId:'notesCohere'}
     ];
     var modelResults={};
     function startComparison(){
@@ -729,6 +789,8 @@ export function compareModels(): void {
         document.getElementById(m.metadataId).style.display='none';
         document.getElementById(m.cardId).classList.remove('winner');
         document.getElementById(m.buttonId).style.display='none';
+        document.getElementById(m.notesId).value='';
+        document.getElementById(m.notesId).style.display='none';
         var h=document.getElementById(m.cardId).querySelector('h4');
         var b=h.querySelector('.winner-badge');if(b)b.remove();
       });
@@ -773,11 +835,15 @@ export function compareModels(): void {
       var r=modelResults[key];
       if(!r||!r.text){alert('No result available');return;}
       var btn=document.getElementById(m.buttonId);
+      var notes=document.getElementById(m.notesId).value||'';
+      var allOutputs={};
+      MODELS.forEach(function(x){allOutputs[x.key]=(modelResults[x.key]&&modelResults[x.key].text)||'';});
       btn.disabled=true;btn.textContent='Applying...';
       google.script.run
         .withSuccessHandler(function(){btn.textContent='✓ Applied!';btn.classList.add('success');setTimeout(function(){google.script.host.close();},1000);})
         .withFailureHandler(function(e){btn.disabled=false;btn.textContent='✓ Choose This';alert('Error: '+e.message);})
         .setActiveCellValue(r.text);
+      google.script.run.logModelChoice(key,notes,allOutputs);
     }
     function displayResult(contentId,countId,r,key){
       var text=r.text||'';
@@ -793,6 +859,7 @@ export function compareModels(): void {
         +'<div class="metadata-row"><span class="metadata-label">Audience:</span><span class="metadata-value">'+r.config.targetAudience+'</span></div>'
         +'<div class="metadata-row"><span class="metadata-label">Prompt:</span><a class="prompt-link" onclick="showPrompt(&quot;'+key+'&quot;)">View Full Prompt</a></div>';
       el.style.display='block';
+      document.getElementById(m.notesId).style.display='block';
       document.getElementById(m.buttonId).style.display='block';
     }
     function showPrompt(key){
@@ -1033,6 +1100,7 @@ declare const global: {
   fetchWithModel: typeof fetchWithModel;
   generateAchievementWithModel: typeof generateAchievementWithModel;
   setActiveCellValue: typeof setActiveCellValue;
+  logModelChoice: typeof logModelChoice;
   chooseModel: typeof chooseModel;
   compareModels: typeof compareModels;
   viewCurrentModels: typeof viewCurrentModels;
@@ -1058,6 +1126,7 @@ global.createCustomization = createCustomization;
 global.fetchWithModel = fetchWithModel;
 global.generateAchievementWithModel = generateAchievementWithModel;
 global.setActiveCellValue = setActiveCellValue;
+global.logModelChoice = logModelChoice;
 global.chooseModel = chooseModel;
 global.compareModels = compareModels;
 global.viewCurrentModels = viewCurrentModels;
