@@ -78,6 +78,7 @@ export interface MaxTokens {
   ACHIEVEMENT_CV: number;
   ACHIEVEMENT_LINKEDIN: number;
   ACHIEVEMENT: number;
+  ACHIEVEMENT_REASONING: number;
   RESUME: number;
   CATEGORIZATION: number;
   ARCHETYPE: number;
@@ -230,6 +231,7 @@ export const CONFIG: Config = {
       ACHIEVEMENT_CV: 80, // CV format: longer, more comprehensive
       ACHIEVEMENT_LINKEDIN: 50, // LinkedIn format: shorter, more concise
       ACHIEVEMENT: 80, // Default (fallback to CV)
+      ACHIEVEMENT_REASONING: 4096, // Flat cap for reasoning models (GPT-5.5, o-series, DeepSeek)
       RESUME: 2048,
       CATEGORIZATION: 15,
       ARCHETYPE: 20,

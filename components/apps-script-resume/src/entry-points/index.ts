@@ -505,23 +505,20 @@ export function generateAchievementWithModel(modelName: string): ModelGeneration
       targetAudience
     );
 
-    let maxTokens = CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
-
-    // Reasoning models need more tokens for internal thinking process
+    // Reasoning models need a flat high cap — their thinking chain alone can consume thousands
+    // of tokens before producing the final answer; scaling from the small output budget doesn't work
     const modelId = services.ai['modelMap'][modelName];
     const isReasoningModel =
       modelId &&
-      (modelId.includes('deepseek') || modelId.includes('gpt-5.5') || /\/o\d/.test(modelId)); // o1, o3, o4, etc.
+      (modelId.includes('deepseek') || modelId.includes('gpt-5.5') || /\/o\d/.test(modelId));
 
-    if (isReasoningModel) {
-      const originalTokens = maxTokens;
-      maxTokens = maxTokens * CONFIG.AI.REASONING_MULTIPLIER;
-      Logger.log(
-        `Reasoning model detected (${modelId}): increased maxTokens from ${originalTokens} to ${maxTokens}`
-      );
-    }
+    const maxTokens = isReasoningModel
+      ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_REASONING
+      : CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
 
-    Logger.log(`generateAchievementWithModel: maxTokens=${maxTokens}`);
+    Logger.log(
+      `generateAchievementWithModel: maxTokens=${maxTokens} (reasoning=${isReasoningModel})`
+    );
 
     const config = {
       provider: modelName,
