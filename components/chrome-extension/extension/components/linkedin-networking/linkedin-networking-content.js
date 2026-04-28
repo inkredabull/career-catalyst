@@ -21,22 +21,7 @@ let paginationState = {
   searchDoc: null   // cached once on first page, reused for all subsequent pages
 };
 
-// Settings
-let linkedInNetworkingEnabled = false; // Disabled by default, requires opt-in
-
-// Load settings from storage
-chrome.storage.sync.get(['linkedInNetworkingEnabled'], (result) => {
-  linkedInNetworkingEnabled = result.linkedInNetworkingEnabled || false;
-  console.log(`LinkedIn Networking: ${linkedInNetworkingEnabled ? 'ENABLED' : 'DISABLED'}`);
-});
-
-// Listen for settings changes
-chrome.storage.onChanged.addListener((changes, namespace) => {
-  if (namespace === 'sync' && changes.linkedInNetworkingEnabled) {
-    linkedInNetworkingEnabled = changes.linkedInNetworkingEnabled.newValue;
-    console.log(`LinkedIn Networking: ${linkedInNetworkingEnabled ? 'ENABLED' : 'DISABLED'}`);
-  }
-});
+// Mutual connections is always-on; use the right-click context menu to trigger.
 
 // ===== LinkedIn Company People Page Extraction =====
 
@@ -46,10 +31,6 @@ function detectLinkedInCompanyPeople() {
 }
 
 function runLinkedInConnectionExtraction() {
-  if (!linkedInNetworkingEnabled) {
-    console.log('LinkedIn Networking: Feature disabled in settings');
-    return;
-  }
 
   console.log("LinkedIn Connection Extractor - Starting profile clicks...");
 
@@ -177,10 +158,6 @@ function getProfilePersonName() {
 }
 
 function findAndClickMutualConnections() {
-  if (!linkedInNetworkingEnabled) {
-    console.log('LinkedIn Networking: Mutual connections feature disabled in settings');
-    return;
-  }
 
   console.log('Looking for mutual connections link...');
 
@@ -271,10 +248,6 @@ function findAndClickMutualConnections() {
 }
 
 async function extractMutualConnectionNames() {
-  if (!linkedInNetworkingEnabled) {
-    console.log('LinkedIn Networking: Mutual connections extraction disabled in settings');
-    return;
-  }
 
   console.log('Extracting mutual connection names...');
 
@@ -398,7 +371,7 @@ async function extractMutualConnectionNames() {
           // Skip degree badges ("• 1st", "• 2nd"), empty strings, and UI labels
           if (!text || text.startsWith('•') || text.toLowerCase().includes('view ')) continue;
           seenHrefs.add(href);
-          nameElements.push({ innerText: text });
+          nameElements.push({ innerText: text, linkedInUrl: href });
           break; // one name per result item
         }
       });
@@ -420,7 +393,11 @@ async function extractMutualConnectionNames() {
         var elements = Array.from(searchDoc.querySelectorAll(selector));
         if (elements.length > 0) {
           var candidates = elements.map(function(el) {
-            return { innerText: (el.textContent || el.innerText || '').replace(/<!---->/g, '').trim() };
+            var anchor = el.closest ? el.closest('a[href*="/in/"]') : (el.tagName === 'A' ? el : null);
+            return {
+              innerText: (el.textContent || el.innerText || '').replace(/<!---->/g, '').trim(),
+              linkedInUrl: anchor ? anchor.href : ''
+            };
           }).filter(function(el) { return el.innerText.length > 0; });
           if (candidates.length > 0) {
             nameElements = candidates;
@@ -443,7 +420,7 @@ async function extractMutualConnectionNames() {
       var mutualConnectionName = element.innerText.trim();
       if (mutualConnectionName && mutualConnectionName.length > 0 && !paginationState.seenNames.has(mutualConnectionName)) {
         paginationState.seenNames.add(mutualConnectionName);
-        paginationState.allResults.push(mutualConnectionName);
+        paginationState.allResults.push({ name: mutualConnectionName, linkedInUrl: element.linkedInUrl || '' });
       }
     });
 
@@ -477,79 +454,63 @@ async function extractMutualConnectionNames() {
 }
 
 
-function outputAccumulatedResults() {
+async function outputAccumulatedResults() {
   if (paginationState.allResults.length === 0) {
     console.log('No results to output');
     paginationState.isExtracting = false;
     return;
   }
 
-  // Build CSV output
-  var result = 'Full,PersonName,PersonURL\n'; // CSV headers
+  const total = paginationState.allResults.length;
+  const pages = paginationState.currentPage;
+  console.log(`✅ Extraction complete! ${total} mutual connections across ${pages} page(s).`);
 
-  paginationState.allResults.forEach((mutualConnectionName) => {
-    var csvRow = `"${mutualConnectionName}","${paginationState.targetFirstName}","${paginationState.targetProfileUrl}"`;
-    result += csvRow + '\n';
+  // Build rows for server + fallback CSV
+  const rows = paginationState.allResults.map(r => ({
+    fullName:   r.name,
+    personName: paginationState.targetFirstName,
+    personUrl:  paginationState.targetProfileUrl,
+    linkedInUrl: r.linkedInUrl || ''
+  }));
+
+  // Fallback CSV still logged to console
+  var csv = 'Full,PersonName,PersonURL,LinkedIn\n';
+  rows.forEach(r => {
+    csv += `"${r.fullName}","${r.personName}","${r.personUrl}","${r.linkedInUrl}"\n`;
   });
+  console.log(csv);
 
-  console.log('='.repeat(80));
-  console.log(`COMPLETE CSV OUTPUT (${paginationState.currentPage} pages, ${paginationState.allResults.length} total connections):`);
-  console.log('='.repeat(80));
-  console.log(result);
-  console.log('='.repeat(80));
-  console.log(`✅ Extraction complete! Total mutual connections found: ${paginationState.allResults.length}`);
-  console.log('='.repeat(80));
-
-  // Copy CSV to clipboard using fallback method (works reliably in content scripts)
-  console.log('🔄 Attempting to copy CSV to clipboard...');
-  const copyToClipboard = (text) => {
-    console.log('📋 copyToClipboard function called, text length:', text.length);
-
+  // POST to unified server → Google Sheet
+  try {
+    const resp = await fetch('http://localhost:3000/append-mutual-connections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      console.log(`✅ Appended ${data.appended} row(s) to Google Sheet`);
+      alert(`✅ ${data.appended} mutual connection(s) appended to Google Sheet (${pages} page(s) extracted).`);
+    } else {
+      throw new Error(data.error || 'Unknown server error');
+    }
+  } catch (err) {
+    console.warn('Sheet append failed:', err.message);
+    // Fall back to clipboard copy
     const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-999999px';
-    textarea.style.top = '-999999px';
+    textarea.value = csv;
+    textarea.style.cssText = 'position:fixed;left:-999999px;top:-999999px';
     document.body.appendChild(textarea);
     textarea.focus();
     textarea.select();
-
-    console.log('📋 Textarea created and text selected');
-
     try {
-      const successful = document.execCommand('copy');
-      console.log('📋 execCommand result:', successful);
-      document.body.removeChild(textarea);
-
-      if (successful) {
-        console.log('✅ CSV automatically copied to clipboard!');
-        alert(
-          `✅ Mutual Connections Extracted!\n\n` +
-          `Found ${paginationState.allResults.length} mutual connections across ${paginationState.currentPage} page(s).\n\n` +
-          `CSV data has been automatically copied to your clipboard.\n\n` +
-          `You can now paste it directly into your spreadsheet.`
-        );
-        return true;
-      } else {
-        console.error('❌ execCommand returned false');
-        throw new Error('execCommand copy failed');
-      }
-    } catch (err) {
-      console.error('❌ Failed to copy to clipboard:', err);
-      document.body.removeChild(textarea);
-      alert(
-        `✅ Extraction Complete!\n\n` +
-        `Found ${paginationState.allResults.length} mutual connections.\n\n` +
-        `⚠️ Could not auto-copy to clipboard.\n` +
-        `Please manually copy the CSV output from the browser console.`
-      );
-      return false;
+      document.execCommand('copy');
+      alert(`✅ ${total} connection(s) extracted.\n⚠️ Sheet append failed (${err.message}).\nCSV copied to clipboard as fallback.`);
+    } catch {
+      alert(`✅ ${total} connection(s) extracted.\n⚠️ Sheet append failed (${err.message}).\nCSV logged to console.`);
     }
-  };
-
-  // Execute the copy
-  console.log('🚀 Calling copyToClipboard with result...');
-  copyToClipboard(result);
+    document.body.removeChild(textarea);
+  }
 
   // Reset pagination state
   paginationState.isExtracting = false;
@@ -613,45 +574,15 @@ function showExtractionPrompt(profileName, onConfirm, onCancel) {
   });
 }
 
-// Auto-detect LinkedIn profile pages and find mutual connections
+// Handles the mutual connections search page that results from findAndClickMutualConnections.
+// Profile page detection is no longer automatic — use the right-click context menu instead.
 function checkForLinkedInProfile() {
-  if (!linkedInNetworkingEnabled) {
-    return; // Skip if disabled
-  }
-
-  // Only run on individual profile pages, NOT on company people pages or search results pages
   var url = window.location.href;
-  var isProfilePage = url.includes('linkedin.com/in/');
-  var isCompanyPage = detectLinkedInCompanyPeople();
   var isSearchPage = url.includes('/search/results/');
 
-  console.log(`checkForLinkedInProfile: isProfilePage=${isProfilePage}, isCompanyPage=${isCompanyPage}, isSearchPage=${isSearchPage}`);
+  if (!isSearchPage) return;
 
-  if (isProfilePage && !isCompanyPage && !isSearchPage) {
-    // Extract profile URL for the confirmation dialog
-    const profileUrl = url;
-    const profileName = getProfilePersonName();
-
-    // Check if we've already prompted for this profile in this session
-    if (promptedProfiles.has(profileUrl)) {
-      console.log('Already prompted for this profile in this session, skipping...');
-      return;
-    }
-
-    console.log('LinkedIn profile page detected - waiting 3 seconds before showing confirmation...');
-    processedSearchPageUrl = null; // Reset for new profile
-
-    setTimeout(() => {
-      // Mark this profile as prompted to avoid duplicate dialogs
-      promptedProfiles.add(profileUrl);
-      showExtractionPrompt(profileName, () => {
-        console.log('User confirmed - proceeding with mutual connections extraction');
-        findAndClickMutualConnections();
-      }, () => {
-        console.log('User cancelled mutual connections extraction');
-      });
-    }, 3000);
-  } else if (isSearchPage) {
+  {
     // Check if we're awaiting mutual connections extraction
     const awaitingExtraction = localStorage.getItem('linkedin_awaiting_mutual_connections');
 
@@ -885,7 +816,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'extractMutualConnections') {
-    extractMutualConnectionNames();
+    // Profile page → find mutual connections link and click it (navigates to search page)
+    // Search page → extract data from current results
+    var url = window.location.href;
+    if (url.includes('/search/results/') && url.includes('facetConnectionOf')) {
+      extractMutualConnectionNames();
+    } else {
+      findAndClickMutualConnections();
+    }
     sendResponse({ success: true });
     return true;
   }

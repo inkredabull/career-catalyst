@@ -1525,6 +1525,66 @@ app.get('/check-blurb/:jobId/:person', (req, res) => {
   }
 });
 
+// Append mutual connections rows to Google Sheet
+app.post('/append-mutual-connections', async (req, res) => {
+  const { rows } = req.body;
+  if (!rows || !Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ success: false, error: 'rows array required' });
+  }
+
+  const spreadsheetId = process.env.MUTUAL_CONNECTIONS_SPREADSHEET_ID;
+  const sheetName     = process.env.MUTUAL_CONNECTIONS_SHEET_NAME;
+
+  if (!spreadsheetId || !sheetName) {
+    return res.status(500).json({ success: false, error: 'MUTUAL_CONNECTIONS_SPREADSHEET_ID or MUTUAL_CONNECTIONS_SHEET_NAME not configured' });
+  }
+
+  let credentials;
+  try {
+    credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  } catch {
+    return res.status(500).json({ success: false, error: 'GOOGLE_SERVICE_ACCOUNT_JSON is missing or invalid JSON' });
+  }
+
+  try {
+    const { google } = require('googleapis');
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    // Column order: Full Name | PersonName | PersonURL | Lookup | Zeitgeisty | Email Sent | Recipient | Cell | LinkedIn | C | JobID
+    const values = rows.map(r => [
+      r.fullName    || '',
+      r.personName  || '',
+      r.personUrl   || '',
+      '',                    // Lookup
+      '',                    // Zeitgeisty
+      '',                    // Email Sent
+      '',                    // Recipient
+      '',                    // Cell
+      r.linkedInUrl || '',
+      '',                    // C
+      r.jobId       || ''
+    ]);
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values }
+    });
+
+    console.log(`[append-mutual-connections] Appended ${rows.length} row(s) to "${sheetName}"`);
+    res.json({ success: true, appended: rows.length });
+  } catch (err) {
+    console.error('[append-mutual-connections] Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Generate resume for a job
 app.post('/generate-resume', async (req, res) => {
   const timestamp = new Date().toISOString();
