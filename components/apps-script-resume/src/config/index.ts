@@ -348,7 +348,7 @@ Return TRUE only if all 6 = YES. Otherwise return FALSE. Return only TRUE or FAL
     ACHIEVEMENT_SIMPLIFIED: `
 Given the following CHALLENGE, ACTIONS, and RESULT, summarize into a single achievement which:
 
-* follows the format: "ACTION_VERB_IN_ACTIVE_VOICE WHAT_WAS_DONE [using/via/with HOW_IT_WAS_DONE] to ACHIEVED_PREFERABLY_QUANTIFIABLE_RESULT"
+* follows the format: "[action verb] [what was done] using/via/with [how it was done] to [quantifiable result]"
 * is approximately maxOuputSizeInChars characters
 * MUST incorporate HOW the achievement was delivered — extract specific technologies, tools, platforms, methods, and approaches from ACTIONS and include them explicitly (e.g., "using Claude Code in Plan mode with background agents", "via RAG pipeline", "leveraging React dashboard")
 * use technical verbiage verbatim from ACTIONS — do not omit named AI frameworks, coding tools, delivery patterns, or specific technologies
