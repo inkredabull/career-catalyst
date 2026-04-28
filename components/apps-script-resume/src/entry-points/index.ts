@@ -507,9 +507,11 @@ export function generateAchievementWithModel(modelName: string): ModelGeneration
 
     let maxTokens = CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
 
-    // Reasoning models (DeepSeek) need more tokens for internal thinking process
+    // Reasoning models need more tokens for internal thinking process
     const modelId = services.ai['modelMap'][modelName];
-    const isReasoningModel = modelId && modelId.includes('deepseek');
+    const isReasoningModel =
+      modelId &&
+      (modelId.includes('deepseek') || modelId.includes('gpt-5.5') || /\/o\d/.test(modelId)); // o1, o3, o4, etc.
 
     if (isReasoningModel) {
       const originalTokens = maxTokens;
@@ -665,7 +667,7 @@ export function compareModels(): void {
       <div class="result-card" id="resultClaude">
         <h4>🤖 ${claudeDisplay}</h4>
         <div class="model-label">${claudeModel}</div>
-        <div class="result-content" id="contentClaude"><div class="loading">Generating...</div></div>
+        <div class="result-content" id="contentClaude"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countClaude"></div>
         <div class="metadata" id="metadataClaude"></div>
         <button class="choose-btn" id="chooseClaude" onclick="chooseModel('claude')">✓ Choose This</button>
@@ -673,7 +675,7 @@ export function compareModels(): void {
       <div class="result-card" id="resultGemini">
         <h4>🔮 ${geminiDisplay}</h4>
         <div class="model-label">${geminiModel}</div>
-        <div class="result-content" id="contentGemini"><div class="loading">Generating...</div></div>
+        <div class="result-content" id="contentGemini"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countGemini"></div>
         <div class="metadata" id="metadataGemini"></div>
         <button class="choose-btn" id="chooseGemini" onclick="chooseModel('gemini')">✓ Choose This</button>
@@ -681,7 +683,7 @@ export function compareModels(): void {
       <div class="result-card" id="resultOpenAI">
         <h4>💬 ${openaiDisplay}</h4>
         <div class="model-label">${openaiModel}</div>
-        <div class="result-content" id="contentOpenAI"><div class="loading">Generating...</div></div>
+        <div class="result-content" id="contentOpenAI"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countOpenAI"></div>
         <div class="metadata" id="metadataOpenAI"></div>
         <button class="choose-btn" id="chooseOpenAI" onclick="chooseModel('openai')">✓ Choose This</button>
@@ -689,7 +691,7 @@ export function compareModels(): void {
       <div class="result-card" id="resultMistral">
         <h4>⚡ ${mistralDisplay}</h4>
         <div class="model-label">${mistralModel}</div>
-        <div class="result-content" id="contentMistral"><div class="loading">Generating...</div></div>
+        <div class="result-content" id="contentMistral"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countMistral"></div>
         <div class="metadata" id="metadataMistral"></div>
         <button class="choose-btn" id="chooseMistral" onclick="chooseModel('mistral')">✓ Choose This</button>
@@ -697,7 +699,7 @@ export function compareModels(): void {
       <div class="result-card" id="resultCohere">
         <h4>🔷 ${cohereDisplay}</h4>
         <div class="model-label">${cohereModel}</div>
-        <div class="result-content" id="contentCohere"><div class="loading">Generating...</div></div>
+        <div class="result-content" id="contentCohere"><div class="loading">Pending...</div></div>
         <div class="char-count" id="countCohere"></div>
         <div class="metadata" id="metadataCohere"></div>
         <button class="choose-btn" id="chooseCohere" onclick="chooseModel('cohere')">✓ Choose This</button>
@@ -725,7 +727,7 @@ export function compareModels(): void {
       status.textContent='Generating all models...';
       status.style.display='block';
       MODELS.forEach(function(m){
-        document.getElementById(m.contentId).innerHTML='<div class="loading">Generating...</div>';
+        document.getElementById(m.contentId).innerHTML='<div class="loading">Pending...</div>';
         document.getElementById(m.countId).textContent='';
         document.getElementById(m.metadataId).style.display='none';
         document.getElementById(m.cardId).classList.remove('winner');
@@ -736,9 +738,10 @@ export function compareModels(): void {
       modelResults={};
       var completed=0;
       var TIMEOUT_MS=60000;
-      var STAGGER_MS=1500;
+      var STAGGER_MS=1000;
       MODELS.forEach(function(m,i){
         setTimeout(function(){
+          document.getElementById(m.contentId).innerHTML='<div class="loading">Generating...</div>';
           var timer=setTimeout(function(){
             if(!modelResults[m.key]){
               document.getElementById(m.contentId).innerHTML='<div style="color:#e67e22;font-style:italic">⏱ Timed out after 60s</div>';
