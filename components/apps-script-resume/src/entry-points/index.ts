@@ -107,6 +107,19 @@ export function fetch(): void {
       return;
     }
 
+    const requiredCols = [
+      CONFIG.COLUMNS.STORY_BANK.CHALLENGE,
+      CONFIG.COLUMNS.STORY_BANK.ACTIONS,
+      CONFIG.COLUMNS.STORY_BANK.RESULT,
+    ];
+    const missingCols = requiredCols.filter((c) => headers.indexOf(c) < 0);
+    if (missingCols.length > 0) {
+      DialogService.showAlert(
+        `Missing required column(s): ${missingCols.join(', ')}. Check header row spelling.`
+      );
+      return;
+    }
+
     const challenge = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE)] as string;
     const actions = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.ACTIONS)] as string;
     const result = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.RESULT)] as string;
