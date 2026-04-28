@@ -719,7 +719,7 @@ header-includes: |
 `;
 
   private runPandoc(mdPath: string, pdfPath: string): void {
-    execSync(`pandoc "${mdPath}" -o "${pdfPath}" -V geometry:margin=0.5in`, { stdio: 'inherit' });
+    execSync(`pandoc "${mdPath}" -o "${pdfPath}" -V geometry:margin=0.4in`, { stdio: 'inherit' });
   }
 
   /** Strip any existing YAML front matter and apply the current header. */
