@@ -736,32 +736,35 @@ export function compareModels(): void {
       modelResults={};
       var completed=0;
       var TIMEOUT_MS=60000;
-      MODELS.forEach(function(m){
-        var timer=setTimeout(function(){
-          if(!modelResults[m.key]){
-            document.getElementById(m.contentId).innerHTML='<div style="color:#e67e22;font-style:italic">⏱ Timed out after 60s</div>';
-            completed++;
-            if(completed===MODELS.length){status.textContent='Completed with timeouts';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
-            else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
-          }
-        },TIMEOUT_MS);
-        google.script.run
-          .withSuccessHandler(function(result){
-            clearTimeout(timer);
-            modelResults[m.key]=result;
-            displayResult(m.contentId,m.countId,result,m.key);
-            completed++;
-            if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
-            else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
-          })
-          .withFailureHandler(function(error){
-            clearTimeout(timer);
-            document.getElementById(m.contentId).innerHTML='<div style="color:red">Error: '+error.message+'</div>';
-            completed++;
-            if(completed===MODELS.length){status.textContent='Completed with errors';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
-            else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
-          })
-          .generateAchievementWithModel(m.key);
+      var STAGGER_MS=1500;
+      MODELS.forEach(function(m,i){
+        setTimeout(function(){
+          var timer=setTimeout(function(){
+            if(!modelResults[m.key]){
+              document.getElementById(m.contentId).innerHTML='<div style="color:#e67e22;font-style:italic">⏱ Timed out after 60s</div>';
+              completed++;
+              if(completed===MODELS.length){status.textContent='Completed with timeouts';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
+              else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
+            }
+          },TIMEOUT_MS);
+          google.script.run
+            .withSuccessHandler(function(result){
+              clearTimeout(timer);
+              modelResults[m.key]=result;
+              displayResult(m.contentId,m.countId,result,m.key);
+              completed++;
+              if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
+              else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
+            })
+            .withFailureHandler(function(error){
+              clearTimeout(timer);
+              document.getElementById(m.contentId).innerHTML='<div style="color:red">Error: '+error.message+'</div>';
+              completed++;
+              if(completed===MODELS.length){status.textContent='Completed with errors';status.className='status error';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
+              else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
+            })
+            .generateAchievementWithModel(m.key);
+        },i*STAGGER_MS);
       });
     }
     function chooseModel(key){
