@@ -94,11 +94,11 @@ function generateConnectScript(message: string): string {
       return;
     }
 
-    // Connect hidden behind "More" button
+    // Connect hidden behind "More" / "..." button
     var btns = Array.from(document.querySelectorAll('button'));
     var anchorBtn = btns.find(function(b) {
       var label = (b.getAttribute('aria-label') || '').toLowerCase();
-      var text = (b.innerText || '').trim().toLowerCase();
+      var text = (b.innerText || '').trim().toLowerCase().replace(/^[^a-z]+/, ''); // strip leading non-alpha (e.g. "+ Follow")
       return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
     });
 
@@ -106,17 +106,21 @@ function generateConnectScript(message: string): string {
     var node = anchorBtn ? anchorBtn.parentElement : null;
     while (node && !moreBtn) {
       var moreCandidates = Array.from(node.querySelectorAll('button')).filter(function(b) {
-        return (b.getAttribute('aria-label') || '').toLowerCase() === 'more';
+        var label = (b.getAttribute('aria-label') || '').toLowerCase();
+        var text = (b.innerText || '').trim();
+        return label.includes('more') || text === '...' || text === '…';
       });
       if (moreCandidates.length > 0) { moreBtn = moreCandidates[0]; }
       else { node = node.parentElement; }
     }
 
     if (!moreBtn) {
-      var allMore = btns.filter(function(b) {
-        return (b.getAttribute('aria-label') || '').toLowerCase() === 'more';
-      });
-      moreBtn = allMore[allMore.length - 1] || null;
+      // Last-resort: any button whose label contains "more" or whose text is an ellipsis
+      moreBtn = btns.find(function(b) {
+        var label = (b.getAttribute('aria-label') || '').toLowerCase();
+        var text = (b.innerText || '').trim();
+        return label.includes('more') || text === '...' || text === '…';
+      }) || null;
     }
 
     if (moreBtn) {
