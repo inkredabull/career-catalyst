@@ -43,17 +43,21 @@ import { DiscoveredProfile } from '../types.js';
 
 function generateConnectScript(message: string): string {
   return `(function() {
+    var LOG = function(msg) { console.log('[NETWORKER] ' + msg); };
     var message = ${JSON.stringify(message)};
+    LOG('Script injected. Message: ' + message.slice(0, 40) + '…');
 
     // Skip if already pending
     var isPending = Array.from(document.querySelectorAll('button')).some(function(b) {
       return (b.innerText || '').trim().toLowerCase() === 'pending';
     });
-    if (isPending) { console.log('Skipping — already pending'); return; }
+    if (isPending) { LOG('Skipping — already pending'); return; }
 
     function fillNote() {
+      LOG('fillNote() called');
       var ta = document.querySelector('textarea');
       if (!ta) {
+        LOG('No plain textarea — checking shadow DOM');
         var shadowHost = Array.from(document.querySelectorAll('*')).find(function(el) {
           return el.shadowRoot && el.shadowRoot.querySelector('textarea');
         });
@@ -64,10 +68,11 @@ function generateConnectScript(message: string): string {
         ta.dispatchEvent(new Event('input', { bubbles: true }));
         ta.dispatchEvent(new Event('change', { bubbles: true }));
         ta.dispatchEvent(new Event('blur', { bubbles: true }));
-        console.log('Note filled (textarea): ' + ta.value.slice(0, 30));
+        LOG('Note filled (textarea): ' + ta.value.slice(0, 40));
         return;
       }
       // LinkedIn may use contenteditable instead of textarea
+      LOG('No textarea — checking contenteditable / role=textbox');
       var ce = document.querySelector('[contenteditable="true"]') ||
                document.querySelector('[role="textbox"]');
       if (ce) {
@@ -78,13 +83,14 @@ function generateConnectScript(message: string): string {
           ce.textContent = message;
           ce.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        console.log('Note filled (contenteditable): ' + (ce.textContent || '').slice(0, 30));
+        LOG('Note filled (contenteditable): ' + (ce.textContent || '').slice(0, 40));
         return;
       }
-      console.log('Textarea not found');
+      LOG('ERROR: no textarea or contenteditable found — modal may not be open yet');
     }
 
     function clickAddNote() {
+      LOG('clickAddNote() called — scanning for "Add a note" button');
       var allBtns = Array.from(document.querySelectorAll('button'));
       Array.from(document.querySelectorAll('*')).forEach(function(el) {
         if (el.shadowRoot) {
@@ -94,8 +100,14 @@ function generateConnectScript(message: string): string {
       var addNote = allBtns.find(function(b) {
         return (b.innerText || '').toLowerCase().includes('add a note');
       });
-      if (addNote) { addNote.click(); setTimeout(fillNote, 2000); }
-      else { setTimeout(fillNote, 2500); }
+      if (addNote) {
+        LOG('"Add a note" button found — clicking, fillNote in 2000ms');
+        addNote.click();
+        setTimeout(fillNote, 2000);
+      } else {
+        LOG('"Add a note" button not found — calling fillNote directly in 2500ms');
+        setTimeout(fillNote, 2500);
+      }
     }
 
     // Direct Connect button on profile
@@ -106,22 +118,32 @@ function generateConnectScript(message: string): string {
     });
 
     if (connectBtn) {
+      var connectLabel = connectBtn.getAttribute('aria-label') || connectBtn.innerText || '';
+      LOG('Direct Connect button found: "' + connectLabel.trim() + '" — clicking');
       connectBtn.click();
       setTimeout(clickAddNote, 3000);
       return;
     }
 
+    LOG('No direct Connect button — looking for More/... button');
+
     // Connect hidden behind "More" / "..." button
     // Primary: LinkedIn's three-dots overflow icon has a stable SVG id
     var moreBtn = null;
     var overflowSvgs = Array.from(document.querySelectorAll('svg[id="overflow-web-ios-small"]'));
+    LOG('overflow-web-ios-small SVGs found: ' + overflowSvgs.length);
     for (var si = 0; si < overflowSvgs.length; si++) {
       var svgBtn = overflowSvgs[si].closest('button');
-      if (svgBtn) { moreBtn = svgBtn; break; }
+      if (svgBtn) {
+        LOG('More button found via SVG id (index ' + si + ')');
+        moreBtn = svgBtn;
+        break;
+      }
     }
 
     // Fallback: aria-label / text heuristics scoped near Message/Follow anchor
     if (!moreBtn) {
+      LOG('SVG detection failed — trying aria-label/text heuristics');
       function isMoreTrigger(el) {
         var label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
         var text  = (el.innerText || '').trim();
@@ -132,6 +154,7 @@ function generateConnectScript(message: string): string {
         var text = (b.innerText || '').trim().toLowerCase().replace(/^[^a-z]+/, '');
         return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
       });
+      LOG('Anchor button (Message/Follow): ' + (anchorBtn ? (anchorBtn.getAttribute('aria-label') || anchorBtn.innerText).trim() : 'NOT FOUND'));
       var node = anchorBtn ? anchorBtn.parentElement : null;
       while (node && !moreBtn) {
         var moreCandidates = Array.from(node.querySelectorAll('button')).filter(isMoreTrigger);
@@ -139,28 +162,42 @@ function generateConnectScript(message: string): string {
         else { node = node.parentElement; }
       }
       if (!moreBtn) {
+        LOG('Scoped search failed — falling back to global button scan');
         moreBtn = Array.from(document.querySelectorAll('button')).find(isMoreTrigger) || null;
+      }
+      if (moreBtn) {
+        LOG('More button found via heuristic: aria-label="' + (moreBtn.getAttribute('aria-label') || '') + '"');
       }
     }
 
     if (moreBtn) {
+      LOG('Clicking More button — waiting 2000ms for dropdown');
       moreBtn.click();
       setTimeout(function() {
         // LinkedIn dropdown items are plain <div> elements — broaden beyond button/li/a
         var elems = Array.from(document.querySelectorAll('div, button, li, a, [role]'));
+        LOG('Dropdown open — scanning ' + elems.length + ' elements for Connect');
         var conn = elems.find(function(e) {
           var l = (e.getAttribute('aria-label') || '').toLowerCase();
           var t = (e.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase();
-          // Must be short (menu item) and match connect intent
           return t.length < 40 && (l.startsWith('invite ') || l.includes('to connect') || t === 'connect');
         });
-        if (conn) { conn.click(); setTimeout(clickAddNote, 3000); }
-        else { console.log('Connect not found in More menu'); }
+        if (conn) {
+          var connLabel = conn.getAttribute('aria-label') || conn.innerText || '';
+          LOG('Connect item found in dropdown: "' + connLabel.trim().slice(0, 40) + '" — clicking');
+          conn.click();
+          setTimeout(clickAddNote, 3000);
+        } else {
+          LOG('ERROR: Connect not found in More menu — dumping first 10 short items:');
+          elems.filter(function(e) { return (e.innerText || '').trim().length > 0 && (e.innerText || '').trim().length < 40; })
+               .slice(0, 10)
+               .forEach(function(e) { LOG('  item: "' + (e.innerText || '').trim() + '"'); });
+        }
       }, 2000);
       return;
     }
 
-    console.log('No Connect button found');
+    LOG('ERROR: No Connect button and no More button found on this page');
   })();`;
 }
 
