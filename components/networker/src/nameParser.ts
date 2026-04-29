@@ -1,5 +1,3 @@
-/** Ported from meetup-networker/nameParser.ts — no changes. */
-
 export interface ParsedName {
   original: string;
   firstName?: string;
@@ -12,6 +10,7 @@ export function parseName(nameStr: string): ParsedName {
   if (!trimmed) return { original: nameStr, isValid: false };
 
   const parts = trimmed.split(/\s+/).filter(p => p.length > 0);
+  // One-word entries (handles "LinkedIn Member", single slugs, etc.)
   if (parts.length < 2) return { original: nameStr, isValid: false };
 
   return {
@@ -22,10 +21,20 @@ export function parseName(nameStr: string): ParsedName {
   };
 }
 
+function getOwnName(): string {
+  return (process.env.NETWORKER_OWN_NAME ?? '').trim().toLowerCase();
+}
+
 export function parseNameList(content: string): ParsedName[] {
+  const ownName = getOwnName();
   return content
     .split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 0)
-    .map(parseName);
+    .map(parseName)
+    .filter(p => {
+      if (!p.isValid) return false;
+      if (ownName && p.original.trim().toLowerCase() === ownName) return false;
+      return true;
+    });
 }
