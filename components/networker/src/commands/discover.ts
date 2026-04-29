@@ -15,10 +15,8 @@ import { BATCH } from '../config.js';
 
 function clampBatchSize(input?: string): number {
   const n = input ? parseInt(input, 10) : BATCH.DEFAULT_SIZE;
-  const size = isNaN(n) || n <= 0 ? BATCH.DEFAULT_SIZE : n;
-  if (size < BATCH.MIN_SIZE) { console.log(`Batch size below ${BATCH.MIN_SIZE}; using ${BATCH.MIN_SIZE}.`); return BATCH.MIN_SIZE; }
-  if (size > BATCH.MAX_SIZE) { console.log(`Batch size above ${BATCH.MAX_SIZE}; using ${BATCH.MAX_SIZE}.`); return BATCH.MAX_SIZE; }
-  return size;
+  if (isNaN(n) || n <= 0) return BATCH.DEFAULT_SIZE;
+  return n;
 }
 
 export function registerDiscover(program: Command): void {

@@ -205,6 +205,7 @@ npm start reinvite
 | `ANTHROPIC_API_KEY` | For variant generation | Anthropic API key (starts with `sk-ant-`) |
 | `OPENAI_API_KEY` | Optional | Condenses profile summaries to 4 words for message personalisation |
 | `SEARCH_CITY` | Optional | City used in EnrichLayer search (default: `San Francisco`) |
+| `BATCH_SIZE` | Optional | Names per `discover` run (default: `12`, no upper limit) |
 | `LINKEDIN_MESSAGE_TEMPLATE` | Optional | Message template for new outreach (see `discover`) |
 | `NETWORKER_TRACKER_FILE` | Optional | Path to tracker JSON (default: `./data/tracker.json`) |
 | `TARGET_TIER_1_PATTERN` | Optional | Regex for T1 classification |
