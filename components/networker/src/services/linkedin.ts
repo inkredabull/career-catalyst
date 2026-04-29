@@ -95,8 +95,9 @@ function generateConnectScript(message: string): string {
     }
 
     // Connect hidden behind "More" / "..." button
-    var btns = Array.from(document.querySelectorAll('button'));
-    var anchorBtn = btns.find(function(b) {
+    // Include div/span[role="button"] — LinkedIn sometimes renders the ... as a non-button element
+    var clickables = Array.from(document.querySelectorAll('button, [role="button"]'));
+    var anchorBtn = clickables.find(function(b) {
       var label = (b.getAttribute('aria-label') || '').toLowerCase();
       var text = (b.innerText || '').trim().toLowerCase().replace(/^[^a-z]+/, ''); // strip leading non-alpha (e.g. "+ Follow")
       return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
@@ -105,7 +106,7 @@ function generateConnectScript(message: string): string {
     var moreBtn = null;
     var node = anchorBtn ? anchorBtn.parentElement : null;
     while (node && !moreBtn) {
-      var moreCandidates = Array.from(node.querySelectorAll('button')).filter(function(b) {
+      var moreCandidates = Array.from(node.querySelectorAll('button, [role="button"]')).filter(function(b) {
         var label = (b.getAttribute('aria-label') || '').toLowerCase();
         var text = (b.innerText || '').trim();
         return label.includes('more') || text === '...' || text === '…';
@@ -115,8 +116,8 @@ function generateConnectScript(message: string): string {
     }
 
     if (!moreBtn) {
-      // Last-resort: any button whose label contains "more" or whose text is an ellipsis
-      moreBtn = btns.find(function(b) {
+      // Last-resort: any clickable whose label contains "more" or whose text is an ellipsis
+      moreBtn = clickables.find(function(b) {
         var label = (b.getAttribute('aria-label') || '').toLowerCase();
         var text = (b.innerText || '').trim();
         return label.includes('more') || text === '...' || text === '…';
@@ -126,15 +127,15 @@ function generateConnectScript(message: string): string {
     if (moreBtn) {
       moreBtn.click();
       setTimeout(function() {
-        var elems = Array.from(document.querySelectorAll('button, [role="menuitem"], li, a'));
+        var elems = Array.from(document.querySelectorAll('button, [role="button"], [role="menuitem"], li, a'));
         var conn = elems.find(function(e) {
           var l = (e.getAttribute('aria-label') || '').toLowerCase();
-          var t = (e.innerText || '').trim().toLowerCase();
+          var t = (e.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase();
           return l.startsWith('invite ') || l.includes('to connect') || t === 'connect';
         });
         if (conn) { conn.click(); setTimeout(clickAddNote, 3000); }
         else { console.log('Connect not found in More menu'); }
-      }, 1000);
+      }, 1500);
       return;
     }
 
