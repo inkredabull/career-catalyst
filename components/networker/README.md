@@ -6,6 +6,34 @@ Merges `meetup-networker` (profile lookup + Chrome automation) and `network-foll
 
 ---
 
+## Architecture
+
+```
+src/
+├── index.ts                  entry point — registers all commands with Commander
+├── config.ts                 env-driven constants: tier patterns, batch limits, days thresholds
+├── nameParser.ts             CSV/text → ParsedName[], filters one-word entries and own name
+├── eventParser.ts            derives event slug from filename (used as cache namespace)
+├── types.ts                  shared types: DiscoveredProfile, ContactPriorityTier, TrackerEntry
+├── cache.ts                  per-event profile cache (logs/<event-slug>/*.json)
+└── commands/
+│   ├── discover.ts           name list → EnrichLayer lookup → tier-ranked results
+│   ├── send.ts               cached profiles → Chrome tabs → AppleScript connect modal injection
+│   ├── review.ts             tracker scan → WITHDRAW / RE-INVITE candidate lists
+│   ├── reinvite.ts           re-invite candidates → Chrome tabs → modal injection + status advance
+│   ├── mark.ts               manual status updates (withdrawn, complete)
+│   └── migrate.ts            one-time import from legacy withdrawn_log.csv
+└── services/
+    ├── profileLookup.ts      EnrichLayer search + profile fetch + OpenAI summary condensation
+    ├── linkedin.ts           AppleScript + Chrome DevTools tab automation
+    ├── tracker.ts            read/write/query data/tracker.json lifecycle state
+    └── variants.ts           Claude-powered re-invite message variant generation
+```
+
+**Data flow:** `discover` writes to the event cache → `send` reads the cache → `send` adds contacts to `tracker.json` → `review`/`reinvite`/`mark-*` operate on `tracker.json` only.
+
+---
+
 ## Setup
 
 ```bash
