@@ -53,8 +53,9 @@ function generateConnectScript(message: string): string {
     });
     if (isPending) { LOG('Skipping — already pending'); return; }
 
-    function fillNote() {
-      LOG('fillNote() called');
+    function fillNote(retryCount) {
+      retryCount = retryCount || 0;
+      LOG('fillNote() called (attempt ' + (retryCount + 1) + ')');
       var ta = document.querySelector('textarea');
       if (!ta) {
         LOG('No plain textarea — checking shadow DOM');
@@ -71,9 +72,9 @@ function generateConnectScript(message: string): string {
         LOG('Note filled (textarea): ' + ta.value.slice(0, 40));
         return;
       }
-      // LinkedIn may use contenteditable instead of textarea
       LOG('No textarea — checking contenteditable / role=textbox');
       var ce = document.querySelector('[contenteditable="true"]') ||
+               document.querySelector('[contenteditable]') ||
                document.querySelector('[role="textbox"]');
       if (ce) {
         ce.focus();
@@ -86,27 +87,51 @@ function generateConnectScript(message: string): string {
         LOG('Note filled (contenteditable): ' + (ce.textContent || '').slice(0, 40));
         return;
       }
-      LOG('ERROR: no textarea or contenteditable found — modal may not be open yet');
+      if (retryCount < 4) {
+        LOG('Nothing found — retrying in 1500ms (attempt ' + (retryCount + 2) + ')');
+        setTimeout(function() { fillNote(retryCount + 1); }, 1500);
+        return;
+      }
+      LOG('ERROR: no textarea or contenteditable after ' + (retryCount + 1) + ' attempts — modal may not be open');
+      // Dump visible dialog buttons to help diagnose
+      var dialog = document.querySelector('[role="dialog"]');
+      if (dialog) {
+        var btns = Array.from(dialog.querySelectorAll('button, [role="button"], a'));
+        LOG('Dialog found with ' + btns.length + ' clickables:');
+        btns.slice(0, 8).forEach(function(b) { LOG('  "' + (b.innerText || b.textContent || '').trim().slice(0, 60) + '"'); });
+      } else {
+        LOG('No [role="dialog"] found on page');
+      }
     }
 
     function clickAddNote() {
-      LOG('clickAddNote() called — scanning for "Add a note" button');
-      var allBtns = Array.from(document.querySelectorAll('button'));
+      LOG('clickAddNote() called');
+      var dialog = document.querySelector('[role="dialog"]');
+      LOG('Modal dialog present: ' + (dialog ? 'YES' : 'NO'));
+      // Broaden beyond button — LinkedIn uses role="button" and sometimes spans
+      var allInteractive = Array.from(document.querySelectorAll('button, [role="button"], a'));
       Array.from(document.querySelectorAll('*')).forEach(function(el) {
         if (el.shadowRoot) {
-          allBtns = allBtns.concat(Array.from(el.shadowRoot.querySelectorAll('button')));
+          allInteractive = allInteractive.concat(Array.from(el.shadowRoot.querySelectorAll('button, [role="button"]')));
         }
       });
-      var addNote = allBtns.find(function(b) {
-        return (b.innerText || '').toLowerCase().includes('add a note');
+      var addNote = allInteractive.find(function(b) {
+        var text = (b.innerText || b.textContent || '').toLowerCase();
+        return text.includes('add a note') || text.includes('add note');
       });
       if (addNote) {
-        LOG('"Add a note" button found — clicking, fillNote in 2000ms');
+        LOG('"Add a note" button found: "' + (addNote.innerText || '').trim() + '" — clicking, fillNote in 2000ms');
         addNote.click();
-        setTimeout(fillNote, 2000);
+        setTimeout(function() { fillNote(0); }, 2000);
       } else {
-        LOG('"Add a note" button not found — calling fillNote directly in 2500ms');
-        setTimeout(fillNote, 2500);
+        // Dump what IS in the dialog to debug
+        if (dialog) {
+          var dlgBtns = Array.from(dialog.querySelectorAll('button, [role="button"]'));
+          LOG('Dialog buttons (' + dlgBtns.length + '):');
+          dlgBtns.forEach(function(b) { LOG('  "' + (b.innerText || b.textContent || '').trim().slice(0, 60) + '"'); });
+        }
+        LOG('"Add a note" not found — trying fillNote(0) directly in 1000ms');
+        setTimeout(function() { fillNote(0); }, 1000);
       }
     }
 
