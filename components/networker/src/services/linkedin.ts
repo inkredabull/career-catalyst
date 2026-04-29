@@ -112,29 +112,35 @@ function generateConnectScript(message: string): string {
     }
 
     // Connect hidden behind "More" / "..." button
-    function isMoreTrigger(el) {
-      // Exact match on aria-label to avoid matching "See more", "Load more", etc.
-      var label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
-      var text  = (el.innerText || '').trim();
-      return label === 'more' || text === '...' || text === '…';
-    }
-
-    var anchorBtn = Array.from(document.querySelectorAll('button')).find(function(b) {
-      var label = (b.getAttribute('aria-label') || '').toLowerCase();
-      var text = (b.innerText || '').trim().toLowerCase().replace(/^[^a-z]+/, '');
-      return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
-    });
-
+    // Primary: LinkedIn's three-dots overflow icon has a stable SVG id
     var moreBtn = null;
-    var node = anchorBtn ? anchorBtn.parentElement : null;
-    while (node && !moreBtn) {
-      var moreCandidates = Array.from(node.querySelectorAll('button')).filter(isMoreTrigger);
-      if (moreCandidates.length > 0) { moreBtn = moreCandidates[0]; }
-      else { node = node.parentElement; }
+    var overflowSvgs = Array.from(document.querySelectorAll('svg[id="overflow-web-ios-small"]'));
+    for (var si = 0; si < overflowSvgs.length; si++) {
+      var svgBtn = overflowSvgs[si].closest('button');
+      if (svgBtn) { moreBtn = svgBtn; break; }
     }
 
+    // Fallback: aria-label / text heuristics scoped near Message/Follow anchor
     if (!moreBtn) {
-      moreBtn = Array.from(document.querySelectorAll('button')).find(isMoreTrigger) || null;
+      function isMoreTrigger(el) {
+        var label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+        var text  = (el.innerText || '').trim();
+        return label === 'more' || text === '...' || text === '…';
+      }
+      var anchorBtn = Array.from(document.querySelectorAll('button')).find(function(b) {
+        var label = (b.getAttribute('aria-label') || '').toLowerCase();
+        var text = (b.innerText || '').trim().toLowerCase().replace(/^[^a-z]+/, '');
+        return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
+      });
+      var node = anchorBtn ? anchorBtn.parentElement : null;
+      while (node && !moreBtn) {
+        var moreCandidates = Array.from(node.querySelectorAll('button')).filter(isMoreTrigger);
+        if (moreCandidates.length > 0) { moreBtn = moreCandidates[0]; }
+        else { node = node.parentElement; }
+      }
+      if (!moreBtn) {
+        moreBtn = Array.from(document.querySelectorAll('button')).find(isMoreTrigger) || null;
+      }
     }
 
     if (moreBtn) {
@@ -150,7 +156,7 @@ function generateConnectScript(message: string): string {
         });
         if (conn) { conn.click(); setTimeout(clickAddNote, 3000); }
         else { console.log('Connect not found in More menu'); }
-      }, 1500);
+      }, 2000);
       return;
     }
 
