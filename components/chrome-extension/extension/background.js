@@ -1516,48 +1516,62 @@ async function handleLookupLinkedInCompany(request, sendResponse) {
     const html = await response.text();
     console.log('  → Received HTML response, length:', html.length, 'chars');
 
-    // Try to extract company ID from the search results
-    // LinkedIn company URLs look like: /company/<company-id>/
-    // Filter out asset paths (e.g. /company/large-on-dark.svg/) — valid slugs never contain dots
-    const companyIdRegex = /\/company\/([^\/\?"]+)\//g;
-    const allMatches = [...html.matchAll(companyIdRegex)].filter(m => !m[1].includes('.'));
+    const safeCompany = companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let companyId = null;
 
-    // Text-proximity: search result cards have the company name as text right next to the company URL.
-    // Nav/profile sections have the user's own company ID but not the searched company name nearby.
-    // Walk all occurrences in order; return the first ID whose surrounding 800 chars contain the search term.
-    const searchTermLower = companyName.toLowerCase().trim();
-    let bestCompanyId = null;
-    for (const m of allMatches) {
-      const start = Math.max(0, m.index - 800);
-      const end = Math.min(html.length, m.index + 800);
-      if (html.substring(start, end).toLowerCase().includes(searchTermLower)) {
-        bestCompanyId = m[1];
+    // Strategy 1: entityUrn + name/universalName proximity in LinkedIn's embedded Voyager JSON.
+    // LinkedIn embeds its API data as JSON in <code> elements — company name and entityUrn
+    // appear in the same JSON object, so they are always adjacent.
+    const entityUrnRe = /"entityUrn":"urn:li:company:(\d+)"/g;
+    const nameProxRe = new RegExp(`"(?:name|universalName|localizedName)"\\s*:\\s*"[^"]*${safeCompany}[^"]*"`, 'i');
+    for (const m of html.matchAll(entityUrnRe)) {
+      const start = Math.max(0, m.index - 1200);
+      const end = Math.min(html.length, m.index + 1200);
+      if (nameProxRe.test(html.substring(start, end))) {
+        companyId = m[1];
+        console.log('  → Strategy 1 (entityUrn+name JSON): found', companyId);
         break;
       }
     }
-    // Fall back to most-frequent ID if proximity search yields nothing
-    if (!bestCompanyId && allMatches.length > 0) {
-      const freq = {};
-      allMatches.forEach(m => { freq[m[1]] = (freq[m[1]] || 0) + 1; });
-      bestCompanyId = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+
+    // Strategy 2: universalName field = lowercase slug that LinkedIn assigns (e.g. "mercor")
+    if (!companyId) {
+      const slugRe = new RegExp(`"universalName"\\s*:\\s*"${safeCompany.toLowerCase()}"`, 'i');
+      const slugMatch = slugRe.exec(html);
+      if (slugMatch) {
+        const start = Math.max(0, slugMatch.index - 800);
+        const end = Math.min(html.length, slugMatch.index + 800);
+        const urnHit = /"entityUrn":"urn:li:company:(\d+)"/.exec(html.substring(start, end));
+        if (urnHit) {
+          companyId = urnHit[1];
+          console.log('  → Strategy 2 (universalName slug): found', companyId);
+        }
+      }
     }
 
-    console.log('  → Found', allMatches.length, 'company ID occurrences; proximity match:', bestCompanyId);
+    // Strategy 3: href proximity — company name as visible text near /company/ID/ links.
+    // Less reliable on LinkedIn (names often only appear in JSON, not adjacent to hrefs).
+    if (!companyId) {
+      const hrefRe = /\/company\/([^\/\?"]+)\//g;
+      const hrefMatches = [...html.matchAll(hrefRe)].filter(m => !m[1].includes('.'));
+      const searchTermLower = companyName.toLowerCase().trim();
+      for (const m of hrefMatches) {
+        const start = Math.max(0, m.index - 800);
+        const end = Math.min(html.length, m.index + 800);
+        if (html.substring(start, end).toLowerCase().includes(searchTermLower)) {
+          companyId = m[1];
+          console.log('  → Strategy 3 (href proximity): found', companyId);
+          break;
+        }
+      }
+    }
 
-    if (bestCompanyId) {
-      const companyId = bestCompanyId;
-      console.log('  → Selected company ID:', companyId);
-      console.log('═══════════════════════════════════════════════════════════');
+    console.log('  → Final company ID:', companyId || 'none found');
+    console.log('═══════════════════════════════════════════════════════════');
 
-      sendResponse({
-        success: true,
-        companyId: companyId,
-        companyName: companyName
-      });
+    if (companyId) {
+      sendResponse({ success: true, companyId, companyName });
     } else {
-      console.log('  → No company ID found in search results');
-      console.log('═══════════════════════════════════════════════════════════');
-
       sendResponse({
         success: false,
         error: `Could not find "${companyName}" on LinkedIn. Try searching manually first.`
@@ -1612,27 +1626,46 @@ async function handleGetCompanyStage(request, sendResponse) {
 
     const searchHtml = await searchResponse.text();
 
-    // Extract company ID from search results using text-proximity heuristic:
-    // the searched company name appears as text within ~800 chars of its own company URL in result cards.
-    // Filter out asset paths (e.g. /company/large-on-dark.svg/) — valid slugs never contain dots
-    const companyIdRegex = /\/company\/([^\/\?"]+)\//g;
-    const allStageMatches = [...searchHtml.matchAll(companyIdRegex)].filter(m => !m[1].includes('.'));
-    const stageSearchTerm = companyName.toLowerCase().trim();
+    // Extract company ID using the same three-strategy approach as handleLookupLinkedInCompany
+    const safeStageCompany = companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     let bestStageId = null;
-    for (const m of allStageMatches) {
-      const start = Math.max(0, m.index - 800);
-      const end = Math.min(searchHtml.length, m.index + 800);
-      if (searchHtml.substring(start, end).toLowerCase().includes(stageSearchTerm)) {
+
+    // Strategy 1: entityUrn + name proximity in LinkedIn's embedded Voyager JSON
+    const stageEntityRe = /"entityUrn":"urn:li:company:(\d+)"/g;
+    const stageNameProxRe = new RegExp(`"(?:name|universalName|localizedName)"\\s*:\\s*"[^"]*${safeStageCompany}[^"]*"`, 'i');
+    for (const m of searchHtml.matchAll(stageEntityRe)) {
+      const start = Math.max(0, m.index - 1200);
+      const end = Math.min(searchHtml.length, m.index + 1200);
+      if (stageNameProxRe.test(searchHtml.substring(start, end))) {
         bestStageId = m[1];
         break;
       }
     }
-    if (!bestStageId && allStageMatches.length > 0) {
-      const stageFreq = {};
-      allStageMatches.forEach(m => { stageFreq[m[1]] = (stageFreq[m[1]] || 0) + 1; });
-      bestStageId = Object.entries(stageFreq).sort((a, b) => b[1] - a[1])[0][0];
+    // Strategy 2: universalName slug
+    if (!bestStageId) {
+      const stageSlugRe = new RegExp(`"universalName"\\s*:\\s*"${safeStageCompany.toLowerCase()}"`, 'i');
+      const stageSlugMatch = stageSlugRe.exec(searchHtml);
+      if (stageSlugMatch) {
+        const start = Math.max(0, stageSlugMatch.index - 800);
+        const end = Math.min(searchHtml.length, stageSlugMatch.index + 800);
+        const urnHit = /"entityUrn":"urn:li:company:(\d+)"/.exec(searchHtml.substring(start, end));
+        if (urnHit) bestStageId = urnHit[1];
+      }
     }
-    // Build a matches-like array for the existing code below that does matches[0][1]
+    // Strategy 3: href proximity
+    if (!bestStageId) {
+      const hrefRe = /\/company\/([^\/\?"]+)\//g;
+      const hrefMs = [...searchHtml.matchAll(hrefRe)].filter(m => !m[1].includes('.'));
+      const stageTerm = companyName.toLowerCase().trim();
+      for (const m of hrefMs) {
+        const start = Math.max(0, m.index - 800);
+        const end = Math.min(searchHtml.length, m.index + 800);
+        if (searchHtml.substring(start, end).toLowerCase().includes(stageTerm)) {
+          bestStageId = m[1];
+          break;
+        }
+      }
+    }
     const matches = bestStageId ? [{ 1: bestStageId }] : [];
 
     if (matches.length === 0) {
