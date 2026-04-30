@@ -1522,18 +1522,30 @@ async function handleLookupLinkedInCompany(request, sendResponse) {
     const companyIdRegex = /\/company\/([^\/\?"]+)\//g;
     const allMatches = [...html.matchAll(companyIdRegex)].filter(m => !m[1].includes('.'));
 
-    // Count occurrences: each search result card repeats the company ID multiple times
-    // (logo URL + name link + etc.), while nav items that show the user's own company appear once.
-    // Pick the first ID that appears more than once; fall back to first match if all are singletons.
-    const freq = {};
-    allMatches.forEach(m => { freq[m[1]] = (freq[m[1]] || 0) + 1; });
-    const repeatedIds = allMatches.filter(m => freq[m[1]] > 1);
-    const matches = repeatedIds.length > 0 ? repeatedIds : allMatches;
+    // Text-proximity: search result cards have the company name as text right next to the company URL.
+    // Nav/profile sections have the user's own company ID but not the searched company name nearby.
+    // Walk all occurrences in order; return the first ID whose surrounding 800 chars contain the search term.
+    const searchTermLower = companyName.toLowerCase().trim();
+    let bestCompanyId = null;
+    for (const m of allMatches) {
+      const start = Math.max(0, m.index - 800);
+      const end = Math.min(html.length, m.index + 800);
+      if (html.substring(start, end).toLowerCase().includes(searchTermLower)) {
+        bestCompanyId = m[1];
+        break;
+      }
+    }
+    // Fall back to most-frequent ID if proximity search yields nothing
+    if (!bestCompanyId && allMatches.length > 0) {
+      const freq = {};
+      allMatches.forEach(m => { freq[m[1]] = (freq[m[1]] || 0) + 1; });
+      bestCompanyId = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+    }
 
-    console.log('  → Found', allMatches.length, 'raw company IDs,', Object.keys(freq).length, 'unique');
+    console.log('  → Found', allMatches.length, 'company ID occurrences; proximity match:', bestCompanyId);
 
-    if (matches.length > 0) {
-      const companyId = matches[0][1];
+    if (bestCompanyId) {
+      const companyId = bestCompanyId;
       console.log('  → Selected company ID:', companyId);
       console.log('═══════════════════════════════════════════════════════════');
 
@@ -1600,15 +1612,28 @@ async function handleGetCompanyStage(request, sendResponse) {
 
     const searchHtml = await searchResponse.text();
 
-    // Extract company ID from search results
+    // Extract company ID from search results using text-proximity heuristic:
+    // the searched company name appears as text within ~800 chars of its own company URL in result cards.
     // Filter out asset paths (e.g. /company/large-on-dark.svg/) — valid slugs never contain dots
     const companyIdRegex = /\/company\/([^\/\?"]+)\//g;
     const allStageMatches = [...searchHtml.matchAll(companyIdRegex)].filter(m => !m[1].includes('.'));
-    // Prefer IDs that appear more than once (search result cards repeat; nav items appear once)
-    const stageFreq = {};
-    allStageMatches.forEach(m => { stageFreq[m[1]] = (stageFreq[m[1]] || 0) + 1; });
-    const repeatedStageIds = allStageMatches.filter(m => stageFreq[m[1]] > 1);
-    const matches = repeatedStageIds.length > 0 ? repeatedStageIds : allStageMatches;
+    const stageSearchTerm = companyName.toLowerCase().trim();
+    let bestStageId = null;
+    for (const m of allStageMatches) {
+      const start = Math.max(0, m.index - 800);
+      const end = Math.min(searchHtml.length, m.index + 800);
+      if (searchHtml.substring(start, end).toLowerCase().includes(stageSearchTerm)) {
+        bestStageId = m[1];
+        break;
+      }
+    }
+    if (!bestStageId && allStageMatches.length > 0) {
+      const stageFreq = {};
+      allStageMatches.forEach(m => { stageFreq[m[1]] = (stageFreq[m[1]] || 0) + 1; });
+      bestStageId = Object.entries(stageFreq).sort((a, b) => b[1] - a[1])[0][0];
+    }
+    // Build a matches-like array for the existing code below that does matches[0][1]
+    const matches = bestStageId ? [{ 1: bestStageId }] : [];
 
     if (matches.length === 0) {
       console.log('  → No company found in search results');
