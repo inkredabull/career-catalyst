@@ -14,36 +14,37 @@ chrome.runtime.onInstalled.addListener((details) => {
     });
   }
 
-  // Create context menu items for LinkedIn networking
-  chrome.contextMenus.create({
-    id: 'extract-linkedin-connections',
-    title: 'Extract LinkedIn Connections',
-    contexts: ['page'],
-    documentUrlPatterns: [
-      'https://www.linkedin.com/company/*/people/*',
-      'https://www.linkedin.com/company/*'
-    ]
-  });
+  // Remove any stale menus from a previous version before recreating
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'extract-linkedin-connections',
+      title: 'Extract LinkedIn Connections',
+      contexts: ['page'],
+      documentUrlPatterns: [
+        'https://www.linkedin.com/company/*/people/*',
+        'https://www.linkedin.com/company/*'
+      ]
+    });
 
-  chrome.contextMenus.create({
-    id: 'extract-mutual-connections',
-    title: 'Extract Mutual Connections',
-    contexts: ['page'],
-    documentUrlPatterns: [
-      'https://www.linkedin.com/in/*',
-      'https://www.linkedin.com/search/results/people/*'
-    ]
-  });
+    chrome.contextMenus.create({
+      id: 'extract-mutual-connections',
+      title: 'Extract Mutual Connections',
+      contexts: ['page'],
+      documentUrlPatterns: [
+        'https://www.linkedin.com/in/*',
+        'https://www.linkedin.com/search/results/people/*'
+      ]
+    });
 
-  chrome.contextMenus.create({
-    id: 'add-to-mail-merge',
-    title: 'Add to Mail Merge',
-    contexts: ['page'],
-    documentUrlPatterns: [
-      'https://www.linkedin.com/in/*'
-    ]
+    chrome.contextMenus.create({
+      id: 'add-to-mail-merge',
+      title: 'Add to Mail Merge',
+      contexts: ['page'],
+      documentUrlPatterns: [
+        'https://www.linkedin.com/in/*'
+      ]
+    });
   });
-});
 
 // Handle keyboard commands
 chrome.commands.onCommand.addListener((command) => {

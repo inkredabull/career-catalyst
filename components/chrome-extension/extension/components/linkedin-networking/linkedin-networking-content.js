@@ -880,7 +880,7 @@ async function addToMailMerge() {
   if (jobIdInput === null) return; // user cancelled
 
   const row = {
-    fullName: firstName,
+    fullName: fullName,
     personName: '',
     personUrl: '',
     linkedInUrl: profileUrl,
@@ -895,14 +895,14 @@ async function addToMailMerge() {
     });
     const data = await resp.json();
     if (data.success) {
-      console.log(`✅ Added ${firstName} to mail merge sheet`);
-      alert(`✅ ${firstName} added to mail merge sheet.`);
+      console.log(`✅ Added ${fullName} to mail merge sheet`);
+      alert(`✅ ${fullName} added to mail merge sheet.`);
     } else {
       throw new Error(data.error || 'Unknown server error');
     }
   } catch (err) {
     console.warn('Mail merge append failed:', err.message);
-    alert(`⚠️ Could not reach server (${err.message})\nRow: ${firstName} | ${profileUrl} | ${jobIdInput.trim()}`);
+    alert(`⚠️ Could not reach server (${err.message})\nRow: ${fullName} | ${profileUrl} | ${jobIdInput.trim()}`);
   }
 }
 
