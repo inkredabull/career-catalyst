@@ -1616,60 +1616,42 @@ app.post('/generate-resume', async (req, res) => {
     // Change to the main project directory
     const projectDir = path.resolve(__dirname, '..', '..');
 
-    // Run the CLI resume command
-    const output = await new Promise((resolve, reject) => {
-      const args = ['run', 'dev', '--workspace=@inkredabull/career-catalyst-core', '--', 'resume', jobId];
-
-      console.log(`  -> Executing: npm ${args.join(' ')}`);
-
-      const resumeProcess = spawn('npm', args, {
-        cwd: projectDir,
-        shell: true
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      resumeProcess.stdout.on('data', (data) => {
-        const output = data.toString();
-        stdout += output;
-        output.split('\n').filter(line => line.trim()).forEach(line => {
-          console.log(`     [RESUME] ${line}`);
-        });
-      });
-
-      resumeProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      resumeProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout);
-        } else {
-          reject(new Error(stderr || `Resume generation failed with exit code ${code}`));
-        }
-      });
-
-      // Set timeout for resume generation (can take a while with LLM)
-      setTimeout(() => {
-        resumeProcess.kill();
-        reject(new Error('Resume generation timed out after 180 seconds'));
-      }, 180000);
-    });
-
-    console.log(`  -> ✅ Resume generated successfully for job: ${jobId}`);
-
-    // Check for the generated resume file
-    const jobDir = path.join(projectDir, 'logs', jobId);
-    const files = fs.readdirSync(jobDir);
-    const resumeFiles = files.filter(f => f.startsWith('tailored-') && f.endsWith('.md'));
-    const mostRecentResume = resumeFiles.sort().reverse()[0];
-    const relativePath = mostRecentResume ? `logs/${jobId}/${mostRecentResume}` : null;
-
+    // Fire-and-forget: respond immediately so the extension doesn't time out waiting.
+    // Resume generation (multi-model parallel pipeline) can take 5-10+ minutes.
     res.json({
       success: true,
       jobId: jobId,
-      resumePath: relativePath
+      status: 'generating'
+    });
+
+    // Spawn the CLI process in the background after responding
+    const args = ['run', 'dev', '--workspace=@inkredabull/career-catalyst-core', '--', 'resume', jobId];
+    console.log(`  -> Executing: npm ${args.join(' ')}`);
+
+    const resumeProcess = spawn('npm', args, {
+      cwd: projectDir,
+      shell: true,
+      detached: false
+    });
+
+    resumeProcess.stdout.on('data', (data) => {
+      data.toString().split('\n').filter(line => line.trim()).forEach(line => {
+        console.log(`     [RESUME] ${line}`);
+      });
+    });
+
+    resumeProcess.stderr.on('data', (data) => {
+      data.toString().split('\n').filter(line => line.trim()).forEach(line => {
+        console.error(`     [RESUME ERR] ${line}`);
+      });
+    });
+
+    resumeProcess.on('close', (code) => {
+      if (code === 0) {
+        console.log(`  -> ✅ Resume generation complete for job: ${jobId}`);
+      } else {
+        console.error(`  -> ❌ Resume generation failed for job: ${jobId} (exit code ${code})`);
+      }
     });
 
   } catch (error) {

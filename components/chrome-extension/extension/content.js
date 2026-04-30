@@ -2059,10 +2059,9 @@ async function handleGenerateResume() {
     });
 
     if (response.success) {
-      console.log('✅ Resume generated successfully');
-      alert('Resume generated successfully!');
-      // Update the resume section to show the new resume
-      await updateResumeSection(jobId);
+      console.log('✅ Resume generation started');
+      generateBtn.textContent = '⏳ Generating…';
+      alert('Resume generation started — this takes 5-10 minutes. Check back shortly.');
     } else {
       throw new Error(response.error || 'Failed to generate resume');
     }
