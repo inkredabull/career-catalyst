@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveFromProjectRoot } from '../utils/project-root';
 
 /**
  * Static instructions for resume generation
@@ -26,7 +27,7 @@ export interface StaticInstructionsOptions {
 export function buildStaticInstructions(options: StaticInstructionsOptions): string {
   try {
     // Load base template
-    const basePath = path.resolve('prompts', 'resume-creator-base.md');
+    const basePath = resolveFromProjectRoot('prompts','resume-creator-base.md');
     let promptTemplate = fs.readFileSync(basePath, 'utf-8');
 
     // Replace maxRoles placeholder
@@ -36,12 +37,12 @@ export function buildStaticInstructions(options: StaticInstructionsOptions): str
     const fragmentsFileName = options.mode === 'builder'
       ? 'resume-creator-builder-fragments.md'
       : 'resume-creator-leader-fragments.md';
-    const fragmentsPath = path.resolve('prompts', fragmentsFileName);
+    const fragmentsPath = resolveFromProjectRoot('prompts',fragmentsFileName);
     const fragments = loadFragments(fragmentsPath);
 
     // Override rolesSpecificInstructions if using split format
     if (options.experienceFormat === 'split') {
-      const splitExperiencePath = path.resolve('prompts', 'resume-creator-split-experience.md');
+      const splitExperiencePath = resolveFromProjectRoot('prompts','resume-creator-split-experience.md');
       try {
         const splitExperienceContent = fs.readFileSync(splitExperiencePath, 'utf-8');
         fragments['rolesSpecificInstructions'] = splitExperienceContent.replace(/^## .+$/m, '').trim();
