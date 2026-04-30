@@ -1451,18 +1451,21 @@ function extractJobDescription() {
 // Clean extracted text
 function cleanText(text) {
   if (!text) return '';
-  
+
   return text
-    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
-    .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
-    .replace(/&amp;/g, '&') // Replace &amp; with &
-    .replace(/&lt;/g, '<') // Replace &lt; with <
-    .replace(/&gt;/g, '>') // Replace &gt; with >
-    .replace(/&quot;/g, '"') // Replace &quot; with "
-    .replace(/[\r\n\t]+/g, ' ') // Replace line breaks and tabs with space
-    .replace(/\s+/g, ' ') // Replace multiple whitespace with single space
-    .trim()
-    .substring(0, 2000); // Limit length to avoid overly long descriptions
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    // Strip HTML tags — block elements become newlines, inline tags are dropped
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(p|div|li|ul|ol|h[1-6]|section|article)[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/[\r\n]{3,}/g, '\n\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 // Check if text looks like navigation/header/footer content
