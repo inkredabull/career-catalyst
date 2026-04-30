@@ -244,6 +244,11 @@ function createGutter() {
         </div>
 
         <div class="form-field">
+          <label for="title-shorthand">Title Shorthand:</label>
+          <input type="text" id="title-shorthand" class="job-input" placeholder="e.g. EM, VP, SWE..." maxlength="20">
+        </div>
+
+        <div class="form-field">
           <label for="company-name">Company:</label>
           <input type="text" id="company-name" class="job-input" placeholder="Company name will be extracted automatically...">
         </div>
@@ -419,6 +424,18 @@ function createGutter() {
 
   // Add search connections button functionality
   document.getElementById('search-connections').addEventListener('click', handleSearchConnections);
+
+  // Auto-suggest title shorthand when job title changes (only if shorthand not manually edited)
+  let shorthandManuallyEdited = false;
+  document.getElementById('title-shorthand').addEventListener('input', () => {
+    shorthandManuallyEdited = true;
+  });
+  document.getElementById('job-title').addEventListener('input', debounce((e) => {
+    if (!shorthandManuallyEdited) {
+      const suggested = generateTitleShorthand(e.target.value.trim());
+      document.getElementById('title-shorthand').value = suggested;
+    }
+  }, 300));
 
   // Add company name field change listener to update connections section
   document.getElementById('company-name').addEventListener('input', debounce((e) => {
@@ -622,6 +639,11 @@ function populateFieldsFromJobData(jobData, jobId) {
   if (titleField && jobData.title) {
     titleField.value = jobData.title;
     titleField.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  const shorthandField = document.getElementById('title-shorthand');
+  if (shorthandField) {
+    shorthandField.value = jobData.titleShorthand || generateTitleShorthand(jobData.title || '');
   }
 
   const companyField = document.getElementById('company-name');
@@ -1682,6 +1704,17 @@ async function handleTealTracking() {
 }
 */
 
+function generateTitleShorthand(title) {
+  if (!title) return '';
+  // Use the part before the first comma or slash (e.g. "Engineering Manager, Applied AI" → "Engineering Manager")
+  const base = title.split(/[,\/]/)[0].trim();
+  const skipWords = new Set(['of', 'the', 'in', 'at', 'and', 'or', 'for', 'to', 'a', 'an', 'with', 'on', 'by']);
+  const words = base.split(/\s+/).filter(w => w.length > 0 && !skipWords.has(w.toLowerCase()));
+  if (words.length === 0) return '';
+  if (words.length === 1) return words[0].substring(0, 4).toUpperCase();
+  return words.map(w => w[0].toUpperCase()).join('');
+}
+
 // Handle tracking job using form field values
 async function handleTrackFromForm() {
   const trackBtn = document.getElementById('track-job-info');
@@ -1699,7 +1732,8 @@ async function handleTrackFromForm() {
       url: document.getElementById('job-url')?.value?.trim() || window.location.href,
       description: document.getElementById('job-description')?.value?.trim() || '',
       minSalary: document.getElementById('min-salary')?.value?.trim() || '',
-      maxSalary: document.getElementById('max-salary')?.value?.trim() || ''
+      maxSalary: document.getElementById('max-salary')?.value?.trim() || '',
+      titleShorthand: document.getElementById('title-shorthand')?.value?.trim() || ''
     };
     
     // Validate that we have at least title and company
