@@ -1350,6 +1350,32 @@ function extractJobDescription() {
   try {
     console.log('Career Catalyst: Extracting job description from page');
     
+    // Strategy 0: Next.js __NEXT_DATA__ embedded JSON (e.g. Mercor, Ashby-backed sites)
+    const nextDataEl = document.getElementById('__NEXT_DATA__');
+    if (nextDataEl) {
+      try {
+        const nextData = JSON.parse(nextDataEl.textContent);
+        const pageProps = nextData?.props?.pageProps;
+        // Try common paths for job description plain text
+        const candidates = [
+          pageProps?.job?.descriptionPlain,
+          pageProps?.job?.description,
+          pageProps?.jobs?.[0]?.descriptionPlain,
+          pageProps?.jobs?.[0]?.description,
+          pageProps?.jobPosting?.descriptionPlain,
+          pageProps?.jobPosting?.description,
+          pageProps?.data?.job?.descriptionPlain,
+          pageProps?.data?.job?.description,
+        ];
+        const found = candidates.find(c => c && c.length > 100);
+        if (found) {
+          extractedJobDescription = cleanText(found);
+          console.log('Career Catalyst: Found job description in __NEXT_DATA__');
+          return;
+        }
+      } catch (e) { /* fall through */ }
+    }
+
     // Strategy 1: Look for JSON-LD structured data first (similar to CLI tool)
     const jsonLdElements = document.querySelectorAll('script[type="application/ld+json"]');
     for (const element of jsonLdElements) {
