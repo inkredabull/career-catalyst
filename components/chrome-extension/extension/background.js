@@ -34,6 +34,15 @@ chrome.runtime.onInstalled.addListener((details) => {
       'https://www.linkedin.com/search/results/people/*'
     ]
   });
+
+  chrome.contextMenus.create({
+    id: 'add-to-mail-merge',
+    title: 'Add to Mail Merge',
+    contexts: ['page'],
+    documentUrlPatterns: [
+      'https://www.linkedin.com/in/*'
+    ]
+  });
 });
 
 // Handle keyboard commands
@@ -69,6 +78,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         console.error('Error sending message:', chrome.runtime.lastError);
       } else {
         console.log('Mutual connections extraction started');
+      }
+    });
+  }
+
+  if (info.menuItemId === 'add-to-mail-merge') {
+    chrome.tabs.sendMessage(tab.id, { action: 'addToMailMerge' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error sending message:', chrome.runtime.lastError);
+      } else {
+        console.log('Add to mail merge triggered');
       }
     });
   }

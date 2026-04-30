@@ -835,9 +835,63 @@ function checkForLinkedInFeed() {
 // ===== Message Handlers =====
 
 // Listen for messages from background script (context menu actions)
+async function addToMailMerge() {
+  // Extract full name from the profile page
+  const nameEl = document.querySelector(
+    'h1.text-heading-xlarge, h1[class*="heading-xlarge"], .ph5 h1, main h1, h1'
+  );
+  const fullName = nameEl ? nameEl.textContent.trim() : '';
+  const firstName = fullName ? fullName.split(/\s+/)[0] : '';
+
+  const profileUrl = cleanLinkedInUrl(window.location.href);
+
+  if (!firstName) {
+    alert('⚠️ Could not extract name from this profile. Make sure you are on a LinkedIn /in/ profile page.');
+    return;
+  }
+
+  const jobIdInput = window.prompt(
+    `Add "${firstName}" to mail merge sheet.\n\nJob ID (leave blank to skip):`,
+    ''
+  );
+  if (jobIdInput === null) return; // user cancelled
+
+  const row = {
+    fullName: firstName,
+    personName: '',
+    personUrl: '',
+    linkedInUrl: profileUrl,
+    jobId: jobIdInput.trim()
+  };
+
+  try {
+    const resp = await fetch('http://localhost:3000/append-mutual-connections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: [row] })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      console.log(`✅ Added ${firstName} to mail merge sheet`);
+      alert(`✅ ${firstName} added to mail merge sheet.`);
+    } else {
+      throw new Error(data.error || 'Unknown server error');
+    }
+  } catch (err) {
+    console.warn('Mail merge append failed:', err.message);
+    alert(`⚠️ Could not reach server (${err.message})\nRow: ${firstName} | ${profileUrl} | ${jobIdInput.trim()}`);
+  }
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractLinkedInConnections') {
     runLinkedInConnectionExtraction();
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'addToMailMerge') {
+    addToMailMerge();
     sendResponse({ success: true });
     return true;
   }
