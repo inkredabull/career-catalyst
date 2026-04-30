@@ -836,13 +836,36 @@ function checkForLinkedInFeed() {
 
 // Listen for messages from background script (context menu actions)
 async function addToMailMerge() {
-  // Extract full name from the profile page
-  const nameEl = document.querySelector(
-    'h1.text-heading-xlarge, h1[class*="heading-xlarge"], .ph5 h1, main h1, h1'
-  );
-  const fullName = nameEl ? nameEl.textContent.trim() : '';
-  const firstName = fullName ? fullName.split(/\s+/)[0] : '';
+  // Extract full name — try DOM selectors, fall back to page title, then URL slug
+  let fullName = '';
 
+  const selectors = [
+    'h1.text-heading-xlarge',
+    'h1[class*="heading-xlarge"]',
+    'h1[class*="heading"]',
+    '.ph5 h1',
+    '.pv-text-details__left-panel h1',
+    'section.artdeco-card h1',
+    'main h1',
+    'h1'
+  ];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el && el.textContent.trim().length > 1) {
+      fullName = el.textContent.trim();
+      break;
+    }
+  }
+
+  // Fall back to page title: LinkedIn sets it to "First Last | LinkedIn" or "First Last - Role | LinkedIn"
+  if (!fullName && document.title) {
+    const titlePart = document.title.split(/[|\-]/)[0].trim();
+    if (titlePart && !titlePart.toLowerCase().includes('linkedin')) {
+      fullName = titlePart;
+    }
+  }
+
+  const firstName = fullName ? fullName.split(/\s+/)[0] : '';
   const profileUrl = cleanLinkedInUrl(window.location.href);
 
   if (!firstName) {
