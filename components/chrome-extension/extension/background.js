@@ -1,20 +1,6 @@
 // Career Catalyst Assistant - Background Script
 
-// Installation handler
-chrome.runtime.onInstalled.addListener((details) => {
-  console.log('Career Catalyst Assistant installed:', details.reason);
-
-  if (details.reason === 'install') {
-    // Set default settings
-    chrome.storage.sync.set({
-      firstInstall: Date.now(),
-      gutterWidth: 33.333,
-      autoDetectJobSites: true,
-      linkedInNetworkingEnabled: false // Disabled by default
-    });
-  }
-
-  // Remove any stale menus from a previous version before recreating
+function setupContextMenus() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: 'extract-linkedin-connections',
@@ -25,7 +11,6 @@ chrome.runtime.onInstalled.addListener((details) => {
         'https://www.linkedin.com/company/*'
       ]
     });
-
     chrome.contextMenus.create({
       id: 'extract-mutual-connections',
       title: 'Extract Mutual Connections',
@@ -35,7 +20,6 @@ chrome.runtime.onInstalled.addListener((details) => {
         'https://www.linkedin.com/search/results/people/*'
       ]
     });
-
     chrome.contextMenus.create({
       id: 'add-to-mail-merge',
       title: 'Add to Mail Merge',
@@ -45,6 +29,24 @@ chrome.runtime.onInstalled.addListener((details) => {
       ]
     });
   });
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
+  console.log('Career Catalyst Assistant installed:', details.reason);
+  if (details.reason === 'install') {
+    chrome.storage.sync.set({
+      firstInstall: Date.now(),
+      gutterWidth: 33.333,
+      autoDetectJobSites: true,
+      linkedInNetworkingEnabled: false
+    });
+  }
+  setupContextMenus();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  setupContextMenus();
+});
 
 // Handle keyboard commands
 chrome.commands.onCommand.addListener((command) => {
