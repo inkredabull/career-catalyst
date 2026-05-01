@@ -920,11 +920,14 @@ async function sendConnectionRequest() {
     .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
   if (isPending) { LOG('Skipping — already pending'); alert('⚠️ Connection request already pending.'); return; }
 
-  // Step 1: Direct Connect button (aria-label starts "invite " or innerText === "connect")
+  // Step 1: Direct Connect button — must reference this profile's name to avoid sidebar buttons
+  const lowerFirst = firstName.toLowerCase();
+  const lowerFull = fullName ? fullName.toLowerCase() : lowerFirst;
   const directConnect = Array.from(document.querySelectorAll('button, a')).find(b => {
     const label = (b.getAttribute('aria-label') || '').toLowerCase();
     const text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
-    return label.startsWith('invite ') || text === 'connect';
+    const nameMatch = label.includes(lowerFirst) || label.includes(lowerFull);
+    return (label.startsWith('invite ') && nameMatch) || text === 'connect';
   });
 
   if (directConnect) {
@@ -986,25 +989,25 @@ async function sendConnectionRequest() {
     await new Promise(r => setTimeout(r, 3000));
   }
 
-  // Step 3: Click "Add a note" in the connection modal (uses includes, not exact match)
+  // Step 3: Click "Add a note" in the connection modal — search ALL elements, not just buttons
   LOG('Looking for "Add a note" button in modal');
   const dialog = document.querySelector('[role="dialog"]');
   LOG(`Modal dialog present: ${dialog ? 'YES' : 'NO'}`);
-  const allInteractive = Array.from(document.querySelectorAll('button, [role="button"], a'));
-  const addNote = allInteractive.find(b => {
-    const text = (b.innerText || b.textContent || '').toLowerCase();
-    return text.includes('add a note') || text.includes('add note');
+  const searchRoot = dialog || document;
+  const addNote = Array.from(searchRoot.querySelectorAll('*')).find(el => {
+    const text = (el.innerText || el.textContent || '').toLowerCase().trim();
+    return (text.includes('add a note') || text.includes('add note')) && text.length < 40;
   });
   if (addNote) {
-    LOG(`"Add a note" button found: "${(addNote.innerText || '').trim()}" — clicking`);
+    LOG(`"Add a note" element found: <${addNote.tagName.toLowerCase()}> "${(addNote.innerText || addNote.textContent || '').trim()}" — clicking`);
     addNote.click();
     await new Promise(r => setTimeout(r, 2000));
   } else {
-    LOG('"Add a note" not found — dumping dialog buttons:');
-    if (dialog) {
-      Array.from(dialog.querySelectorAll('button, [role="button"]'))
-        .forEach(b => LOG(`  dialog btn: "${(b.innerText || b.textContent || '').trim().slice(0, 60)}"`));
-    }
+    LOG('"Add a note" not found — dumping dialog leaf nodes with text:');
+    Array.from(searchRoot.querySelectorAll('*'))
+      .filter(el => el.children.length === 0 && (el.innerText || '').trim().length > 0 && (el.innerText || '').trim().length < 80)
+      .slice(0, 15)
+      .forEach(el => LOG(`  <${el.tagName.toLowerCase()}> "${(el.innerText || '').trim()}"`));
     LOG('Attempting to fill textarea directly anyway');
   }
 
