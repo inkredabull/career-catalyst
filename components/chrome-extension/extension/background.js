@@ -28,6 +28,14 @@ function setupContextMenus() {
         'https://www.linkedin.com/in/*'
       ]
     });
+    chrome.contextMenus.create({
+      id: 'send-connection-request',
+      title: 'Send Connection Request',
+      contexts: ['page'],
+      documentUrlPatterns: [
+        'https://www.linkedin.com/in/*'
+      ]
+    });
   });
 }
 
@@ -91,6 +99,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         console.error('Error sending message:', chrome.runtime.lastError);
       } else {
         console.log('Add to mail merge triggered');
+      }
+    });
+  }
+
+  if (info.menuItemId === 'send-connection-request') {
+    chrome.tabs.sendMessage(tab.id, { action: 'sendConnectionRequest' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error sending message:', chrome.runtime.lastError);
+      } else {
+        console.log('Send connection request triggered');
       }
     });
   }

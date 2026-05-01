@@ -33,6 +33,13 @@ function cleanLinkedInUrl(url) {
   }
 }
 
+async function findAndClickByText(tag, text, delayMs = 0) {
+  if (delayMs) await new Promise(r => setTimeout(r, delayMs));
+  const el = Array.from(document.querySelectorAll(tag)).find(e => e.textContent.trim() === text);
+  if (el) { el.click(); return true; }
+  return false;
+}
+
 // Mutual connections is always-on; use the right-click context menu to trigger.
 
 // ===== LinkedIn Company People Page Extraction =====
@@ -836,35 +843,7 @@ function checkForLinkedInFeed() {
 
 // Listen for messages from background script (context menu actions)
 async function addToMailMerge() {
-  // Extract full name — try DOM selectors, fall back to page title, then URL slug
-  let fullName = '';
-
-  const selectors = [
-    'h1.text-heading-xlarge',
-    'h1[class*="heading-xlarge"]',
-    'h1[class*="heading"]',
-    '.ph5 h1',
-    '.pv-text-details__left-panel h1',
-    'section.artdeco-card h1',
-    'main h1',
-    'h1'
-  ];
-  for (const sel of selectors) {
-    const el = document.querySelector(sel);
-    if (el && el.textContent.trim().length > 1) {
-      fullName = el.textContent.trim();
-      break;
-    }
-  }
-
-  // Fall back to page title: LinkedIn sets it to "First Last | LinkedIn" or "First Last - Role | LinkedIn"
-  if (!fullName && document.title) {
-    const titlePart = document.title.split(/[|\-]/)[0].trim();
-    if (titlePart && !titlePart.toLowerCase().includes('linkedin')) {
-      fullName = titlePart;
-    }
-  }
-
+  const fullName = getProfilePersonName() !== 'Unknown Profile' ? getProfilePersonName() : '';
   const firstName = fullName ? fullName.split(/\s+/)[0] : '';
   const profileUrl = cleanLinkedInUrl(window.location.href);
 
@@ -906,6 +885,62 @@ async function addToMailMerge() {
   }
 }
 
+async function sendConnectionRequest() {
+  const fullName = getProfilePersonName();
+  const firstName = fullName && fullName !== 'Unknown Profile' ? fullName.split(/\s+/)[0] : '';
+  if (!firstName) {
+    alert('⚠️ Could not extract name from this profile.');
+    return;
+  }
+
+  // Build message via prompts (mirrors bookmarklet logic)
+  const msg = ['Hi ', firstName, ', '];
+  const retry = prompt('Retry?');
+  if (retry) {
+    msg.push("hope my previous outreach didn't go to your Spam! ");
+  } else {
+    const event = prompt('For which event?');
+    if (event) msg.push(`found you via ${event}; I couldn't make it. `);
+  }
+  if (prompt('Include looking?')) {
+    msg.push("I'm hands-on ENG leader who's scaled SaaS and data-driven products and global teams of up to 50 over 13+ years. I'm seeking a new challenge, ideally in/near SF @ Series A/B. ");
+  }
+  const expertise = prompt('For what expertise?');
+  if (expertise) msg.push(`Seems like you're a Go-To person on ${expertise}! `);
+  if (prompt('Weekend?')) msg.push('Have a great weekend! ');
+
+  const outreach = msg.join('');
+  console.log(outreach.length, outreach);
+
+  // Click LinkedIn UI to open the connection note dialog
+  const moreActionsBtn = document.querySelector('button[aria-label="More actions"]');
+  if (!moreActionsBtn) {
+    alert('⚠️ Could not find "More actions" button on this profile.');
+    return;
+  }
+  moreActionsBtn.click();
+
+  if (!await findAndClickByText('span', 'Connect', 500)) {
+    alert('⚠️ Could not find "Connect" option. Already connected?');
+    return;
+  }
+  if (!await findAndClickByText('span', 'Add a note', 500)) {
+    alert('⚠️ Could not find "Add a note" button.');
+    return;
+  }
+
+  // Insert message into React-controlled textarea (native setter triggers char counter)
+  await new Promise(r => setTimeout(r, 500));
+  const textarea = document.getElementById('custom-message');
+  if (textarea) {
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+    nativeSetter.call(textarea, outreach);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  } else {
+    alert(`Message built (${outreach.length} chars) but could not auto-insert. Check console.`);
+  }
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractLinkedInConnections') {
     runLinkedInConnectionExtraction();
@@ -915,6 +950,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'addToMailMerge') {
     addToMailMerge();
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'sendConnectionRequest') {
+    sendConnectionRequest();
     sendResponse({ success: true });
     return true;
   }
