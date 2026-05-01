@@ -35,6 +35,50 @@ export interface JobRow {
   companyStage?: string;
 }
 
+const COLUMN_MAP: Record<keyof JobRow, string> = {
+  id:                 'A',
+  role:               'B',
+  company:            'C',
+  status:             'D',
+  applied:            'E',
+  updated:            'F',
+  rejectionRationale: 'G',
+  notes:              'H',
+  origin:             'I',
+  score:              'J',
+  threshold:          'K',
+  analysis:           'L',
+  jobUrl:             'M',
+  resumeUrl:          'N',
+  critique:           'O',
+  whoGotHired:        'P',
+  jobTitleShorthand:  'Q',
+  control:            'R',
+  description:        'S',
+  location:           'T',
+  salaryMin:          'U',
+  salaryMax:          'V',
+  salaryCurrency:     'W',
+  linkedInCompany:    'X',
+  source:             'Y',
+  companyStage:       'Z',
+};
+
+function rowToValues(row: JobRow): string[] {
+  return (Object.keys(COLUMN_MAP) as Array<keyof JobRow>).map(
+    field => row[field] || ''
+  );
+}
+
+function valuesToRow(values: string[]): JobRow {
+  const row: Partial<JobRow> = {};
+  for (const [field, col] of Object.entries(COLUMN_MAP) as Array<[keyof JobRow, string]>) {
+    const idx = col.charCodeAt(0) - 65;
+    (row as Record<string, string>)[field] = values[idx] || '';
+  }
+  return row as JobRow;
+}
+
 export class GoogleSheetsClient {
   private sheets: any;
   private oauth2Client: OAuth2Client;
@@ -70,39 +114,7 @@ export class GoogleSheetsClient {
         throw new Error('GOOGLE_REFRESH_TOKEN not found. Run: npm run setup-gmail');
       }
 
-      // Column order matching the headers:
-      // ID, Role, Company, Status, Applied, Updated, Rejection Rationale, Notes, Origin,
-      // Score (%), Threshold?, Analysis, Job URL, Resume URL, Critique, Who Got Hired,
-      // JobTitleShorthand, Control?, Description, Location, SalaryMin, SalaryMax,
-      // SalaryCurrency, LinkedInCompany, Source, CompanyStage
-      const values = [
-        row.id || '',
-        row.role || '',
-        row.company || '',
-        row.status || '',
-        row.applied || '',
-        row.updated || '',
-        row.rejectionRationale || '',
-        row.notes || '',
-        row.origin || '',
-        row.score || '',
-        row.threshold || '',
-        row.analysis || '',
-        row.jobUrl || '',
-        row.resumeUrl || '',
-        row.critique || '',
-        row.whoGotHired || '',
-        row.jobTitleShorthand || '',
-        row.control || '',
-        row.description || '',
-        row.location || '',
-        row.salaryMin || '',
-        row.salaryMax || '',
-        row.salaryCurrency || '',
-        row.linkedInCompany || '',
-        row.source || '',
-        row.companyStage || ''
-      ];
+      const values = rowToValues(row);
 
       // First, insert a new row at position 2 (below headers)
       await this.sheets.spreadsheets.batchUpdate({
@@ -159,34 +171,7 @@ export class GoogleSheetsClient {
         throw new Error('GOOGLE_REFRESH_TOKEN not found. Run: npm run setup-gmail');
       }
 
-      const values = [
-        row.id || '',
-        row.role || '',
-        row.company || '',
-        row.status || '',
-        row.applied || '',
-        row.updated || '',
-        row.rejectionRationale || '',
-        row.notes || '',
-        row.origin || '',
-        row.score || '',
-        row.threshold || '',
-        row.analysis || '',
-        row.jobUrl || '',
-        row.resumeUrl || '',
-        row.critique || '',
-        row.whoGotHired || '',
-        row.jobTitleShorthand || '',
-        row.control || '',
-        row.description || '',
-        row.location || '',
-        row.salaryMin || '',
-        row.salaryMax || '',
-        row.salaryCurrency || '',
-        row.linkedInCompany || '',
-        row.source || '',
-        row.companyStage || ''
-      ];
+      const values = rowToValues(row);
 
       const range = `${sheetName}!A:Z`;
 
@@ -246,34 +231,7 @@ export class GoogleSheetsClient {
 
       const rows = response.data.values || [];
 
-      return rows.map((row: any[]) => ({
-        id: row[0] || '',
-        role: row[1] || '',
-        company: row[2] || '',
-        status: row[3] || '',
-        applied: row[4] || '',
-        updated: row[5] || '',
-        rejectionRationale: row[6] || '',
-        notes: row[7] || '',
-        origin: row[8] || '',
-        score: row[9] || '',
-        threshold: row[10] || '',
-        analysis: row[11] || '',
-        jobUrl: row[12] || '',
-        resumeUrl: row[13] || '',
-        critique: row[14] || '',
-        whoGotHired: row[15] || '',
-        jobTitleShorthand: row[16] || '',
-        control: row[17] || '',
-        description: row[18] || '',
-        location: row[19] || '',
-        salaryMin: row[20] || '',
-        salaryMax: row[21] || '',
-        salaryCurrency: row[22] || '',
-        linkedInCompany: row[23] || '',
-        source: row[24] || '',
-        companyStage: row[25] || ''
-      }));
+      return rows.map((row: string[]) => valuesToRow(row));
 
     } catch (error) {
       console.error('❌ Error reading rows:', error);
@@ -302,34 +260,7 @@ export class GoogleSheetsClient {
       // Merge updates with existing row
       const updatedRow = { ...rows[rowIndex], ...updates };
 
-      const values = [
-        updatedRow.id || '',
-        updatedRow.role || '',
-        updatedRow.company || '',
-        updatedRow.status || '',
-        updatedRow.applied || '',
-        updatedRow.updated || '',
-        updatedRow.rejectionRationale || '',
-        updatedRow.notes || '',
-        updatedRow.origin || '',
-        updatedRow.score || '',
-        updatedRow.threshold || '',
-        updatedRow.analysis || '',
-        updatedRow.jobUrl || '',
-        updatedRow.resumeUrl || '',
-        updatedRow.critique || '',
-        updatedRow.whoGotHired || '',
-        updatedRow.jobTitleShorthand || '',
-        updatedRow.control || '',
-        updatedRow.description || '',
-        updatedRow.location || '',
-        updatedRow.salaryMin || '',
-        updatedRow.salaryMax || '',
-        updatedRow.salaryCurrency || '',
-        updatedRow.linkedInCompany || '',
-        updatedRow.source || '',
-        updatedRow.companyStage || ''
-      ];
+      const values = rowToValues(updatedRow);
 
       // Row 2 is index 0 in our data, so actual row is rowIndex + 2
       const actualRow = rowIndex + 2;
