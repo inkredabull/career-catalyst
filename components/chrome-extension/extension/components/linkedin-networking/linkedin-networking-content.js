@@ -920,14 +920,15 @@ async function sendConnectionRequest() {
     .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
   if (isPending) { LOG('Skipping — already pending'); alert('⚠️ Connection request already pending.'); return; }
 
-  // Step 1: Direct Connect button — must reference this profile's name to avoid sidebar buttons
-  const lowerFirst = firstName.toLowerCase();
-  const lowerFull = fullName ? fullName.toLowerCase() : lowerFirst;
-  const directConnect = Array.from(document.querySelectorAll('button, a')).find(b => {
+  // Scope all top-card searches to the -HwTopcard container to avoid sidebar buttons
+  const topCard = document.querySelector('[componentkey*="-HwTopcard"]') || document;
+  LOG(`Top card container: ${topCard === document ? 'NOT FOUND (using document)' : 'found via -HwTopcard'}`);
+
+  // Step 1: Direct Connect button scoped to top card
+  const directConnect = Array.from(topCard.querySelectorAll('button, a')).find(b => {
     const label = (b.getAttribute('aria-label') || '').toLowerCase();
     const text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
-    const nameMatch = label.includes(lowerFirst) || label.includes(lowerFull);
-    return (label.startsWith('invite ') && nameMatch) || text === 'connect';
+    return label.startsWith('invite ') || text === 'connect';
   });
 
   if (directConnect) {
@@ -937,18 +938,18 @@ async function sendConnectionRequest() {
   } else {
     LOG('No direct Connect button — searching for More/··· button');
 
-    // Step 2a: Find ··· More button — primary: stable SVG icon id
+    // Step 2a: Find ··· More button scoped to top card — primary: stable SVG icon id
     let moreBtn = null;
-    const overflowSvgs = document.querySelectorAll('svg[id="overflow-web-ios-small"]');
+    const overflowSvgs = topCard.querySelectorAll('svg[id="overflow-web-ios-small"]');
     LOG(`overflow-web-ios-small SVGs found: ${overflowSvgs.length}`);
     for (const svg of overflowSvgs) {
       const btn = svg.closest('button');
       if (btn) { moreBtn = btn; LOG('More button found via SVG id'); break; }
     }
-    // Fallback: aria-label*="More actions" (LinkedIn's "More actions for Name" pattern)
+    // Fallback: aria-label*="More actions" scoped to top card
     if (!moreBtn) {
-      moreBtn = document.querySelector('button[aria-label*="More actions"]') ||
-                Array.from(document.querySelectorAll('button')).find(b => {
+      moreBtn = topCard.querySelector('button[aria-label*="More actions"]') ||
+                Array.from(topCard.querySelectorAll('button')).find(b => {
                   const label = (b.getAttribute('aria-label') || '').trim().toLowerCase();
                   const text = (b.innerText || '').trim();
                   return label === 'more' || text === '...' || text === '…';
