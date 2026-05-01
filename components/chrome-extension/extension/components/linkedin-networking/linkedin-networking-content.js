@@ -911,7 +911,7 @@ async function sendConnectionRequest() {
   if (dow === 5 || dow === 6 || dow === 0) msg.push('Have a great weekend! ');
 
   const outreach = msg.join('');
-  const LOG = msg => console.log('[CONNECTION REQUEST] ' + msg);
+  const LOG = msg => console.debug('[CONNECTION REQUEST] ' + msg);
   LOG(`Message (${outreach.length} chars): ${outreach.slice(0, 60)}…`);
 
   // -- LinkedIn UI automation (mirrors components/networker/src/services/linkedin.ts) --
