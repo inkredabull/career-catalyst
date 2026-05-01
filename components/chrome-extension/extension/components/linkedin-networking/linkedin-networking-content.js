@@ -985,13 +985,17 @@ async function sendConnectionRequest() {
     conn.click();
   }
 
-  // Step 3: Poll for the "Add a note" button — use aria-label selector (fast + exact)
-  // Modal loads via /preload/ async route so give it up to 10s
-  LOG('Polling for "Add a note" button (up to 10s)');
+  // LinkedIn renders its connect modal inside an open shadow DOM on #interop-outlet
+  const getShadowRoot = () =>
+    document.querySelector('[data-testid="interop-shadowdom"]')?.shadowRoot || null;
+  const shadowQ = sel => getShadowRoot()?.querySelector(sel) || document.querySelector(sel);
+
+  // Step 3: Poll for "Add a note" button — check shadow DOM first, then main document
+  LOG('Polling for "Add a note" button in shadow DOM (up to 10s)');
   const addNote = await (async () => {
     const deadline = Date.now() + 10000;
     while (Date.now() < deadline) {
-      const el = document.querySelector('button[aria-label="Add a note"], [aria-label="Add a note"]');
+      const el = shadowQ('button[aria-label="Add a note"]');
       if (el) return el;
       await new Promise(r => setTimeout(r, 200));
     }
@@ -999,39 +1003,32 @@ async function sendConnectionRequest() {
   })();
 
   if (addNote) {
-    LOG(`"Add a note" button found — clicking`);
+    LOG('"Add a note" button found in shadow DOM — clicking');
     addNote.click();
-    // Poll for textarea to appear after clicking "Add a note" (it expands the modal)
+    // Poll for textarea to appear (modal expands after clicking "Add a note")
     LOG('Polling for textarea (up to 5s)');
     await (async () => {
       const deadline = Date.now() + 5000;
       while (Date.now() < deadline) {
-        if (document.querySelector('textarea')) return;
+        if (shadowQ('textarea')) return;
         await new Promise(r => setTimeout(r, 200));
       }
     })();
   } else {
-    LOG('"Add a note" not found after 10s — modal may not have opened');
-    LOG('Attempting to fill textarea directly anyway');
+    LOG('"Add a note" not found after 10s — attempting to fill textarea directly');
   }
 
-  // Step 4: Fill textarea (querySelector first; shadow DOM fallback; native setter for React)
-  let ta = document.querySelector('textarea');
-  LOG(`textarea via querySelector: ${ta ? 'FOUND' : 'NOT FOUND'}`);
-  if (!ta) {
-    const shadowHost = Array.from(document.querySelectorAll('*'))
-      .find(el => el.shadowRoot && el.shadowRoot.querySelector('textarea'));
-    if (shadowHost) { ta = shadowHost.shadowRoot.querySelector('textarea'); LOG('textarea found in shadow DOM'); }
-  }
+  // Step 4: Fill textarea — check shadow DOM first
+  const ta = shadowQ('textarea');
+  LOG(`textarea: ${ta ? `FOUND (id="${ta.id || 'none'}")` : 'NOT FOUND'}`);
   if (ta) {
-    LOG(`Filling textarea (id="${ta.id || 'none'}", name="${ta.name || 'none'}")`);
     const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
     nativeSetter.call(ta, outreach);
     ta.dispatchEvent(new Event('input', { bubbles: true }));
     ta.dispatchEvent(new Event('change', { bubbles: true }));
     LOG('Textarea filled successfully');
   } else {
-    LOG('ERROR: no textarea found after all fallbacks');
+    LOG('ERROR: no textarea found in shadow DOM or main document');
     alert(`Message built (${outreach.length} chars) but could not auto-insert. Check console.`);
   }
 }
