@@ -985,9 +985,9 @@ async function sendConnectionRequest() {
       alert('⚠️ Could not find "Connect" in the overflow menu. Already connected?');
       return;
     }
-    // Click the nearest interactive ancestor to ensure the click registers
-    const clickTarget = conn.closest('button, a, [role="menuitem"], [role="button"]') || conn;
-    LOG(`Connect item found in dropdown: "${(conn.getAttribute('aria-label') || conn.innerText || '').trim().slice(0, 40)}" — clicking <${clickTarget.tagName.toLowerCase()}>`);
+    // Click the nearest interactive ancestor — include li since LinkedIn dropdown items use li containers
+    const clickTarget = conn.closest('li, button, a, [role="menuitem"], [role="button"]') || conn;
+    LOG(`Connect item found in dropdown: "${(conn.getAttribute('aria-label') || conn.innerText || '').trim().slice(0, 40)}" — clicking <${clickTarget.tagName.toLowerCase()}> (conn was <${conn.tagName.toLowerCase()}>)`);
     clickTarget.click();
   }
 
