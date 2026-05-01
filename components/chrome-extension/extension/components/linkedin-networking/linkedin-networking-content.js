@@ -912,52 +912,86 @@ async function sendConnectionRequest() {
   const outreach = msg.join('');
   console.log(outreach.length, outreach);
 
-  // Poll for an element matching text across multiple tag types, up to timeoutMs
-  async function pollClick(text, timeoutMs = 2500) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      for (const tag of ['button', 'span', 'div', 'a']) {
-        const el = Array.from(document.querySelectorAll(tag))
-          .find(e => e.textContent.trim() === text);
-        if (el) { el.click(); return true; }
-      }
-      await new Promise(r => setTimeout(r, 150));
-    }
-    return false;
-  }
+  // -- LinkedIn UI automation (mirrors components/networker/src/services/linkedin.ts) --
 
-  // Step 1: Click Connect — top-level button if present, otherwise open ··· overflow menu
-  const topLevelConnect = Array.from(document.querySelectorAll('button'))
-    .find(b => b.textContent.trim() === 'Connect' || b.getAttribute('aria-label') === 'Connect');
+  // Skip if already pending
+  const isPending = Array.from(document.querySelectorAll('button'))
+    .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
+  if (isPending) { alert('⚠️ Connection request already pending.'); return; }
 
-  if (topLevelConnect) {
-    topLevelConnect.click();
+  // Step 1: Direct Connect button (aria-label starts "invite " or innerText === "connect")
+  const directConnect = Array.from(document.querySelectorAll('button, a')).find(b => {
+    const label = (b.getAttribute('aria-label') || '').toLowerCase();
+    const text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+    return label.startsWith('invite ') || text === 'connect';
+  });
+
+  if (directConnect) {
+    directConnect.click();
+    await new Promise(r => setTimeout(r, 3000));
   } else {
-    const moreActionsBtn = document.querySelector('button[aria-label*="More actions"]');
-    if (!moreActionsBtn) {
+    // Step 2a: Find ··· More button — primary: stable SVG icon id
+    let moreBtn = null;
+    for (const svg of document.querySelectorAll('svg[id="overflow-web-ios-small"]')) {
+      const btn = svg.closest('button');
+      if (btn) { moreBtn = btn; break; }
+    }
+    // Fallback: aria-label*="More actions" (LinkedIn's "More actions for Name" pattern)
+    if (!moreBtn) {
+      moreBtn = document.querySelector('button[aria-label*="More actions"]') ||
+                Array.from(document.querySelectorAll('button')).find(b => {
+                  const label = (b.getAttribute('aria-label') || '').trim().toLowerCase();
+                  const text = (b.innerText || '').trim();
+                  return label === 'more' || text === '...' || text === '…';
+                }) || null;
+    }
+
+    if (!moreBtn) {
       alert('⚠️ Could not find "More actions" or "Connect" button on this profile.');
       return;
     }
-    moreActionsBtn.click();
-    if (!await pollClick('Connect')) {
+
+    moreBtn.click();
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Step 2b: Find Connect in dropdown (broad: div, button, li, a, [role])
+    const conn = Array.from(document.querySelectorAll('div, button, li, a, [role]')).find(e => {
+      const label = (e.getAttribute('aria-label') || '').toLowerCase();
+      const text = (e.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      return text.length < 40 && (label.startsWith('invite ') || label.includes('to connect') || text === 'connect');
+    });
+
+    if (!conn) {
       alert('⚠️ Could not find "Connect" in the overflow menu. Already connected?');
       return;
     }
+    conn.click();
+    await new Promise(r => setTimeout(r, 3000));
   }
 
-  // Step 2: Click "Add a note" in the connection modal
-  if (!await pollClick('Add a note')) {
-    alert('⚠️ Could not find "Add a note" button. The connect dialog may not have opened.');
-    return;
+  // Step 3: Click "Add a note" in the connection modal (uses includes, not exact match)
+  const allInteractive = Array.from(document.querySelectorAll('button, [role="button"], a'));
+  const addNote = allInteractive.find(b => {
+    const text = (b.innerText || b.textContent || '').toLowerCase();
+    return text.includes('add a note') || text.includes('add note');
+  });
+  if (addNote) {
+    addNote.click();
+    await new Promise(r => setTimeout(r, 2000));
   }
 
-  // Step 3: Insert message into React-controlled textarea (native setter triggers char counter)
-  await new Promise(r => setTimeout(r, 400));
-  const textarea = document.getElementById('custom-message');
-  if (textarea) {
+  // Step 4: Fill textarea (querySelector first; shadow DOM fallback; native setter for React)
+  let ta = document.querySelector('textarea');
+  if (!ta) {
+    const shadowHost = Array.from(document.querySelectorAll('*'))
+      .find(el => el.shadowRoot && el.shadowRoot.querySelector('textarea'));
+    if (shadowHost) ta = shadowHost.shadowRoot.querySelector('textarea');
+  }
+  if (ta) {
     const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
-    nativeSetter.call(textarea, outreach);
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    nativeSetter.call(ta, outreach);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    ta.dispatchEvent(new Event('change', { bubbles: true }));
   } else {
     alert(`Message built (${outreach.length} chars) but could not auto-insert. Check console.`);
   }
