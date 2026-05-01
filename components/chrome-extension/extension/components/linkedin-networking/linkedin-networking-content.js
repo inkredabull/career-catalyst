@@ -921,9 +921,22 @@ async function sendConnectionRequest() {
     .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
   if (isPending) { LOG('Skipping — already pending'); alert('⚠️ Connection request already pending.'); return; }
 
-  // Scope all top-card searches to the -HwTopcard container to avoid sidebar buttons
-  const topCard = document.querySelector('[componentkey*="-HwTopcard"]') || document;
-  LOG(`Top card container: ${topCard === document ? 'NOT FOUND (using document)' : 'found via -HwTopcard'}`);
+  // Scope to main profile topcard — walk up from h1 to find the Topcard ancestor,
+  // guaranteeing we target the profile being viewed rather than a sidebar card.
+  const getTopCard = () => {
+    const h1 = document.querySelector('h1');
+    if (h1) {
+      let node = h1.parentElement;
+      while (node && node !== document.body) {
+        const ck = node.getAttribute('componentkey') || '';
+        if (ck.endsWith('Topcard') || ck.includes('Topcard')) return node;
+        node = node.parentElement;
+      }
+    }
+    return document.querySelector('[componentkey*="Topcard"]') || document;
+  };
+  const topCard = getTopCard();
+  LOG(`Top card: ${topCard === document ? 'NOT FOUND (fallback to document)' : 'found, componentkey="...' + (topCard.getAttribute('componentkey') || '').slice(-30) + '"'}`);
 
   // Step 1: Direct Connect button scoped to top card
   const directConnect = Array.from(topCard.querySelectorAll('button, a')).find(b => {
