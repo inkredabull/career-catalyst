@@ -53,10 +53,32 @@ function generateConnectScript(message: string): string {
       .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
     if (isPending) { LOG('Skipping — already pending'); return; }
 
-    // LinkedIn renders the connect modal inside the interop-shadowdom shadow root
-    const getShadowRoot = () =>
-      document.querySelector('[data-testid="interop-shadowdom"]')?.shadowRoot || null;
-    const shadowQ = sel => getShadowRoot()?.querySelector(sel) || document.querySelector(sel);
+    // Deep query: main document first, then known LinkedIn shadow hosts, then all shadow roots
+    const deepQ = sel => {
+      let el = document.querySelector(sel);
+      if (el) return el;
+      for (const id of ['interop-shadowdom', 'interop-outlet']) {
+        const host = document.querySelector('[data-testid="' + id + '"]') || document.getElementById(id);
+        if (host?.shadowRoot) { el = host.shadowRoot.querySelector(sel); if (el) return el; }
+      }
+      for (const host of document.querySelectorAll('*')) {
+        if (host.shadowRoot) { el = host.shadowRoot.querySelector(sel); if (el) return el; }
+      }
+      return null;
+    };
+    // "Add a note" may vary in aria-label — also find by button text across all roots
+    const findAddNote = () => {
+      let btn = deepQ('button[aria-label="Add a note"]');
+      if (btn) return btn;
+      const roots = [document, ...Array.from(document.querySelectorAll('*')).filter(h => h.shadowRoot).map(h => h.shadowRoot)];
+      for (const root of roots) {
+        btn = Array.from(root.querySelectorAll('button')).find(b =>
+          (b.innerText || b.textContent || '').trim().toLowerCase().includes('add a note')
+        );
+        if (btn) return btn;
+      }
+      return null;
+    };
 
     // Scope to top card to avoid sidebar Connect buttons
     const topCard = document.querySelector('[componentkey*="-HwTopcard"]') || document;
@@ -122,12 +144,12 @@ function generateConnectScript(message: string): string {
       await sleep(1000);
     }
 
-    // Step 3: Poll for "Add a note" button in shadow DOM (up to 10s)
+    // Step 3: Poll for "Add a note" button across all shadow roots (up to 10s)
     LOG('Polling for "Add a note" button (up to 10s)');
     let addNote = null;
     const addNoteDeadline = Date.now() + 10000;
     while (Date.now() < addNoteDeadline) {
-      addNote = shadowQ('button[aria-label="Add a note"]');
+      addNote = findAddNote();
       if (addNote) break;
       await sleep(200);
     }
@@ -138,7 +160,7 @@ function generateConnectScript(message: string): string {
       LOG('Polling for textarea (up to 5s)');
       const taDeadline = Date.now() + 5000;
       while (Date.now() < taDeadline) {
-        if (shadowQ('textarea')) break;
+        if (deepQ('textarea')) break;
         await sleep(200);
       }
     } else {
@@ -146,7 +168,7 @@ function generateConnectScript(message: string): string {
     }
 
     // Step 4: Fill textarea via native setter (triggers React synthetic events)
-    const ta = shadowQ('textarea');
+    const ta = deepQ('textarea');
     LOG('textarea: ' + (ta ? 'FOUND id="' + (ta.id || 'none') + '"' : 'NOT FOUND'));
     if (ta) {
       const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
