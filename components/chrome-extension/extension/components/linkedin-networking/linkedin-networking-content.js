@@ -985,28 +985,36 @@ async function sendConnectionRequest() {
       alert('⚠️ Could not find "Connect" in the overflow menu. Already connected?');
       return;
     }
-    LOG(`Connect item found in dropdown: "${(conn.getAttribute('aria-label') || conn.innerText || '').trim().slice(0, 40)}" — clicking`);
-    conn.click();
-    await new Promise(r => setTimeout(r, 3000));
+    // Click the nearest interactive ancestor to ensure the click registers
+    const clickTarget = conn.closest('button, a, [role="menuitem"], [role="button"]') || conn;
+    LOG(`Connect item found in dropdown: "${(conn.getAttribute('aria-label') || conn.innerText || '').trim().slice(0, 40)}" — clicking <${clickTarget.tagName.toLowerCase()}>`);
+    clickTarget.click();
   }
 
-  // Step 3: Click "Add a note" in the connection modal — search ALL elements, not just buttons
-  LOG('Looking for "Add a note" button in modal');
-  const dialog = document.querySelector('[role="dialog"]');
-  LOG(`Modal dialog present: ${dialog ? 'YES' : 'NO'}`);
-  const searchRoot = dialog || document;
-  const addNote = Array.from(searchRoot.querySelectorAll('*')).find(el => {
-    const text = (el.innerText || el.textContent || '').toLowerCase().trim();
-    return (text.includes('add a note') || text.includes('add note')) && text.length < 40;
-  });
+  // Step 3: Poll the full document for "Add a note" — do NOT rely on [role="dialog"]
+  // since LinkedIn uses that role for an unrelated accessibility placeholder
+  LOG('Polling for "Add a note" button (up to 5s)');
+  const addNote = await (async () => {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      const el = Array.from(document.querySelectorAll('*')).find(e => {
+        const t = (e.innerText || e.textContent || '').toLowerCase().trim();
+        return (t === 'add a note' || t === 'add note') && e.offsetParent !== null;
+      });
+      if (el) return el;
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return null;
+  })();
+
   if (addNote) {
     LOG(`"Add a note" element found: <${addNote.tagName.toLowerCase()}> "${(addNote.innerText || addNote.textContent || '').trim()}" — clicking`);
     addNote.click();
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 1500));
   } else {
-    LOG('"Add a note" not found — dumping dialog leaf nodes with text:');
-    Array.from(searchRoot.querySelectorAll('*'))
-      .filter(el => el.children.length === 0 && (el.innerText || '').trim().length > 0 && (el.innerText || '').trim().length < 80)
+    LOG('"Add a note" not found after 5s — dumping visible leaf nodes with text:');
+    Array.from(document.querySelectorAll('*'))
+      .filter(el => el.children.length === 0 && el.offsetParent !== null && (el.innerText || '').trim().length > 0 && (el.innerText || '').trim().length < 80)
       .slice(0, 15)
       .forEach(el => LOG(`  <${el.tagName.toLowerCase()}> "${(el.innerText || '').trim()}"`));
     LOG('Attempting to fill textarea directly anyway');
