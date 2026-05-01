@@ -967,45 +967,21 @@ async function sendConnectionRequest() {
     LOG('More button clicked — waiting 2000ms for dropdown');
     await new Promise(r => setTimeout(r, 2000));
 
-    // Step 2b: Find Connect in dropdown (broad: div, button, li, a, [role])
-    const allDropdownEls = Array.from(document.querySelectorAll('div, button, li, a, [role]'));
-    LOG(`Dropdown open — scanning ${allDropdownEls.length} elements for Connect`);
-    const conn = allDropdownEls.find(e => {
-      const label = (e.getAttribute('aria-label') || '').toLowerCase();
-      const text = (e.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase();
-      return text.length < 40 && (label.startsWith('invite ') || label.includes('to connect') || text === 'connect');
+    // Step 2b: Find the Connect <a role="menuitem"> specifically — outer divs contain the same text
+    // so a broad element search finds the wrong ancestor. Target the anchor directly.
+    const conn = Array.from(document.querySelectorAll('a[role="menuitem"]')).find(el => {
+      const text = (el.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const label = (el.getAttribute('aria-label') || '').toLowerCase();
+      const href = (el.getAttribute('href') || '').toLowerCase();
+      return text === 'connect' || label.includes('invite') || href.includes('invite');
     });
+    LOG(`Connect <a> found: ${conn ? `href="${conn.getAttribute('href')}"` : 'NOT FOUND'}`);
 
     if (!conn) {
-      LOG('Connect not found in dropdown — dumping short visible items:');
-      allDropdownEls
-        .filter(e => { const t = (e.innerText || '').trim(); return t.length > 0 && t.length < 40; })
-        .slice(0, 10)
-        .forEach(e => LOG(`  item: "${(e.innerText || '').trim()}"`));
       alert('⚠️ Could not find "Connect" in the overflow menu. Already connected?');
       return;
     }
-    // Walk up the parent chain — LinkedIn's click handler may be on an ancestor div, not the matched element
-    LOG(`Connect item found: "${(conn.innerText || '').trim()}" — trying parent chain`);
-    let clickWorked = false;
-    let tryEl = conn;
-    for (let i = 0; i < 5; i++) {
-      if (!tryEl || tryEl === document.body) break;
-      LOG(`Click attempt ${i + 1}: <${tryEl.tagName.toLowerCase()}> class="${(tryEl.getAttribute('class') || '').slice(0, 40)}"`);
-      tryEl.click();
-      await new Promise(r => setTimeout(r, 700));
-      const appeared = Array.from(document.querySelectorAll('*')).some(e => {
-        const t = (e.innerText || '').toLowerCase().trim();
-        return (t === 'add a note' || t === 'send without a note') && e.offsetParent !== null;
-      });
-      if (appeared) { LOG(`Modal appeared after click attempt ${i + 1}`); clickWorked = true; break; }
-      tryEl = tryEl.parentElement;
-    }
-    if (!clickWorked) {
-      LOG('ERROR: Connect click did not open modal after 5 ancestor attempts');
-      alert('⚠️ Could not trigger Connect flow. Already connected or LinkedIn blocked the click?');
-      return;
-    }
+    conn.click();
   }
 
   // Step 3: Poll the full document for "Add a note" — do NOT rely on [role="dialog"]
