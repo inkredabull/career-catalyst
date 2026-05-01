@@ -985,15 +985,13 @@ async function sendConnectionRequest() {
     conn.click();
   }
 
-  // Step 3: Poll the full document for "Add a note" — do NOT rely on [role="dialog"]
-  LOG('Polling for "Add a note" button (up to 5s)');
+  // Step 3: Poll for the "Add a note" button — use aria-label selector (fast + exact)
+  // Modal loads via /preload/ async route so give it up to 10s
+  LOG('Polling for "Add a note" button (up to 10s)');
   const addNote = await (async () => {
-    const deadline = Date.now() + 5000;
+    const deadline = Date.now() + 10000;
     while (Date.now() < deadline) {
-      const el = Array.from(document.querySelectorAll('*')).find(e => {
-        const t = (e.innerText || e.textContent || '').toLowerCase().trim();
-        return (t === 'add a note' || t === 'add note') && e.offsetParent !== null;
-      });
+      const el = document.querySelector('button[aria-label="Add a note"], [aria-label="Add a note"]');
       if (el) return el;
       await new Promise(r => setTimeout(r, 200));
     }
@@ -1001,11 +999,19 @@ async function sendConnectionRequest() {
   })();
 
   if (addNote) {
-    LOG(`"Add a note" element found: <${addNote.tagName.toLowerCase()}> "${(addNote.innerText || addNote.textContent || '').trim()}" — clicking`);
+    LOG(`"Add a note" button found — clicking`);
     addNote.click();
-    await new Promise(r => setTimeout(r, 1500));
+    // Poll for textarea to appear after clicking "Add a note" (it expands the modal)
+    LOG('Polling for textarea (up to 5s)');
+    await (async () => {
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        if (document.querySelector('textarea')) return;
+        await new Promise(r => setTimeout(r, 200));
+      }
+    })();
   } else {
-    LOG('"Add a note" not found after 5s — modal may not have opened');
+    LOG('"Add a note" not found after 10s — modal may not have opened');
     LOG('Attempting to fill textarea directly anyway');
   }
 
