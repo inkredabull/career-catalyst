@@ -912,40 +912,47 @@ async function sendConnectionRequest() {
   const outreach = msg.join('');
   console.log(outreach.length, outreach);
 
-  // Click LinkedIn UI to open the connection note dialog.
-  // LinkedIn's aria-label varies: "More actions" or "More actions for {Name}".
-  // For 500+ connections / follow-first profiles, Connect lives in the overflow menu (···).
-  // For direct connections, Connect may already be a top-level button.
+  // Poll for an element matching text across multiple tag types, up to timeoutMs
+  async function pollClick(text, timeoutMs = 2500) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      for (const tag of ['button', 'span', 'div', 'a']) {
+        const el = Array.from(document.querySelectorAll(tag))
+          .find(e => e.textContent.trim() === text);
+        if (el) { el.click(); return true; }
+      }
+      await new Promise(r => setTimeout(r, 150));
+    }
+    return false;
+  }
+
+  // Step 1: Click Connect — top-level button if present, otherwise open ··· overflow menu
   const topLevelConnect = Array.from(document.querySelectorAll('button'))
     .find(b => b.textContent.trim() === 'Connect' || b.getAttribute('aria-label') === 'Connect');
 
-  if (!topLevelConnect) {
+  if (topLevelConnect) {
+    topLevelConnect.click();
+  } else {
     const moreActionsBtn = document.querySelector('button[aria-label*="More actions"]');
     if (!moreActionsBtn) {
       alert('⚠️ Could not find "More actions" or "Connect" button on this profile.');
       return;
     }
     moreActionsBtn.click();
-    // Wait for dropdown, then click Connect inside it
-    if (!await findAndClickByText('span', 'Connect', 500)) {
+    if (!await pollClick('Connect')) {
       alert('⚠️ Could not find "Connect" in the overflow menu. Already connected?');
       return;
     }
-  } else {
-    topLevelConnect.click();
   }
 
-  if (!await findAndClickByText('span', 'Add a note', 500)) {
-    alert('⚠️ Could not find "Connect" option. Already connected?');
-    return;
-  }
-  if (!await findAndClickByText('span', 'Add a note', 500)) {
-    alert('⚠️ Could not find "Add a note" button.');
+  // Step 2: Click "Add a note" in the connection modal
+  if (!await pollClick('Add a note')) {
+    alert('⚠️ Could not find "Add a note" button. The connect dialog may not have opened.');
     return;
   }
 
-  // Insert message into React-controlled textarea (native setter triggers char counter)
-  await new Promise(r => setTimeout(r, 500));
+  // Step 3: Insert message into React-controlled textarea (native setter triggers char counter)
+  await new Promise(r => setTimeout(r, 400));
   const textarea = document.getElementById('custom-message');
   if (textarea) {
     const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
