@@ -912,15 +912,30 @@ async function sendConnectionRequest() {
   const outreach = msg.join('');
   console.log(outreach.length, outreach);
 
-  // Click LinkedIn UI to open the connection note dialog
-  const moreActionsBtn = document.querySelector('button[aria-label="More actions"]');
-  if (!moreActionsBtn) {
-    alert('⚠️ Could not find "More actions" button on this profile.');
-    return;
-  }
-  moreActionsBtn.click();
+  // Click LinkedIn UI to open the connection note dialog.
+  // LinkedIn's aria-label varies: "More actions" or "More actions for {Name}".
+  // For 500+ connections / follow-first profiles, Connect lives in the overflow menu (···).
+  // For direct connections, Connect may already be a top-level button.
+  const topLevelConnect = Array.from(document.querySelectorAll('button'))
+    .find(b => b.textContent.trim() === 'Connect' || b.getAttribute('aria-label') === 'Connect');
 
-  if (!await findAndClickByText('span', 'Connect', 500)) {
+  if (!topLevelConnect) {
+    const moreActionsBtn = document.querySelector('button[aria-label*="More actions"]');
+    if (!moreActionsBtn) {
+      alert('⚠️ Could not find "More actions" or "Connect" button on this profile.');
+      return;
+    }
+    moreActionsBtn.click();
+    // Wait for dropdown, then click Connect inside it
+    if (!await findAndClickByText('span', 'Connect', 500)) {
+      alert('⚠️ Could not find "Connect" in the overflow menu. Already connected?');
+      return;
+    }
+  } else {
+    topLevelConnect.click();
+  }
+
+  if (!await findAndClickByText('span', 'Add a note', 500)) {
     alert('⚠️ Could not find "Connect" option. Already connected?');
     return;
   }
