@@ -907,7 +907,8 @@ async function sendConnectionRequest() {
   }
   const expertise = prompt('For what expertise?');
   if (expertise) msg.push(`Seems like you're a Go-To person on ${expertise}! `);
-  if (prompt('Weekend?')) msg.push('Have a great weekend! ');
+  const dow = new Date().getDay(); // 0=Sun,5=Fri,6=Sat
+  if (dow === 5 || dow === 6 || dow === 0) msg.push('Have a great weekend! ');
 
   const outreach = msg.join('');
   const LOG = msg => console.log('[CONNECTION REQUEST] ' + msg);
