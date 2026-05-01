@@ -985,14 +985,30 @@ async function sendConnectionRequest() {
       alert('⚠️ Could not find "Connect" in the overflow menu. Already connected?');
       return;
     }
-    // Click the nearest interactive ancestor — include li since LinkedIn dropdown items use li containers
-    const clickTarget = conn.closest('li, button, a, [role="menuitem"], [role="button"]') || conn;
-    LOG(`Connect item found in dropdown: "${(conn.getAttribute('aria-label') || conn.innerText || '').trim().slice(0, 40)}" — clicking <${clickTarget.tagName.toLowerCase()}> (conn was <${conn.tagName.toLowerCase()}>)`);
-    clickTarget.click();
+    // Walk up the parent chain — LinkedIn's click handler may be on an ancestor div, not the matched element
+    LOG(`Connect item found: "${(conn.innerText || '').trim()}" — trying parent chain`);
+    let clickWorked = false;
+    let tryEl = conn;
+    for (let i = 0; i < 5; i++) {
+      if (!tryEl || tryEl === document.body) break;
+      LOG(`Click attempt ${i + 1}: <${tryEl.tagName.toLowerCase()}> class="${(tryEl.getAttribute('class') || '').slice(0, 40)}"`);
+      tryEl.click();
+      await new Promise(r => setTimeout(r, 700));
+      const appeared = Array.from(document.querySelectorAll('*')).some(e => {
+        const t = (e.innerText || '').toLowerCase().trim();
+        return (t === 'add a note' || t === 'send without a note') && e.offsetParent !== null;
+      });
+      if (appeared) { LOG(`Modal appeared after click attempt ${i + 1}`); clickWorked = true; break; }
+      tryEl = tryEl.parentElement;
+    }
+    if (!clickWorked) {
+      LOG('ERROR: Connect click did not open modal after 5 ancestor attempts');
+      alert('⚠️ Could not trigger Connect flow. Already connected or LinkedIn blocked the click?');
+      return;
+    }
   }
 
   // Step 3: Poll the full document for "Add a note" — do NOT rely on [role="dialog"]
-  // since LinkedIn uses that role for an unrelated accessibility placeholder
   LOG('Polling for "Add a note" button (up to 5s)');
   const addNote = await (async () => {
     const deadline = Date.now() + 5000;
@@ -1012,11 +1028,7 @@ async function sendConnectionRequest() {
     addNote.click();
     await new Promise(r => setTimeout(r, 1500));
   } else {
-    LOG('"Add a note" not found after 5s — dumping visible leaf nodes with text:');
-    Array.from(document.querySelectorAll('*'))
-      .filter(el => el.children.length === 0 && el.offsetParent !== null && (el.innerText || '').trim().length > 0 && (el.innerText || '').trim().length < 80)
-      .slice(0, 15)
-      .forEach(el => LOG(`  <${el.tagName.toLowerCase()}> "${(el.innerText || '').trim()}"`));
+    LOG('"Add a note" not found after 5s — modal may not have opened');
     LOG('Attempting to fill textarea directly anyway');
   }
 
