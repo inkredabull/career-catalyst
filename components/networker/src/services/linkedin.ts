@@ -42,210 +42,121 @@ import { DiscoveredProfile } from '../types.js';
 // ---------------------------------------------------------------------------
 
 function generateConnectScript(message: string): string {
-  return `(function() {
-    var LOG = function(msg) { console.log('[NETWORKER] ' + msg); };
-    var message = ${JSON.stringify(message)};
+  return `(async function() {
+    const LOG = msg => console.log('[NETWORKER] ' + msg);
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const message = ${JSON.stringify(message)};
     LOG('Script injected. Message: ' + message.slice(0, 40) + '…');
 
     // Skip if already pending
-    var isPending = Array.from(document.querySelectorAll('button')).some(function(b) {
-      return (b.innerText || '').trim().toLowerCase() === 'pending';
-    });
+    const isPending = Array.from(document.querySelectorAll('button'))
+      .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
     if (isPending) { LOG('Skipping — already pending'); return; }
 
-    function fillNote(retryCount) {
-      retryCount = retryCount || 0;
-      LOG('fillNote() called (attempt ' + (retryCount + 1) + ')');
-      var ta = document.querySelector('textarea');
-      if (!ta) {
-        LOG('No plain textarea — checking shadow DOM');
-        var shadowHost = Array.from(document.querySelectorAll('*')).find(function(el) {
-          return el.shadowRoot && el.shadowRoot.querySelector('textarea');
-        });
-        if (shadowHost) { ta = shadowHost.shadowRoot.querySelector('textarea'); }
-      }
-      if (ta) {
-        ta.value = message;
-        ta.dispatchEvent(new Event('input', { bubbles: true }));
-        ta.dispatchEvent(new Event('change', { bubbles: true }));
-        ta.dispatchEvent(new Event('blur', { bubbles: true }));
-        LOG('Note filled (textarea): ' + ta.value.slice(0, 40));
-        return;
-      }
-      LOG('No textarea — checking contenteditable / role=textbox');
-      var ce = document.querySelector('[contenteditable="true"]') ||
-               document.querySelector('[contenteditable]') ||
-               document.querySelector('[role="textbox"]');
-      if (ce) {
-        ce.focus();
-        document.execCommand('selectAll', false, null);
-        document.execCommand('insertText', false, message);
-        if (!ce.textContent || ce.textContent.trim() === '') {
-          ce.textContent = message;
-          ce.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        LOG('Note filled (contenteditable): ' + (ce.textContent || '').slice(0, 40));
-        return;
-      }
-      if (retryCount < 4) {
-        LOG('Nothing found — retrying in 1500ms (attempt ' + (retryCount + 2) + ')');
-        setTimeout(function() { fillNote(retryCount + 1); }, 1500);
-        return;
-      }
-      LOG('ERROR: no textarea or contenteditable after ' + (retryCount + 1) + ' attempts — modal may not be open');
-      // Dump visible dialog buttons to help diagnose
-      var dialog = document.querySelector('[role="dialog"]');
-      if (dialog) {
-        var btns = Array.from(dialog.querySelectorAll('button, [role="button"], a'));
-        LOG('Dialog found with ' + btns.length + ' clickables:');
-        btns.slice(0, 8).forEach(function(b) { LOG('  "' + (b.innerText || b.textContent || '').trim().slice(0, 60) + '"'); });
-      } else {
-        LOG('No [role="dialog"] found on page');
-      }
-    }
+    // LinkedIn renders the connect modal inside the interop-shadowdom shadow root
+    const getShadowRoot = () =>
+      document.querySelector('[data-testid="interop-shadowdom"]')?.shadowRoot || null;
+    const shadowQ = sel => getShadowRoot()?.querySelector(sel) || document.querySelector(sel);
 
-    function clickAddNote() {
-      LOG('clickAddNote() called');
-      var dialog = document.querySelector('[role="dialog"]');
-      LOG('Modal dialog present: ' + (dialog ? 'YES' : 'NO'));
-      // Broaden beyond button — LinkedIn uses role="button" and sometimes spans
-      var allInteractive = Array.from(document.querySelectorAll('button, [role="button"], a'));
-      Array.from(document.querySelectorAll('*')).forEach(function(el) {
-        if (el.shadowRoot) {
-          allInteractive = allInteractive.concat(Array.from(el.shadowRoot.querySelectorAll('button, [role="button"]')));
-        }
-      });
-      var addNote = allInteractive.find(function(b) {
-        var text = (b.innerText || b.textContent || '').toLowerCase();
-        return text.includes('add a note') || text.includes('add note');
-      });
-      if (addNote) {
-        LOG('"Add a note" button found: "' + (addNote.innerText || '').trim() + '" — clicking, fillNote in 2000ms');
-        addNote.click();
-        setTimeout(function() { fillNote(0); }, 2000);
-      } else {
-        // Dump what IS in the dialog to debug
-        if (dialog) {
-          var dlgBtns = Array.from(dialog.querySelectorAll('button, [role="button"]'));
-          LOG('Dialog buttons (' + dlgBtns.length + '):');
-          dlgBtns.forEach(function(b) { LOG('  "' + (b.innerText || b.textContent || '').trim().slice(0, 60) + '"'); });
-        }
-        LOG('"Add a note" not found — trying fillNote(0) directly in 1000ms');
-        setTimeout(function() { fillNote(0); }, 1000);
-      }
-    }
+    // Scope to top card to avoid sidebar Connect buttons
+    const topCard = document.querySelector('[componentkey*="-HwTopcard"]') || document;
+    LOG('Top card: ' + (topCard === document ? 'NOT FOUND (fallback to document)' : 'found via -HwTopcard'));
 
-    // Scope all button searches to the profile hero to avoid sidebar "Connect" buttons
-    // (LinkedIn shows other people's Connect buttons in "People also viewed")
-    function getProfileActionRoot() {
-      var h1 = document.querySelector('h1');
-      if (!h1) return document.body;
-      var node = h1.parentElement;
-      while (node && node !== document.body) {
-        if (node.querySelectorAll('button').length >= 2) return node;
-        node = node.parentElement;
-      }
-      return document.body;
-    }
-    var actionRoot = getProfileActionRoot();
-    LOG('Profile action root: ' + actionRoot.tagName + (actionRoot.id ? '#' + actionRoot.id : ''));
-
-    // Direct Connect button — aria-label is person-specific; text===connect scoped to hero
-    var connectBtn = Array.from(actionRoot.querySelectorAll('button, a')).find(function(b) {
-      var label = (b.getAttribute('aria-label') || '').toLowerCase();
-      var text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+    // Step 1: Direct Connect button scoped to top card
+    const directConnect = Array.from(topCard.querySelectorAll('button, a')).find(b => {
+      const label = (b.getAttribute('aria-label') || '').toLowerCase();
+      const text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
       return label.startsWith('invite ') || text === 'connect';
     });
 
-    if (connectBtn) {
-      var connectLabel = connectBtn.getAttribute('aria-label') || connectBtn.innerText || '';
-      LOG('Direct Connect button found: "' + connectLabel.trim() + '" — clicking');
-      connectBtn.click();
-      setTimeout(clickAddNote, 3000);
-      return;
-    }
+    if (directConnect) {
+      LOG('Direct Connect found: "' + (directConnect.getAttribute('aria-label') || directConnect.innerText || '').trim() + '" — clicking');
+      directConnect.click();
+      await sleep(3000);
+    } else {
+      LOG('No direct Connect — looking for More/··· button');
 
-    LOG('No direct Connect in profile hero — looking for More/... button');
-
-    function isMoreTrigger(el) {
-      var label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
-      var text  = (el.innerText || '').trim();
-      return label === 'more' || text === '...' || text === '…';
-    }
-
-    // Find anchor (Follow/Message) within hero, then walk up to find More nearby
-    var anchorBtn = Array.from(actionRoot.querySelectorAll('button')).find(function(b) {
-      var label = (b.getAttribute('aria-label') || '').toLowerCase();
-      var text = (b.innerText || '').trim().toLowerCase().replace(/^[^a-z]+/, '');
-      return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
-    });
-    LOG('Anchor button (Follow/Message): ' + (anchorBtn ? (anchorBtn.getAttribute('aria-label') || anchorBtn.innerText).trim() : 'NOT FOUND'));
-
-    var moreBtn = null;
-
-    // 1. SVG detection scoped to actionRoot first
-    var svgsInHero = Array.from(actionRoot.querySelectorAll('svg[id="overflow-web-ios-small"]'));
-    LOG('overflow-web-ios-small SVGs in profile hero: ' + svgsInHero.length);
-    for (var si = 0; si < svgsInHero.length; si++) {
-      var svgBtn = svgsInHero[si].closest('button');
-      if (svgBtn) { moreBtn = svgBtn; LOG('More button found via SVG in hero (index ' + si + ')'); break; }
-    }
-
-    // 2. Heuristic scoped to anchor container
-    if (!moreBtn && anchorBtn) {
-      var node = anchorBtn.parentElement;
-      while (node && !moreBtn) {
-        var moreCandidates = Array.from(node.querySelectorAll('button')).filter(isMoreTrigger);
-        if (moreCandidates.length > 0) { moreBtn = moreCandidates[0]; LOG('More button found via heuristic in anchor container'); }
-        else { node = node.parentElement; }
+      // Step 2a: More button — SVG id first, then aria-label*="More actions", then heuristic
+      let moreBtn = null;
+      const overflowSvgs = topCard.querySelectorAll('svg[id="overflow-web-ios-small"]');
+      LOG('overflow-web-ios-small SVGs in top card: ' + overflowSvgs.length);
+      for (const svg of overflowSvgs) {
+        const btn = svg.closest('button');
+        if (btn) { moreBtn = btn; LOG('More button found via SVG id'); break; }
       }
-    }
-
-    // 3. Global SVG fallback (whole page)
-    if (!moreBtn) {
-      LOG('Scoped search failed — trying global SVG scan');
-      var allSvgs = Array.from(document.querySelectorAll('svg[id="overflow-web-ios-small"]'));
-      LOG('Global overflow SVGs: ' + allSvgs.length);
-      for (var gi = 0; gi < allSvgs.length; gi++) {
-        var gBtn = allSvgs[gi].closest('button');
-        if (gBtn) { moreBtn = gBtn; LOG('More button found via global SVG (index ' + gi + ')'); break; }
+      if (!moreBtn) {
+        moreBtn = topCard.querySelector('button[aria-label*="More actions"]') ||
+                  Array.from(topCard.querySelectorAll('button')).find(b => {
+                    const label = (b.getAttribute('aria-label') || '').trim().toLowerCase();
+                    const text = (b.innerText || '').trim();
+                    return label === 'more' || text === '...' || text === '…';
+                  }) || null;
+        if (moreBtn) LOG('More button found via fallback: aria-label="' + (moreBtn.getAttribute('aria-label') || '') + '"');
       }
-    }
 
-    // 4. Global heuristic last resort
-    if (!moreBtn) {
-      moreBtn = Array.from(document.querySelectorAll('button')).find(isMoreTrigger) || null;
-      if (moreBtn) LOG('More button found via global heuristic');
-    }
+      if (!moreBtn) {
+        LOG('ERROR: Could not find Connect or More button on this profile');
+        return;
+      }
 
-    if (moreBtn) {
-      LOG('Clicking More button — waiting 2000ms for dropdown');
       moreBtn.click();
-      setTimeout(function() {
-        // LinkedIn dropdown items are plain <div> elements — broaden beyond button/li/a
-        var elems = Array.from(document.querySelectorAll('div, button, li, a, [role]'));
-        LOG('Dropdown open — scanning ' + elems.length + ' elements for Connect');
-        var conn = elems.find(function(e) {
-          var l = (e.getAttribute('aria-label') || '').toLowerCase();
-          var t = (e.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase();
-          return t.length < 40 && (l.startsWith('invite ') || l.includes('to connect') || t === 'connect');
-        });
-        if (conn) {
-          var connLabel = conn.getAttribute('aria-label') || conn.innerText || '';
-          LOG('Connect item found in dropdown: "' + connLabel.trim().slice(0, 40) + '" — clicking');
-          conn.click();
-          setTimeout(clickAddNote, 3000);
-        } else {
-          LOG('ERROR: Connect not found in More menu — dumping first 10 short items:');
-          elems.filter(function(e) { return (e.innerText || '').trim().length > 0 && (e.innerText || '').trim().length < 40; })
-               .slice(0, 10)
-               .forEach(function(e) { LOG('  item: "' + (e.innerText || '').trim() + '"'); });
-        }
-      }, 2000);
-      return;
+      LOG('More button clicked — waiting 2000ms for dropdown');
+      await sleep(2000);
+
+      // Step 2b: Connect item — target a[role="menuitem"] specifically (avoids parent divs with same text)
+      const conn = Array.from(document.querySelectorAll('a[role="menuitem"]')).find(el => {
+        const text = (el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+        const label = (el.getAttribute('aria-label') || '').toLowerCase();
+        const href = (el.getAttribute('href') || '').toLowerCase();
+        return text === 'connect' || label.includes('invite') || href.includes('invite');
+      });
+      LOG('Connect menu item: ' + (conn ? 'FOUND href="' + (conn.getAttribute('href') || '') + '"' : 'NOT FOUND'));
+
+      if (!conn) {
+        LOG('ERROR: Connect not found in dropdown — dumping menu items:');
+        Array.from(document.querySelectorAll('a[role="menuitem"], div[role="menuitem"]'))
+          .forEach(el => LOG('  menuitem: "' + (el.innerText || '').trim().slice(0, 60) + '"'));
+        return;
+      }
+      conn.click();
+      await sleep(1000);
     }
 
-    LOG('ERROR: No Connect button and no More button found on this page');
+    // Step 3: Poll for "Add a note" button in shadow DOM (up to 10s)
+    LOG('Polling for "Add a note" button (up to 10s)');
+    let addNote = null;
+    const addNoteDeadline = Date.now() + 10000;
+    while (Date.now() < addNoteDeadline) {
+      addNote = shadowQ('button[aria-label="Add a note"]');
+      if (addNote) break;
+      await sleep(200);
+    }
+
+    if (addNote) {
+      LOG('"Add a note" found — clicking');
+      addNote.click();
+      LOG('Polling for textarea (up to 5s)');
+      const taDeadline = Date.now() + 5000;
+      while (Date.now() < taDeadline) {
+        if (shadowQ('textarea')) break;
+        await sleep(200);
+      }
+    } else {
+      LOG('"Add a note" not found after 10s — attempting direct textarea fill');
+    }
+
+    // Step 4: Fill textarea via native setter (triggers React synthetic events)
+    const ta = shadowQ('textarea');
+    LOG('textarea: ' + (ta ? 'FOUND id="' + (ta.id || 'none') + '"' : 'NOT FOUND'));
+    if (ta) {
+      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+      nativeSetter.call(ta, message);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      ta.dispatchEvent(new Event('change', { bubbles: true }));
+      LOG('Textarea filled: ' + message.slice(0, 40));
+    } else {
+      LOG('ERROR: no textarea found — modal may not have opened');
+    }
   })();`;
 }
 
