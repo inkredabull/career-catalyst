@@ -103,7 +103,6 @@ export class SheetsLogger {
         salaryMax: jobListing?.salary?.max || '',
         salaryCurrency: jobListing?.salary?.currency || '',
         linkedInCompany: jobListing?.linkedInCompany || '',
-        source: jobListing?.source || '',
         companyStage: jobListing?.companyStage || ''
       };
 

@@ -24,14 +24,12 @@ export interface JobRow {
   critique?: string;
   whoGotHired?: string;
   jobTitleShorthand?: string;
-  control?: string;
   description?: string;
   location?: string;
   salaryMin?: string;
   salaryMax?: string;
   salaryCurrency?: string;
   linkedInCompany?: string;
-  source?: string;
   companyStage?: string;
 }
 
@@ -40,28 +38,26 @@ const COLUMN_MAP: Record<keyof JobRow, string> = {
   role:               'B',
   company:            'C',
   status:             'D',
-  applied:            'E',
-  updated:            'F',
-  rejectionRationale: 'G',
-  notes:              'H',
-  origin:             'I',
-  score:              'J',
-  threshold:          'K',
-  analysis:           'L',
-  jobUrl:             'M',
-  resumeUrl:          'N',
-  critique:           'O',
-  whoGotHired:        'P',
-  jobTitleShorthand:  'Q',
-  control:            'R',
+  companyStage:       'E',
+  notes:              'F',
+  applied:            'G',
+  updated:            'H',
+  rejectionRationale: 'I',
+  origin:             'J',
+  score:              'K',
+  threshold:          'L',
+  analysis:           'M',
+  jobUrl:             'N',
+  resumeUrl:          'O',
+  critique:           'P',
+  whoGotHired:        'Q',
+  jobTitleShorthand:  'R',
   description:        'S',
   location:           'T',
   salaryMin:          'U',
   salaryMax:          'V',
   salaryCurrency:     'W',
-  linkedInCompany:    'X',
-  source:             'Y',
-  companyStage:       'Z',
+  linkedInCompany:    'X'
 };
 
 function rowToValues(row: JobRow): string[] {
@@ -336,7 +332,6 @@ export function sheetsRowToJobListing(row: JobRow): JobListing {
       currency: row.salaryCurrency || 'USD'
     },
     linkedInCompany: row.linkedInCompany,
-    source: row.source || 'extracted',
     companyStage: row.companyStage
   };
 }
