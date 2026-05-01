@@ -90,7 +90,7 @@ export class JobExtractorAgent extends BaseAgent {
       const jobDataWithSource: JobListing = {
         ...jobData,
         jobId,
-        titleShorthand: this.buildTitleShorthand(jobData.title || ''),
+        titleShorthand: jobData.titleShorthand || this.buildTitleShorthand(jobData.title || ''),
         source: sourceUrl ? "extracted" : "html_parsed"
       };
 
@@ -163,7 +163,7 @@ export class JobExtractorAgent extends BaseAgent {
       const jobDataWithSource: JobListing = {
         ...normalizedJobData,
         jobId,
-        titleShorthand: this.buildTitleShorthand(normalizedJobData.title || ''),
+        titleShorthand: normalizedJobData.titleShorthand || this.buildTitleShorthand(normalizedJobData.title || ''),
         source: "json_input"
       };
 
@@ -325,7 +325,8 @@ export class JobExtractorAgent extends BaseAgent {
       applicantCount: inputData.applicantCount || inputData.applicant_count,
       competitionLevel: inputData.competitionLevel || inputData.competition_level,
       linkedInCompany: inputData.linkedInCompany || inputData.linked_in || inputData.linkedin_company ||
-                       (company ? this.convertToLinkedInSlug(company) : undefined)
+                       (company ? this.convertToLinkedInSlug(company) : undefined),
+      titleShorthand: inputData.titleShorthand || undefined
     };
   }
 
