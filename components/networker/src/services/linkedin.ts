@@ -135,8 +135,23 @@ function generateConnectScript(message: string): string {
       }
     }
 
-    // Direct Connect button on profile
-    var connectBtn = Array.from(document.querySelectorAll('button, a')).find(function(b) {
+    // Scope all button searches to the profile hero to avoid sidebar "Connect" buttons
+    // (LinkedIn shows other people's Connect buttons in "People also viewed")
+    function getProfileActionRoot() {
+      var h1 = document.querySelector('h1');
+      if (!h1) return document.body;
+      var node = h1.parentElement;
+      while (node && node !== document.body) {
+        if (node.querySelectorAll('button').length >= 2) return node;
+        node = node.parentElement;
+      }
+      return document.body;
+    }
+    var actionRoot = getProfileActionRoot();
+    LOG('Profile action root: ' + actionRoot.tagName + (actionRoot.id ? '#' + actionRoot.id : ''));
+
+    // Direct Connect button — aria-label is person-specific; text===connect scoped to hero
+    var connectBtn = Array.from(actionRoot.querySelectorAll('button, a')).find(function(b) {
       var label = (b.getAttribute('aria-label') || '').toLowerCase();
       var text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
       return label.startsWith('invite ') || text === 'connect';
@@ -150,49 +165,57 @@ function generateConnectScript(message: string): string {
       return;
     }
 
-    LOG('No direct Connect button — looking for More/... button');
+    LOG('No direct Connect in profile hero — looking for More/... button');
 
-    // Connect hidden behind "More" / "..." button
-    // Primary: LinkedIn's three-dots overflow icon has a stable SVG id
+    function isMoreTrigger(el) {
+      var label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+      var text  = (el.innerText || '').trim();
+      return label === 'more' || text === '...' || text === '…';
+    }
+
+    // Find anchor (Follow/Message) within hero, then walk up to find More nearby
+    var anchorBtn = Array.from(actionRoot.querySelectorAll('button')).find(function(b) {
+      var label = (b.getAttribute('aria-label') || '').toLowerCase();
+      var text = (b.innerText || '').trim().toLowerCase().replace(/^[^a-z]+/, '');
+      return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
+    });
+    LOG('Anchor button (Follow/Message): ' + (anchorBtn ? (anchorBtn.getAttribute('aria-label') || anchorBtn.innerText).trim() : 'NOT FOUND'));
+
     var moreBtn = null;
-    var overflowSvgs = Array.from(document.querySelectorAll('svg[id="overflow-web-ios-small"]'));
-    LOG('overflow-web-ios-small SVGs found: ' + overflowSvgs.length);
-    for (var si = 0; si < overflowSvgs.length; si++) {
-      var svgBtn = overflowSvgs[si].closest('button');
-      if (svgBtn) {
-        LOG('More button found via SVG id (index ' + si + ')');
-        moreBtn = svgBtn;
-        break;
+
+    // 1. SVG detection scoped to actionRoot first
+    var svgsInHero = Array.from(actionRoot.querySelectorAll('svg[id="overflow-web-ios-small"]'));
+    LOG('overflow-web-ios-small SVGs in profile hero: ' + svgsInHero.length);
+    for (var si = 0; si < svgsInHero.length; si++) {
+      var svgBtn = svgsInHero[si].closest('button');
+      if (svgBtn) { moreBtn = svgBtn; LOG('More button found via SVG in hero (index ' + si + ')'); break; }
+    }
+
+    // 2. Heuristic scoped to anchor container
+    if (!moreBtn && anchorBtn) {
+      var node = anchorBtn.parentElement;
+      while (node && !moreBtn) {
+        var moreCandidates = Array.from(node.querySelectorAll('button')).filter(isMoreTrigger);
+        if (moreCandidates.length > 0) { moreBtn = moreCandidates[0]; LOG('More button found via heuristic in anchor container'); }
+        else { node = node.parentElement; }
       }
     }
 
-    // Fallback: aria-label / text heuristics scoped near Message/Follow anchor
+    // 3. Global SVG fallback (whole page)
     if (!moreBtn) {
-      LOG('SVG detection failed — trying aria-label/text heuristics');
-      function isMoreTrigger(el) {
-        var label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
-        var text  = (el.innerText || '').trim();
-        return label === 'more' || text === '...' || text === '…';
+      LOG('Scoped search failed — trying global SVG scan');
+      var allSvgs = Array.from(document.querySelectorAll('svg[id="overflow-web-ios-small"]'));
+      LOG('Global overflow SVGs: ' + allSvgs.length);
+      for (var gi = 0; gi < allSvgs.length; gi++) {
+        var gBtn = allSvgs[gi].closest('button');
+        if (gBtn) { moreBtn = gBtn; LOG('More button found via global SVG (index ' + gi + ')'); break; }
       }
-      var anchorBtn = Array.from(document.querySelectorAll('button')).find(function(b) {
-        var label = (b.getAttribute('aria-label') || '').toLowerCase();
-        var text = (b.innerText || '').trim().toLowerCase().replace(/^[^a-z]+/, '');
-        return label.startsWith('message ') || text === 'message' || label.startsWith('follow ') || text === 'follow';
-      });
-      LOG('Anchor button (Message/Follow): ' + (anchorBtn ? (anchorBtn.getAttribute('aria-label') || anchorBtn.innerText).trim() : 'NOT FOUND'));
-      var node = anchorBtn ? anchorBtn.parentElement : null;
-      while (node && !moreBtn) {
-        var moreCandidates = Array.from(node.querySelectorAll('button')).filter(isMoreTrigger);
-        if (moreCandidates.length > 0) { moreBtn = moreCandidates[0]; }
-        else { node = node.parentElement; }
-      }
-      if (!moreBtn) {
-        LOG('Scoped search failed — falling back to global button scan');
-        moreBtn = Array.from(document.querySelectorAll('button')).find(isMoreTrigger) || null;
-      }
-      if (moreBtn) {
-        LOG('More button found via heuristic: aria-label="' + (moreBtn.getAttribute('aria-label') || '') + '"');
-      }
+    }
+
+    // 4. Global heuristic last resort
+    if (!moreBtn) {
+      moreBtn = Array.from(document.querySelectorAll('button')).find(isMoreTrigger) || null;
+      if (moreBtn) LOG('More button found via global heuristic');
     }
 
     if (moreBtn) {
