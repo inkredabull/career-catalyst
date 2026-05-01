@@ -910,14 +910,15 @@ async function sendConnectionRequest() {
   if (prompt('Weekend?')) msg.push('Have a great weekend! ');
 
   const outreach = msg.join('');
-  console.log(outreach.length, outreach);
+  const LOG = msg => console.log('[CONNECTION REQUEST] ' + msg);
+  LOG(`Message (${outreach.length} chars): ${outreach.slice(0, 60)}…`);
 
   // -- LinkedIn UI automation (mirrors components/networker/src/services/linkedin.ts) --
 
   // Skip if already pending
   const isPending = Array.from(document.querySelectorAll('button'))
     .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
-  if (isPending) { alert('⚠️ Connection request already pending.'); return; }
+  if (isPending) { LOG('Skipping — already pending'); alert('⚠️ Connection request already pending.'); return; }
 
   // Step 1: Direct Connect button (aria-label starts "invite " or innerText === "connect")
   const directConnect = Array.from(document.querySelectorAll('button, a')).find(b => {
@@ -927,14 +928,19 @@ async function sendConnectionRequest() {
   });
 
   if (directConnect) {
+    LOG(`Direct Connect button found: "${(directConnect.getAttribute('aria-label') || directConnect.innerText || '').trim()}" — clicking`);
     directConnect.click();
     await new Promise(r => setTimeout(r, 3000));
   } else {
+    LOG('No direct Connect button — searching for More/··· button');
+
     // Step 2a: Find ··· More button — primary: stable SVG icon id
     let moreBtn = null;
-    for (const svg of document.querySelectorAll('svg[id="overflow-web-ios-small"]')) {
+    const overflowSvgs = document.querySelectorAll('svg[id="overflow-web-ios-small"]');
+    LOG(`overflow-web-ios-small SVGs found: ${overflowSvgs.length}`);
+    for (const svg of overflowSvgs) {
       const btn = svg.closest('button');
-      if (btn) { moreBtn = btn; break; }
+      if (btn) { moreBtn = btn; LOG('More button found via SVG id'); break; }
     }
     // Fallback: aria-label*="More actions" (LinkedIn's "More actions for Name" pattern)
     if (!moreBtn) {
@@ -944,55 +950,81 @@ async function sendConnectionRequest() {
                   const text = (b.innerText || '').trim();
                   return label === 'more' || text === '...' || text === '…';
                 }) || null;
+      if (moreBtn) LOG(`More button found via fallback heuristic: aria-label="${moreBtn.getAttribute('aria-label') || ''}"`);
     }
 
     if (!moreBtn) {
+      LOG('ERROR: Could not find More actions or Connect button');
       alert('⚠️ Could not find "More actions" or "Connect" button on this profile.');
       return;
     }
 
     moreBtn.click();
+    LOG('More button clicked — waiting 2000ms for dropdown');
     await new Promise(r => setTimeout(r, 2000));
 
     // Step 2b: Find Connect in dropdown (broad: div, button, li, a, [role])
-    const conn = Array.from(document.querySelectorAll('div, button, li, a, [role]')).find(e => {
+    const allDropdownEls = Array.from(document.querySelectorAll('div, button, li, a, [role]'));
+    LOG(`Dropdown open — scanning ${allDropdownEls.length} elements for Connect`);
+    const conn = allDropdownEls.find(e => {
       const label = (e.getAttribute('aria-label') || '').toLowerCase();
       const text = (e.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase();
       return text.length < 40 && (label.startsWith('invite ') || label.includes('to connect') || text === 'connect');
     });
 
     if (!conn) {
+      LOG('Connect not found in dropdown — dumping short visible items:');
+      allDropdownEls
+        .filter(e => { const t = (e.innerText || '').trim(); return t.length > 0 && t.length < 40; })
+        .slice(0, 10)
+        .forEach(e => LOG(`  item: "${(e.innerText || '').trim()}"`));
       alert('⚠️ Could not find "Connect" in the overflow menu. Already connected?');
       return;
     }
+    LOG(`Connect item found in dropdown: "${(conn.getAttribute('aria-label') || conn.innerText || '').trim().slice(0, 40)}" — clicking`);
     conn.click();
     await new Promise(r => setTimeout(r, 3000));
   }
 
   // Step 3: Click "Add a note" in the connection modal (uses includes, not exact match)
+  LOG('Looking for "Add a note" button in modal');
+  const dialog = document.querySelector('[role="dialog"]');
+  LOG(`Modal dialog present: ${dialog ? 'YES' : 'NO'}`);
   const allInteractive = Array.from(document.querySelectorAll('button, [role="button"], a'));
   const addNote = allInteractive.find(b => {
     const text = (b.innerText || b.textContent || '').toLowerCase();
     return text.includes('add a note') || text.includes('add note');
   });
   if (addNote) {
+    LOG(`"Add a note" button found: "${(addNote.innerText || '').trim()}" — clicking`);
     addNote.click();
     await new Promise(r => setTimeout(r, 2000));
+  } else {
+    LOG('"Add a note" not found — dumping dialog buttons:');
+    if (dialog) {
+      Array.from(dialog.querySelectorAll('button, [role="button"]'))
+        .forEach(b => LOG(`  dialog btn: "${(b.innerText || b.textContent || '').trim().slice(0, 60)}"`));
+    }
+    LOG('Attempting to fill textarea directly anyway');
   }
 
   // Step 4: Fill textarea (querySelector first; shadow DOM fallback; native setter for React)
   let ta = document.querySelector('textarea');
+  LOG(`textarea via querySelector: ${ta ? 'FOUND' : 'NOT FOUND'}`);
   if (!ta) {
     const shadowHost = Array.from(document.querySelectorAll('*'))
       .find(el => el.shadowRoot && el.shadowRoot.querySelector('textarea'));
-    if (shadowHost) ta = shadowHost.shadowRoot.querySelector('textarea');
+    if (shadowHost) { ta = shadowHost.shadowRoot.querySelector('textarea'); LOG('textarea found in shadow DOM'); }
   }
   if (ta) {
+    LOG(`Filling textarea (id="${ta.id || 'none'}", name="${ta.name || 'none'}")`);
     const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
     nativeSetter.call(ta, outreach);
     ta.dispatchEvent(new Event('input', { bubbles: true }));
     ta.dispatchEvent(new Event('change', { bubbles: true }));
+    LOG('Textarea filled successfully');
   } else {
+    LOG('ERROR: no textarea found after all fallbacks');
     alert(`Message built (${outreach.length} chars) but could not auto-insert. Check console.`);
   }
 }
