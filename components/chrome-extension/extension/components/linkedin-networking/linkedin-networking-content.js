@@ -200,39 +200,20 @@ function findAndClickMutualConnections() {
   var profileName = getProfilePersonName();
   console.log(`Profile person name: "${profileName}"`);
 
-  // Look specifically for the main mutual connections link, not individual connection links
+  // Find the mutual connections link — covers all cases:
+  //   "Sandra and Josh are mutual connections"  (2 connections, no "other")
+  //   "Jane and 5 other mutual connections"     (many connections)
+  //   "Jane is a mutual connection"             (1 connection)
   var mutualConnectionLink = null;
 
-  // Find elements that contain mutual connections text - be more specific
-  var textElements = document.querySelectorAll('span.t-normal, span.hoverable-link-text');
-  for (let textElement of textElements) {
-    var text = textElement.innerText || textElement.textContent || '';
-    // Look for text that says "X other mutual connections" or "and X other mutual connections"
-    if (text.includes('mutual connection') && text.includes('other')) {
-      // Found text like "Dawn Ho, Robert Monarch, and 5 other mutual connections"
-      var linkElement = textElement.closest('a');
-      if (linkElement) {
-        var linkText = linkElement.innerText;
-        if (linkText.includes('other mutual connection')) {
-          mutualConnectionLink = linkElement;
-          console.log(`Found mutual connections link with full text: "${linkText.trim()}"`);
-          break;
-        }
-      }
-    }
-  }
-
-  // Alternative approach: find all links and look for mutual connections text
-  if (!mutualConnectionLink) {
-    var allLinks = document.querySelectorAll('a');
-    for (let link of allLinks) {
-      var linkText = link.innerText || link.textContent || '';
-      // Make sure it contains the full mutual connections text and not just a name
-      if (linkText.includes('mutual connection') && linkText.includes('other') && !link.href.includes('/in/')) {
-        mutualConnectionLink = link;
-        console.log(`Selected mutual connections link: "${linkText.trim()}"`);
-        break;
-      }
+  var allLinks = document.querySelectorAll('a');
+  for (let link of allLinks) {
+    var linkText = (link.innerText || link.textContent || '').replace(/\s+/g, ' ').trim();
+    // Must contain "mutual connection" and must NOT be a plain profile /in/ link
+    if (linkText.toLowerCase().includes('mutual connection') && !link.href.includes('/in/')) {
+      mutualConnectionLink = link;
+      console.log(`Found mutual connections link: "${linkText.slice(0, 80)}"`);
+      break;
     }
   }
 
