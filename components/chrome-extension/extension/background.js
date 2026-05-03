@@ -1522,6 +1522,7 @@ async function handleLookupLinkedInCompany(request, sendResponse) {
 
   try {
     const companyName = request.companyName;
+    const linkedInCompanySlug = request.linkedInCompanySlug || '';
 
     if (!companyName) {
       console.log('  → Error: No company name provided');
@@ -1531,6 +1532,34 @@ async function handleLookupLinkedInCompany(request, sendResponse) {
         error: 'Company name is required'
       });
       return;
+    }
+
+    // Strategy 0: Use known slug from job cache — fetch company page directly, no search needed.
+    if (linkedInCompanySlug) {
+      console.log('  → Strategy 0 (direct slug fetch):', linkedInCompanySlug);
+      const slugUrl = `https://www.linkedin.com/company/${encodeURIComponent(linkedInCompanySlug)}/`;
+      try {
+        const slugResp = await fetch(slugUrl, {
+          method: 'GET',
+          headers: { 'Accept': 'text/html' },
+          signal: AbortSignal.timeout(10000)
+        });
+        if (slugResp.ok) {
+          const slugHtml = await slugResp.text();
+          const urnMatch = /"entityUrn":"urn:li:company:(\d+)"/.exec(slugHtml);
+          if (urnMatch) {
+            console.log('  → Strategy 0 found company ID:', urnMatch[1]);
+            console.log('═══════════════════════════════════════════════════════════');
+            sendResponse({ success: true, companyId: urnMatch[1], companyName });
+            return;
+          }
+          console.log('  → Strategy 0: page fetched but no entityUrn found — falling through to search');
+        } else {
+          console.log('  → Strategy 0: fetch returned', slugResp.status, '— falling through to search');
+        }
+      } catch (slugErr) {
+        console.log('  → Strategy 0 failed:', slugErr.message, '— falling through to search');
+      }
     }
 
     // Use LinkedIn search to find the company

@@ -157,6 +157,7 @@ function createGutter() {
         </h4>
         <p class="section-description">Find connections at this company on LinkedIn</p>
 
+        <input type="hidden" id="linkedin-company-slug">
         <button id="search-connections" class="action-btn connections-btn" disabled>
           🔍 Search LinkedIn Connections
         </button>
@@ -651,6 +652,9 @@ function populateFieldsFromJobData(jobData, jobId) {
     companyField.value = jobData.company;
     companyField.dispatchEvent(new Event('input', { bubbles: true }));
   }
+
+  const slugField = document.getElementById('linkedin-company-slug');
+  if (slugField) slugField.value = jobData.linkedInCompany || '';
 
   const locationField = document.getElementById('job-location');
   if (locationField && jobData.location) {
@@ -2389,8 +2393,10 @@ async function handleSearchConnections() {
 
   const companyNameField = document.getElementById('company-name');
   const companyName = companyNameField ? companyNameField.value.trim() : '';
+  const linkedInCompanySlug = document.getElementById('linkedin-company-slug')?.value?.trim() || '';
 
   console.log('  → Company name:', companyName);
+  if (linkedInCompanySlug) console.log('  → LinkedIn slug hint:', linkedInCompanySlug);
 
   if (!companyName) {
     alert('Please enter a company name first');
@@ -2413,7 +2419,8 @@ async function handleSearchConnections() {
     // Call background script to look up the company's LinkedIn ID
     const response = await chrome.runtime.sendMessage({
       action: 'lookupLinkedInCompany',
-      companyName: companyName
+      companyName: companyName,
+      linkedInCompanySlug: linkedInCompanySlug || undefined
     });
 
     console.log('  → Background script response:', response);
