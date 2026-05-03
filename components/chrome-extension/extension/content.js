@@ -279,7 +279,7 @@ function createGutter() {
 
         <div class="form-field">
           <label for="reports-to">Reports to:</label>
-          <input type="text" id="reports-to" class="job-input" placeholder="Will be extracted from job description..." disabled>
+          <input type="text" id="reports-to" class="job-input" placeholder="Extracted from JD or inferred from title">
         </div>
 
         <div class="form-field">
@@ -682,9 +682,9 @@ function populateFieldsFromJobData(jobData, jobId) {
   if (jobData.description) {
     extractedJobDescription = jobData.description;
 
-    const reportsTo = extractReportsTo();
     const reportsToField = document.getElementById('reports-to');
     if (reportsToField) {
+      const reportsTo = jobData.reportsTo || extractReportsTo() || inferReportsToFromTitle(jobData.title || '');
       reportsToField.value = reportsTo;
       reportsToField.dispatchEvent(new Event('input', { bubbles: true }));
     }
@@ -761,10 +761,12 @@ function extractJobInformationLocal() {
   const urlField = document.getElementById('job-url');
   if (urlField) urlField.value = window.location.href;
 
-  // Extract reports-to information
-  const reportsTo = extractReportsTo();
+  // Extract reports-to information; fall back to title inference if JD has nothing
   const reportsToField = document.getElementById('reports-to');
-  if (reportsToField) {
+  if (reportsToField && !reportsToField.value) {
+    const reportsTo = extractReportsTo() || inferReportsToFromTitle(
+      document.getElementById('job-title')?.value || ''
+    );
     reportsToField.value = reportsTo;
     reportsToField.dispatchEvent(new Event('input', { bubbles: true }));
   }
@@ -1287,6 +1289,20 @@ function extractReportsTo() {
   return '';
 }
 
+function inferReportsToFromTitle(title) {
+  const t = (title || '').toLowerCase();
+  if (/\bchief\b|\bceo\b|\bcoo\b|\bcto\b|\bcpo\b/.test(t)) return '';
+  if (/\bvp\b|vice\s+president/.test(t)) return 'CEO / C-suite Executive';
+  if (/\bhead\s+of\b/.test(t)) return 'VP';
+  if (/\bdirector\b/.test(t)) return 'VP';
+  if (/\bsenior\s+manager\b/.test(t)) return 'Director';
+  if (/\bmanager\b|\blead\b/.test(t)) return 'Director / Senior Manager';
+  if (/\bprincipal\b|\bstaff\b/.test(t)) return 'Director / VP';
+  if (/\bsenior\b|\bsr\.?\b/.test(t)) return 'Engineering Manager';
+  if (/\bengineer\b|\bdeveloper\b|\bscientist\b|\bdesigner\b|\banalyst\b/.test(t)) return 'Engineering Manager';
+  return '';
+}
+
 // Extract company stage from job description
 function extractCompanyStage() {
   console.log('🔍 Career Catalyst: Extracting company stage');
@@ -1733,7 +1749,8 @@ async function handleTrackFromForm() {
       description: document.getElementById('job-description')?.value?.trim() || '',
       minSalary: document.getElementById('min-salary')?.value?.trim() || '',
       maxSalary: document.getElementById('max-salary')?.value?.trim() || '',
-      titleShorthand: document.getElementById('title-shorthand')?.value?.trim() || ''
+      titleShorthand: document.getElementById('title-shorthand')?.value?.trim() || '',
+      reportsTo: document.getElementById('reports-to')?.value?.trim() || ''
     };
     
     // Validate that we have at least title and company

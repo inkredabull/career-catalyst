@@ -16,6 +16,7 @@ export interface JobListing {
   titleShorthand?: string;
   source?: string;
   companyStage?: string;
+  reportsTo?: string;
 }
 
 export interface AgentConfig {
