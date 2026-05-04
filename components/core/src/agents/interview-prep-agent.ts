@@ -352,7 +352,7 @@ Format as:
   ): Promise<string> {
     // Check if all sections already exist
     const existingSections = this.listSections(this.currentJobId);
-    const allSections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close', 'questions'];
+    const allSections: AboutMeSection[] = ['hook', 'career-snapshot', 'why', 'focus-story', 'close', 'questions'];
     const missingSections = allSections.filter(s => !existingSections.includes(s));
 
     // If all sections exist, combine them
@@ -381,10 +381,6 @@ Format as:
           const userTheme = await this.determineFocalThemeFromJob(job);
           const focusContent = await this.generateFocusStory(job, cvContent, userTheme, options);
           this.saveSection(this.currentJobId, 'focus-story', focusContent, { userTheme });
-          break;
-        case 'themes':
-          const themesContent = await this.generateThemes(job, cvContent, options);
-          this.saveSection(this.currentJobId, 'themes', themesContent);
           break;
         case 'why':
           const whyContent = await this.generateWhyCompany(job, cvContent, companyValues, options);
@@ -707,7 +703,7 @@ Format as:
   async combineSections(jobId: string): Promise<string> {
     try {
       const jobData = await this.loadJobData(jobId);
-      const requiredSections: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close'];
+      const requiredSections: AboutMeSection[] = ['hook', 'career-snapshot', 'why', 'focus-story', 'close'];
       const sectionContents: Partial<Record<AboutMeSection, string>> = {};
 
       // Load required sections
@@ -1237,7 +1233,7 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
       const files = fs.readdirSync(searchDir);
       const sections: AboutMeSection[] = [];
 
-      const sectionTypes: AboutMeSection[] = ['hook', 'career-snapshot', 'themes', 'why', 'focus-story', 'close', 'personal-touch'];
+      const sectionTypes: AboutMeSection[] = ['hook', 'career-snapshot', 'why', 'focus-story', 'close', 'personal-touch'];
       for (const section of sectionTypes) {
         const sectionFile = `about-me-${section}.json`;
         if (files.includes(sectionFile)) {
