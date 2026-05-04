@@ -16,6 +16,7 @@ Generate 3–5 questions the candidate should ask the interviewer. Each question
 2. **Signal the candidate's priorities** — surface what a hands-on engineering leader cares about: team health, technical vision, build vs. buy decisions, how AI/LLM tooling is being adopted, go-to-market alignment with engineering.
 3. **Open a dialogue, not a monologue** — phrased to invite the interviewer to think, not just answer.
 4. **Vary the angle** — cover different dimensions: team dynamics, strategic direction, technical bets, success metrics, or organizational context.
+5. **Be compact and conversational** — structure: one brief setup sentence (1 sentence of context from the JD or role) followed immediately by the question itself. Stop there. No trailing explanation of why you're asking, no "I want to understand..." or "I ask because..." epilogue. The question should be able to land naturally mid-conversation without the interviewer needing to sit through a paragraph.
 
 ## Content Guidelines
 

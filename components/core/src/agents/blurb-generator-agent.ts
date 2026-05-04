@@ -24,7 +24,8 @@ Job Description (excerpt):
 ${job.description.slice(0, 2000)}
 
 Generate two blurbs for Anthony based on this specific role and company. Rules:
-- 100-150 words each
+- firstPerson: ≤ 280 characters (strict limit — count carefully)
+- thirdPerson: 100-150 words
 - Specific to this job and company (not generic)
 - No clichés
 - NO headings, labels, or titles before the text
@@ -50,13 +51,20 @@ Respond with ONLY valid JSON. The values must be plain prose strings with no emb
       throw new Error('BlurbGeneratorAgent: response missing firstPerson or thirdPerson fields');
     }
 
-    // Strip any leading heading line, collapse newlines, then hard-truncate to ≤150 words at sentence boundary
-    const clean = (s: string): string => {
-      const flat = s.replace(/^[A-Z][^\n]{0,40}\n/, '').replace(/\n+/g, ' ').trim();
-      const words = flat.split(/\s+/);
-      if (words.length <= 150) return flat;
-      // Truncate at last sentence-ending punctuation at or before word 150
-      const truncated = words.slice(0, 150).join(' ');
+    const flattenHeading = (s: string) =>
+      s.replace(/^[A-Z][^\n]{0,40}\n/, '').replace(/\n+/g, ' ').trim();
+
+    const truncateToChars = (s: string, limit: number): string => {
+      if (s.length <= limit) return s;
+      const cut = s.slice(0, limit);
+      const lastSentenceEnd = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+      return lastSentenceEnd > 0 ? cut.slice(0, lastSentenceEnd + 1) : cut.trimEnd();
+    };
+
+    const truncateToWords = (s: string, limit: number): string => {
+      const words = s.split(/\s+/);
+      if (words.length <= limit) return s;
+      const truncated = words.slice(0, limit).join(' ');
       const lastSentenceEnd = Math.max(
         truncated.lastIndexOf('. '),
         truncated.lastIndexOf('! '),
@@ -64,8 +72,9 @@ Respond with ONLY valid JSON. The values must be plain prose strings with no emb
       );
       return lastSentenceEnd > 0 ? truncated.slice(0, lastSentenceEnd + 1) : truncated;
     };
-    parsed.firstPerson = clean(parsed.firstPerson);
-    parsed.thirdPerson = clean(parsed.thirdPerson);
+
+    parsed.firstPerson = truncateToChars(flattenHeading(parsed.firstPerson), 280);
+    parsed.thirdPerson = truncateToWords(flattenHeading(parsed.thirdPerson), 150);
 
     return parsed;
   }
