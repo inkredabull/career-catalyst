@@ -118,6 +118,8 @@ jspm_packages/
 !package.json
 !package-lock.json
 !tsconfig.json
+!tsconfig.webpack.json
+!appsscript.json
 !extension/manifest.json
 !packages/chrome-extension/extension/manifest.json
 !components/chrome-extension/extension/manifest.json
