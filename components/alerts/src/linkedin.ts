@@ -1,5 +1,6 @@
 import { requireProp, SCRIPT_PROPS } from './config/settings';
 import { GEOS } from './config/constants';
+import { INCLUDE_PATTERNS, EXCLUDE_PATTERNS } from './config/titles';
 
 export interface SearchFilter {
   origin: string;
@@ -9,7 +10,22 @@ export interface SearchFilter {
   spellCorrectionEnabled: boolean;
 }
 
-type SearchResults = Record<string, string>;
+export interface JobResult {
+  id:      string;
+  company: string;
+  title:   string;
+  info?:   string;
+  url:     string;
+  search:  string;
+}
+
+export type SearchResults = Record<string, JobResult>;
+
+function titlePassesPatterns(title: string): boolean {
+  if (EXCLUDE_PATTERNS.some(re => re.test(title))) return false;
+  if (INCLUDE_PATTERNS.length > 0 && !INCLUDE_PATTERNS.some(re => re.test(title))) return false;
+  return true;
+}
 
 function buildLiOptions(cookie: string, csrfToken: string, referer: string): GoogleAppsScript.URL_Fetch.URLFetchRequestOptions {
   return {
@@ -61,19 +77,19 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
       if (!id) return;
 
       const title = (item.title as { text?: string } | undefined)?.text;
-      if (!title || /software engineer/i.test(title)) return;
+      if (!title || !titlePassesPatterns(title)) return;
 
-      const entry: string[] = [];
-      const primary = (item.primaryDescription as { text?: string } | undefined)?.text;
-      if (primary) entry.push(primary);
-      entry.push(title);
-      const tertiary = (item.tertiaryDescription as { text?: string } | undefined)?.text;
-      if (tertiary) entry.push(tertiary);
-      entry.push(`https://www.linkedin.com/jobs/view/${id}`);
-      entry.push(search);
-      entry.push('***************');
+      const company = (item.primaryDescription as { text?: string } | undefined)?.text ?? '';
+      const info    = (item.tertiaryDescription as { text?: string } | undefined)?.text;
 
-      hashOfResults[id] = entry.join('\n');
+      hashOfResults[id] = {
+        id,
+        company,
+        title,
+        ...(info ? { info } : {}),
+        url: `https://www.linkedin.com/jobs/view/${id}`,
+        search,
+      };
     });
   }
 

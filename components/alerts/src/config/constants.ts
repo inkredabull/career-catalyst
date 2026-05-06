@@ -77,39 +77,3 @@ export const US_FILTER = {
   spellCorrectionEnabled: true,
 };
 
-/** Job titles to search — uncomment/add to expand coverage */
-export const TITLES = [
-  // Engineering leadership
-  'Chief of Staff to the CTO',
-  'Head of Engineering Operations',
-  'VP of Platform Engineering',
-  'Chief Technologist',
-  'VP of Operations',
-  'Head of AI Engineering',
-  'Head of Technical Strategy',
-  'VP Engineering',
-  'Head of Engineering',
-  'CTO',
-  'Director of Engineering',
-  'Founding Engineer',
-  'AI Engineer',
-
-  // Program management
-  'Technical Program Manager',
-  'Forward Deployed Engineer',
-
-  // Product (uncomment to activate)
-  // 'VP Product',
-  // 'Director of Product Management',
-  // 'Technical Product Manager',
-
-  // Solutions / field
-  // 'Solutions Engineer',
-  // 'Solutions Architect',
-  // 'Field CTO',
-  // 'Developer Relations',
-  // 'Channel Partner Manager',
-  // 'Fractional CTO',
-  // 'Head of Product and Technology',
-  // 'Head of Product and Engineering',
-];
