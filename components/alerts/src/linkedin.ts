@@ -1,0 +1,101 @@
+import { requireProp, SCRIPT_PROPS } from './config/settings';
+import { GEOS } from './config/constants';
+
+export interface SearchFilter {
+  origin: string;
+  keywords?: string;
+  locationUnion: { geoId: string };
+  selectedFilters: Record<string, (string | number)[]>;
+  spellCorrectionEnabled: boolean;
+}
+
+type SearchResults = Record<string, string>;
+
+function buildLiOptions(cookie: string, csrfToken: string, referer: string): GoogleAppsScript.URL_Fetch.URLFetchRequestOptions {
+  return {
+    method: 'get',
+    headers: {
+      'accept': 'application/vnd.linkedin.normalized+json+2.1',
+      'accept-language': 'en-US,en;q=0.9',
+      'csrf-token': csrfToken,
+      'x-li-lang': 'en_US',
+      'x-restli-protocol-version': '2.0.0',
+      'cookie': cookie,
+      'Referer': referer,
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    },
+    muteHttpExceptions: true,
+    contentType: 'application/json',
+  };
+}
+
+export function getLinkedinURL(filter: SearchFilter): string {
+  const baseUrl = 'https://www.linkedin.com/voyager/api/voyagerJobsDashJobCards';
+  const decorationId = 'com.linkedin.voyager.dash.deco.jobs.search.JobSearchCardsCollection-216';
+
+  const queryParts = [
+    `origin:${filter.origin}`,
+    `keywords:${filter.keywords ?? ''}`,
+    `locationUnion:(geoId:${filter.locationUnion.geoId})`,
+    `selectedFilters:(${Object.entries(filter.selectedFilters)
+      .map(([key, value]) => `${key}:List(${value.join(',')})`)
+      .join(',')})`,
+    `spellCorrectionEnabled:${filter.spellCorrectionEnabled}`,
+  ];
+
+  return `${baseUrl}?decorationId=${decorationId}&count=25&q=jobSearch&query=(${queryParts.join(',')})&start=0`;
+}
+
+export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<string, unknown>, search: string): SearchResults {
+  const hashOfResults: SearchResults = {};
+  const included = (data as Record<string, unknown[]>).included;
+  console.log('Result count: %s', included?.length);
+
+  if (Array.isArray(included)) {
+    included.forEach((raw: unknown) => {
+      const item = raw as Record<string, unknown>;
+      if (Object.keys(item).length !== 30) return;
+
+      const urn = item.entityUrn as string | undefined;
+      const id = urn?.match(/\d+/)?.[0];
+      if (!id) return;
+
+      const title = (item.title as { text?: string } | undefined)?.text;
+      if (!title || /software engineer/i.test(title)) return;
+
+      const entry: string[] = [];
+      const primary = (item.primaryDescription as { text?: string } | undefined)?.text;
+      if (primary) entry.push(primary);
+      entry.push(title);
+      const tertiary = (item.tertiaryDescription as { text?: string } | undefined)?.text;
+      if (tertiary) entry.push(tertiary);
+      entry.push(`https://www.linkedin.com/jobs/view/${id}`);
+      entry.push(search);
+      entry.push('***************');
+
+      hashOfResults[id] = entry.join('\n');
+    });
+  }
+
+  return hashOfResults;
+}
+
+export function getSearchResultsFromLinkedin(filter: SearchFilter): Record<string, unknown> {
+  const cookie    = requireProp(SCRIPT_PROPS.LI_COOKIE);
+  const csrfToken = requireProp(SCRIPT_PROPS.LI_CSRF_TOKEN);
+  const url       = getLinkedinURL(filter);
+  const referer   = `https://www.linkedin.com/jobs/search/?geoId=${filter.locationUnion.geoId}`;
+
+  const response = UrlFetchApp.fetch(url, buildLiOptions(cookie, csrfToken, referer));
+  return JSON.parse(response.getContentText()) as Record<string, unknown>;
+}
+
+export function getSearchToPerform(filter: SearchFilter): string {
+  const label = [
+    decodeURIComponent(filter.keywords ?? ''),
+    ', ',
+    GEOS[filter.locationUnion.geoId] ?? filter.locationUnion.geoId,
+  ].join('').toUpperCase();
+  console.log('Fetching results for: %s', label);
+  return label;
+}

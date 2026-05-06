@@ -1,0 +1,9 @@
+dist/
+node_modules/
+coverage/
+
+# GAS deploy config — machine-specific, created per machine via clasp
+.clasp.json
+
+# LinkedIn session credentials — treated as secrets, never commit
+src/config/credentials.ts
