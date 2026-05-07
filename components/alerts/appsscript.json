@@ -4,6 +4,6 @@
   "runtimeVersion": "V8",
   "oauthScopes": [
     "https://www.googleapis.com/auth/script.external_request",
-    "https://mail.google.com/"
+    "https://www.googleapis.com/auth/script.send_mail"
   ]
 }
