@@ -25,8 +25,6 @@ npm install
 
 ### 2. Link to the Google Sheet / Script
 
-The Apps Script is bound to spreadsheet `1McSGJbUHhvyP-WrYNvsRJhYWidWZcbsDp0IwOyaZYdA`.
-
 ```bash
 npx clasp clone <scriptId> --rootDir dist
 ```
@@ -101,3 +99,11 @@ Nothing sensitive is committed. Credentials live in GAS Script Properties only:
 - `LI_CSRF_TOKEN` — LinkedIn CSRF token
 
 `dist/`, `node_modules/`, and `.clasp.json` are gitignored.
+
+## Reference
+
+Set SEARCH_TIME_FRAME in Script Properties to one of:
+
+r28800 — 8 hours
+r86400 — 24 hours
+r604800 — 7 days
