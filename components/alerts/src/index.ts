@@ -29,7 +29,8 @@ function formatEntry(r: JobResult, webAppUrl: string): { text: string; html: str
       ${r.title} <a href="${banTi}">👎</a><br>
       ${r.info ? r.info + '<br>' : ''}
       <a href="${r.url}">${r.url}</a><br>
-      <small>${r.search}</small>
+      <small>${r.search}</small><br>
+      <small>Source: LinkedIn</small>
     </div>`,
   };
 }
