@@ -6,6 +6,7 @@ export const SCRIPT_PROPS = {
   WEB_APP_URL:         'WEB_APP_URL',         // set after deploying as web app
   STOP_LIST_COMPANIES: 'STOP_LIST_COMPANIES', // JSON array of company name strings
   STOP_LIST_TITLES:    'STOP_LIST_TITLES',    // JSON array of title strings
+  SEARCH_TIME_FRAME:   'SEARCH_TIME_FRAME',   // LinkedIn time filter: r28800 (8h), r86400 (24h), r604800 (7d)
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */

@@ -52,8 +52,8 @@ export function mergeResults(results: SearchResults, searchResults: SearchResult
   return { ...results, ...searchResults };
 }
 
-function fetchResults(title: string, results: SearchResults, filter: SearchFilter): SearchResults {
-  const f = { ...filter, keywords: encodeURIComponent(title), timePostedRange: [TIME_FRAME] } as SearchFilter;
+function fetchResults(title: string, results: SearchResults, filter: SearchFilter, timeFrame: string): SearchResults {
+  const f = { ...filter, keywords: encodeURIComponent(title), timePostedRange: [timeFrame] } as SearchFilter;
   const search = getSearchToPerform(f);
   const data   = getSearchResultsFromLinkedin(f);
   const found  = extractInfo(data as Parameters<typeof extractInfo>[0], search);
@@ -62,10 +62,11 @@ function fetchResults(title: string, results: SearchResults, filter: SearchFilte
 }
 
 export function getResults(): SearchResults {
+  const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
   let results: SearchResults = {};
   SEARCH_TITLES.forEach(title => {
-    results = fetchResults(title, results, SF_FILTER as SearchFilter);
-    results = fetchResults(title, results, US_FILTER as SearchFilter);
+    results = fetchResults(title, results, SF_FILTER as SearchFilter, timeFrame);
+    results = fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
   });
 
   const blockedCos    = readStopList(SCRIPT_PROPS.STOP_LIST_COMPANIES);
