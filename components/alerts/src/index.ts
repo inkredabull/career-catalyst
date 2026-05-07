@@ -73,7 +73,11 @@ export function getResults(): SearchResults {
   const blockedTitles = readStopList(SCRIPT_PROPS.STOP_LIST_TITLES);
   if (blockedCos.length || blockedTitles.length) {
     Object.keys(results).forEach(id => {
-      if (isBlocked(results[id], blockedCos, blockedTitles)) delete results[id];
+      const r = results[id];
+      if (isBlocked(r, blockedCos, blockedTitles)) {
+        console.log('Excluded (stop list): %s — %s', r.company, r.title);
+        delete results[id];
+      }
     });
   }
 
