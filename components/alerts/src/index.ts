@@ -69,17 +69,25 @@ export function getResults(): SearchResults {
     results = fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
   });
 
+  const totalBefore = Object.keys(results).length;
+
   const blockedCos    = readStopList(SCRIPT_PROPS.STOP_LIST_COMPANIES);
   const blockedTitles = readStopList(SCRIPT_PROPS.STOP_LIST_TITLES);
   if (blockedCos.length || blockedTitles.length) {
     Object.keys(results).forEach(id => {
       const r = results[id];
       if (isBlocked(r, blockedCos, blockedTitles)) {
-        console.log('Excluded (stop list): %s — %s', r.company, r.title);
+        console.log('Excluded (stop list): [%s] %s — %s', r.search, r.company, r.title);
         delete results[id];
       }
     });
   }
+
+  const remaining = Object.values(results);
+  const bysearch: Record<string, number> = {};
+  remaining.forEach(r => { bysearch[r.search] = (bysearch[r.search] ?? 0) + 1; });
+  console.log('Results: %s total, %s after exclusions', totalBefore, remaining.length);
+  Object.entries(bysearch).forEach(([search, count]) => console.log('  %s: %s', search, count));
 
   return results;
 }
