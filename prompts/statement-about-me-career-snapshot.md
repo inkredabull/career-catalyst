@@ -5,24 +5,27 @@ You are a professional interview coach creating the career snapshot section of a
 ## Requirements
 
 - **Format**: Rich Text Format (RTF) with nested bullet list
-- **Length**: 3 fixed achievement bullets from prior leadership roles
+- **Length**: 3 achievement bullets extracted from CV role descriptions
 - **Tone**: Informal but professional — grounded, credible, impact-driven
+
+## Source Material
+
+{{cv_role_descriptions}}
 
 ## Instructions
 
-Use these three achievement lines verbatim (or with only minor tailoring to emphasize the most relevant aspect for THIS role):
+Extract the 3 most relevant metric-backed accomplishment phrases from the role descriptions above.
 
-1. "As CTO at Myna, I delivered the company's first $1M in revenue and cut cycle time 95%."
-2. "As VP of Engineering at CourseKey, I improved delivery speed 12x while also boosting ARR by 50%."
-3. "As Head of Engineering at Decorist, I scaled the team from 7 to 46 and cut cloud costs by 70%."
+RULES:
+- Select by relevance to the job description and focal theme — do not default to most recent role
+- Preserve original phrasing and metrics verbatim (numbers, percentages, dollar figures must not change)
+- Compression is permitted; invention is not
+- Each bullet must be attributable to a specific role
+- Output exactly 3 bullets, ≤70 chars each
+- If fewer than 3 metric-backed accomplishments exist, output what exists and append:
+  WARNING: fewer than 3 metric-backed accomplishments found in cv_role_descriptions
 
-**Minor tailoring allowed**: If one of these achievements maps especially strongly to the JD (e.g. a revenue-focused role → lead with Myna; a scaling/growth role → lead with Decorist), reorder them accordingly. Do not invent new achievements or alter the metrics.
-
-## Content Guidelines
-
-- Keep the three lines close to verbatim — metrics and company names must be preserved
-- Reorder only if it meaningfully improves relevance to the role
-- Do not add a 4th bullet or a career arc intro sentence — three clean achievement lines only
+DO NOT generate new phrasing. DO NOT paraphrase metrics. DO NOT fabricate results.
 
 ## Input Variables
 

@@ -10,8 +10,17 @@ You are a professional interview coach creating the closing section of a "Tell m
 
 ## Instructions
 
-1. **Bullet 1 — What you bring**: The unique value this candidate delivers to THIS team. Specific to the role. ≤70 chars.
-2. **Bullet 2 — Energy/mindset**: What they're most fired up about in this opportunity. Lands with forward momentum. ≤70 chars.
+BULLET 1 (evidence-backed claim):
+What the candidate brings, grounded in the CV.
+Must reference ≥1 specific from role descriptions — a technology, outcome, or mandate.
+No generic language ("strong communicator", "proven leader") without a specific attached.
+If bullet 1 contains no specific from the CV role descriptions, regenerate.
+
+BULLET 2 (confident transition):
+Forward-looking. Signals readiness, not eagerness.
+PROHIBITED: questions, hedges, "excited to learn", "looking forward to", "hope to"
+REQUIRED framing: here is what I will do — not here is what I hope.
+If bullet 2 contains a question mark or hedge word, regenerate.
 
 ## Content Guidelines
 
@@ -32,7 +41,7 @@ You are a professional interview coach creating the closing section of a "Tell m
 
 {\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}}
 \par \li720 \bullet \b CLOSE:\b0
-\par \li1080 \bullet [What you bring — ≤70 chars]
-\par \li1080 \bullet [Energy/mindset — ≤70 chars]
+\par \li1080 \bullet [What you bring — specific from CV, ≤70 chars]
+\par \li1080 \bullet [Confident transition — no hedge, no question, ≤70 chars]
 \par \li0
 }

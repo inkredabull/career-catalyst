@@ -5,23 +5,29 @@ You are a professional interview coach creating the "Why this role and company?"
 ## Requirements
 
 - **Format**: Rich Text Format (RTF) with nested bullet list
-- **Length**: 4 bullets
+- **Length**: 1 required bullet + 1 conditional bullet
 - **Style**: Memory triggers, not sentences. Fragments OK. ≤70 characters each.
 
 ## Instructions
 
-Generate exactly 4 bullets under WHY {{job.company}}?:
+OUTPUT STRUCTURE: 1 required bullet + 1 conditional bullet, ≤70 chars each.
 
-1. **Why this company/role**: Specific hook — mission signal, growth stage, or role mandate. Shows homework. ≤70 chars.
-2. **Why now & why you**: The 1-line match between your current capabilities and their current need. ≤70 chars.
-3. **Transition framing (ALWAYS INCLUDE)**: Since Myna 2024 — building/shipping LLM systems, advising on AI architecture. Intentional, productive, exactly on-point for this role. Confident. Not apologetic. ≤70 chars.
-4. **Gap or confidence close**: If a gap exists — one transferable bridge. If no gap — forward-looking closer. ≤70 chars.
+BULLET 1 (alignment) — always required:
+Map the candidate's strongest relevant experience directly to the job's primary need.
+Derive from: focal theme and CV role descriptions.
+Must be specific — no generic "passion for X" language.
+If the focal theme cannot be matched to a specific experience in the CV, flag it.
+
+BULLET 2 (timing/context) — conditional:
+Only generate bullet 2 if the job description or company values contain an explicit or implicit
+signal that the interviewer will ask "why are you looking at this role right now?"
+Signals: urgency language, growth-stage context, transition framing, "why now" framing.
+If no such signal is present: omit bullet 2 entirely. Do not generate a placeholder.
 
 ## Content Guidelines
 
 - Be specific about the company — use company info and JD signals
 - Memory triggers only — the speaker elaborates verbally
-- Transition framing is always required and always positive
 
 ## Input Variables
 
@@ -37,9 +43,7 @@ Generate exactly 4 bullets under WHY {{job.company}}?:
 
 {\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}}
 \par \li720 \bullet \b WHY {{job.company}}?\b0
-\par \li1080 \bullet [Why this company/role — ≤70 chars]
-\par \li1080 \bullet [Why now & why you — ≤70 chars]
-\par \li1080 \bullet [Transition framing — confident, ≤70 chars]
-\par \li1080 \bullet [Gap bridge or confidence close — ≤70 chars]
+\par \li1080 \bullet [Alignment — specific match to focal theme, ≤70 chars]
+\par \li1080 \bullet [Timing/context — only if "why now" signal present, ≤70 chars]
 \par \li0
 }

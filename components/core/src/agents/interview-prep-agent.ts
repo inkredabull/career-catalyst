@@ -683,7 +683,8 @@ Format as:
       .replace(/{{companyInfo}}/g, options.companyInfo || '')
       .replace(/{{customInstructions}}/g, options.customInstructions || '')
       .replace(/{{companyValues}}/g, companyValuesSection || '')
-      .replace(/{{person}}/g, options.person || 'first');
+      .replace(/{{person}}/g, options.person || 'first')
+      .replace(/{{cv_role_descriptions}}/g, section === 'career-snapshot' ? this.extractRoleDescriptions(cvContent) : '');
 
     // Remove the section for the opposite person perspective to avoid confusion
     const person = options.person || 'first';
@@ -698,6 +699,26 @@ Format as:
     prompt += `\n\nJob Posting:\nTitle: ${job.title}\nCompany: ${job.company}\nDescription: ${job.description}\n\nWork History:\n${cvContent}`;
 
     return prompt;
+  }
+
+  private extractRoleDescriptions(cvContent: string): string {
+    const rolePattern = /^.+@\s*.+\(.+\)/m;
+    const lines = cvContent.split('\n');
+    const roleBlocks: string[] = [];
+    let currentBlock: string[] = [];
+    let inBlock = false;
+
+    for (const line of lines) {
+      if (rolePattern.test(line)) {
+        if (currentBlock.length > 0) roleBlocks.push(currentBlock.join('\n').trim());
+        currentBlock = [line];
+        inBlock = true;
+      } else if (inBlock) {
+        currentBlock.push(line);
+      }
+    }
+    if (currentBlock.length > 0) roleBlocks.push(currentBlock.join('\n').trim());
+    return roleBlocks.join('\n\n');
   }
 
   async combineSections(jobId: string): Promise<string> {
@@ -1233,7 +1254,7 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
       const files = fs.readdirSync(searchDir);
       const sections: AboutMeSection[] = [];
 
-      const sectionTypes: AboutMeSection[] = ['hook', 'career-snapshot', 'why', 'focus-story', 'close', 'personal-touch'];
+      const sectionTypes: AboutMeSection[] = ['hook', 'career-snapshot', 'why', 'focus-story', 'close', 'questions'];
       for (const section of sectionTypes) {
         const sectionFile = `about-me-${section}.json`;
         if (files.includes(sectionFile)) {
