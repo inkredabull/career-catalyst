@@ -64,10 +64,12 @@ function fetchResults(title: string, results: SearchResults, filter: SearchFilte
 export function getResults(): SearchResults {
   const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
   let results: SearchResults = {};
-  SEARCH_TITLES.forEach(title => {
-    results = fetchResults(title, results, SF_FILTER as SearchFilter, timeFrame);
-    results = fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
-  });
+  Object.entries(SEARCH_TITLES)
+    .filter(([, enabled]) => enabled)
+    .forEach(([title]) => {
+      results = fetchResults(title, results, SF_FILTER as SearchFilter, timeFrame);
+      results = fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
+    });
 
   const totalBefore = Object.keys(results).length;
 

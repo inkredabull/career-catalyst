@@ -1,28 +1,31 @@
-/** Titles sent as queries to LinkedIn search */
-export const SEARCH_TITLES: string[] = [
-  'Chief of Staff to the CTO',
-  'Head of Engineering Operations',
-  'Head of AI Engineering',
-  'Head of Technical Strategy',
-  'VP Engineering',
-  'Head of Engineering',
-  'CTO',
-  'CPTO',
-  'Director of Engineering',
-  'AI Enablement Engineer',
-  'Forward Deployed Engineer',
-  'Technical Program Manager',
-  'Technical Product Manager',
-  'Solutions Engineer',
-  'Solutions Architect',
-  'Field CTO',
-  'Developer Relations',
-  'Fractional CTO',
-  'Head of Product and Technology',
-  'VP of Product Engineering',
-  'Head of Product Engineering',
-  'Director of Product Engineering',
-];
+/**
+ * Search queries sent to LinkedIn. Set a title's value to false to disable it
+ * without removing it — makes it easy to re-enable without losing the entry.
+ */
+export const SEARCH_TITLES: Record<string, boolean> = {
+  'Chief of Staff to the CTO':   true,
+  'Head of Engineering Operations': true,
+  'Head of AI Engineering':      true,
+  'Head of Technical Strategy':  true,
+  'VP Engineering':              true,
+  'Head of Engineering':         true,
+  'CTO':                         true,
+  'CPTO':                        true,
+  'Director of Engineering':     true,
+  'AI Enablement Engineer':      true,
+  'Forward Deployed Engineer':   true,
+  'Technical Program Manager':   true,
+  'Technical Product Manager':   true,
+  'Solutions Engineer':          true,
+  'Solutions Architect':         true,
+  'Field CTO':                   true,
+  'Developer Relations':         true,
+  'Fractional CTO':              true,
+  'Head of Product and Technology': true,
+  'VP of Product Engineering':   true,
+  'Head of Product Engineering': true,
+  'Director of Product Engineering': true,
+};
 
 /**
  * Result title must match at least one of these to be included.
