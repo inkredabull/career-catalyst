@@ -110,6 +110,7 @@ export class SheetsLogger {
       console.log(`📊 Job tracked in Google Sheets: ${jobId}`);
     } catch (error) {
       console.error('⚠️ Failed to log tracked job to Google Sheets:', error);
+      throw error;
     }
   }
 

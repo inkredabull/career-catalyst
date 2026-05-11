@@ -472,14 +472,18 @@ program
       // Log to Google Sheets immediately — regardless of whether scoring runs
       const sheetsLogger = createSheetsLogger();
       if (sheetsLogger) {
-        await sheetsLogger.logTracked(
-          jobId,
-          result.data.title,
-          result.data.company,
-          result.data.url || '',
-          'CLI',
-          result.data
-        );
+        try {
+          await sheetsLogger.logTracked(
+            jobId,
+            result.data.title,
+            result.data.company,
+            result.data.url || '',
+            'CLI',
+            result.data
+          );
+        } catch (sheetsError) {
+          console.error('❌ Google Sheets logging failed — job was extracted but NOT written to sheet. Re-run: npm run dev track-sheet', jobId);
+        }
       }
 
       // Auto-generate first and third person blurbs via Gemini Flash (via OpenRouter)
