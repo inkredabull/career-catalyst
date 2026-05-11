@@ -12,7 +12,6 @@ export const SEARCH_TITLES: string[] = [
   'AI Enablement Engineer',
   'Forward Deployed Engineer',
   'Technical Program Manager',
-  'Forward Deployed Engineer',
   'Technical Product Manager',
   'Solutions Engineer',
   'Solutions Architect',
@@ -27,9 +26,35 @@ export const SEARCH_TITLES: string[] = [
 
 /**
  * Result title must match at least one of these to be included.
- * Leave empty to skip positive filtering (rely on EXCLUDE_PATTERNS alone).
+ * LinkedIn `keywords` is full-text search — it returns jobs where the term
+ * appears anywhere in the posting, not just the title. These patterns act as
+ * a positive allowlist so noise (e.g. "Business Development Director") is
+ * rejected even when LinkedIn surfaces it for a "CPTO" keyword search.
  */
-export const INCLUDE_PATTERNS: RegExp[] = [];
+export const INCLUDE_PATTERNS: RegExp[] = [
+  // CTO, Field CTO, Fractional CTO, "Chief of Staff to the CTO"
+  /\bCTO\b/i,
+  // CPTO — separate from CTO because the letters C-P-T-O don't contain the substring "CTO"
+  /\bCPTO\b/i,
+  // full spelling LinkedIn sometimes returns instead of the acronym
+  /Chief\s+(Technology|Technical)\s+Officer/i,
+  // VP Engineering, VP of Product Engineering, Vice President Engineering, etc.
+  // No trailing \b on the second group — "engineer" must prefix-match "Engineering"
+  /\b(VP|V\.P\.|Vice\s+President)\b.*(engineer|product|tech|platform|ai)/i,
+  // Head of Engineering, Head of AI Engineering, Head of Technical Strategy,
+  // Head of Engineering Operations, Head of Product and Technology
+  /\bHead\s+of\s+(engineer|ai|tech|product|platform|operat)/i,
+  // Director of Engineering, Director of Product Engineering, Senior Director of Engineering, etc.
+  /\bDirector\b.*(engineer|tech|platform|ai)/i,
+  // Technical Program Manager, Technical Product Manager
+  /\b(Technical|AI)\s+(Program|Product)\s+Manager\b/i,
+  // Solutions Engineer, Solutions Architect, Forward Deployed Engineer, AI Enablement Engineer
+  /\b(Solutions|Forward.Deployed|AI.Enablement)\s+(Engineer|Architect)\b/i,
+  // Developer Relations
+  /\bDeveloper\s+Relations\b/i,
+  // Chief of Staff (CTO\b also catches "Chief of Staff to the CTO", belt-and-suspenders)
+  /\bChief\s+of\s+Staff\b/i,
+];
 
 /**
  * Result title matching any of these is always rejected,

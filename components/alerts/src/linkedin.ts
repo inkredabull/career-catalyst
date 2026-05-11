@@ -1,6 +1,6 @@
 import { requireProp, SCRIPT_PROPS } from './config/settings';
 import { GEOS } from './config/constants';
-import { INCLUDE_PATTERNS, EXCLUDE_PATTERNS } from './config/titles';
+import { titlePassesPatterns } from './filters';
 
 export interface SearchFilter {
   origin: string;
@@ -21,11 +21,6 @@ export interface JobResult {
 
 export type SearchResults = Record<string, JobResult>;
 
-function titlePassesPatterns(title: string): boolean {
-  if (EXCLUDE_PATTERNS.some(re => re.test(title))) return false;
-  if (INCLUDE_PATTERNS.length > 0 && !INCLUDE_PATTERNS.some(re => re.test(title))) return false;
-  return true;
-}
 
 function buildLiOptions(cookie: string, csrfToken: string, referer: string): GoogleAppsScript.URL_Fetch.URLFetchRequestOptions {
   return {
