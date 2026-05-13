@@ -89,4 +89,24 @@ describe('parseResultTitle', () => {
     const r = parseResultTitle('VP Engineering @ Stripe');
     expect(r).toEqual({ title: 'VP Engineering', company: 'Stripe' });
   });
+
+  it('parses "COMPANY hiring TITLE in LOCATION" format', () => {
+    const r = parseResultTitle('Arlo Hotels hiring Director of Engineering in Washington, DC');
+    expect(r).toEqual({ title: 'Director of Engineering', company: 'Arlo Hotels' });
+  });
+
+  it('parses "COMPANY hiring TITLE" without location', () => {
+    const r = parseResultTitle('Acme Corp hiring VP Engineering | LinkedIn');
+    expect(r).toEqual({ title: 'VP Engineering', company: 'Acme Corp' });
+  });
+
+  it('extracts company from remaining segment stripping Careers suffix', () => {
+    const r = parseResultTitle('Senior Forward Deployed Engineer, Cloud Applied AI | Google Careers');
+    expect(r).toEqual({ title: 'Senior Forward Deployed Engineer, Cloud Applied AI', company: 'Google' });
+  });
+
+  it('extracts company from remaining segment without suffix', () => {
+    const r = parseResultTitle('Director of Engineering | Stripe');
+    expect(r).toEqual({ title: 'Director of Engineering', company: 'Stripe' });
+  });
 });

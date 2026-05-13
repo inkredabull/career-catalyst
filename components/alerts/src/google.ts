@@ -25,11 +25,13 @@ const NOISE_SEGMENTS = new Set(['jobs', 'ashby', 'wellfound', 'linkedin', 'indee
 
 /** Parses a raw Google/Serper result title into job title + company.
  *  Handles common formats:
- *    "Head of Engineering @ Notion | Jobs"   (Ashby @ format)
- *    "Jobs | Chief of Staff @ Superpower"    (Jobs prefix noise)
+ *    "Head of Engineering @ Notion | Jobs"                     (Ashby @ format)
+ *    "Jobs | Chief of Staff @ Superpower"                      (Jobs prefix noise)
  *    "VP Engineering at Stripe | Ashby"
+ *    "Arlo Hotels hiring Director of Engineering in Seattle"   (LinkedIn alert format)
  *    "Head of Engineering - Acme | Wellfound"
- *    "CTO – Some Company"  */
+ *    "CTO – Some Company"
+ *    "Senior FDE, Cloud AI | Google Careers"                   (segment fallback)  */
 export function parseResultTitle(raw: string): { title: string; company: string } {
   const segments = raw.split(' | ').map(s => s.trim());
   const withoutSite = segments.find(s => !NOISE_SEGMENTS.has(s.toLowerCase())) ?? segments[0];
@@ -40,8 +42,18 @@ export function parseResultTitle(raw: string): { title: string; company: string 
   const atWordMatch = withoutSite.match(/^(.+?)\s+at\s+(.+)$/i);
   if (atWordMatch) return { title: atWordMatch[1].trim(), company: atWordMatch[2].trim() };
 
+  const hiringMatch = withoutSite.match(/^(.+?)\s+hiring\s+(.+?)(?:\s+in\s+.+)?$/i);
+  if (hiringMatch) return { title: hiringMatch[2].trim(), company: hiringMatch[1].trim() };
+
   const dashMatch = withoutSite.match(/^(.+?)\s+[-–—]\s+(.+)$/);
   if (dashMatch) return { title: dashMatch[1].trim(), company: dashMatch[2].trim() };
+
+  // Fallback: use other non-noise segments, stripping "Careers" / "Job Board" suffixes
+  const others = segments.filter(s => s !== withoutSite && !NOISE_SEGMENTS.has(s.toLowerCase()));
+  if (others.length > 0) {
+    const company = others[others.length - 1].replace(/\s+(careers?|job\s+board)\s*$/i, '').trim();
+    if (company) return { title: withoutSite, company };
+  }
 
   return { title: withoutSite, company: '' };
 }
