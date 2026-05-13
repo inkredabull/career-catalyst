@@ -9,7 +9,7 @@ export const CV = readFileSync(cvPath, "utf8").trim();
 
 // ─── SCORING RUBRIC ───────────────────────────────────────────────────────────
 export const RUBRIC = `
-## 15-Dimension Scoring Rubric (1–5 each)
+## 14-Dimension Scoring Rubric (1–5 each)
 
 Score each dimension for Anthony specifically:
 - 5 = Exceptional fit, exceeds bar
@@ -22,7 +22,7 @@ Dimensions:
 1. Skills & Strengths Alignment — Does the role leverage AI-native systems, RAG, LLMs, platform/infra, 0-to-1 building?
 2. Role Availability & Growth — Clear mandate and upward path? Avoid IC-heavy or purely operational roles.
 3. Values & Mission Fit — Does the company's mission connect to Anthony's long-term arc?
-4. Compensation & Stability — Target: $255K+ TC. Flag if not disclosed or likely below target.
+4. Compensation & Stability — Target: $225K+ base salary. Flag if not disclosed or likely below target.
 5. Learning & Innovation — Will Anthony be stretched technically and strategically?
 6. Company Culture Norms — Evidence of async-first, high-trust, low-bureaucracy culture?
 7. Lifestyle & Flexibility — Remote-friendly preferred; in-person in San Francisco is acceptable. Only flag roles requiring relocation or outside SF Bay Area.
@@ -31,12 +31,11 @@ Dimensions:
 10. Leadership Reputation — Any signals on the exec team (prior exits, public presence, employee sentiment)?
 11. Glassdoor / Employee Sentiment — If company is known, any public signals worth noting?
 12. Recent News / Growth Direction — Is the company on an upward trajectory?
-13. DEI Commitment — Any signals in the JD or public record?
-14. Internal Mobility — Could this role evolve into a true CTO mandate over time?
-15. Recruiter Responsiveness — Default 3 if not yet engaged.
+13. Internal Mobility — Could this role evolve into a true CTO mandate over time?
+14. Recruiter Responsiveness — Default 3 if not yet engaged.
 
 Hard filters (score 1 if triggered):
-- Comp ceiling clearly below $255K TC
+- Comp ceiling clearly below $225K base salary
 - Full-time in-office outside San Francisco Bay Area (requires relocation)
 - IC-heavy with no direct reports or org-building mandate
 - No AI/ML component to the product or platform
@@ -67,7 +66,7 @@ Produce a scorecard in this exact structure:
 | 1 | Skills & Strengths Alignment | X | | |
 ... (all 15 rows) ...
 
-**Total: XX / 75**
+**Total: XX / 70**
 
 #### 🔴 Red Flags
 - [List scores of 1 or hard filter failures, or "None" if clean]
@@ -99,7 +98,7 @@ One of:
 
 Scoring notes:
 - A 3.5/5 average is NOT a Strong Fit.
-- Below 45/75 total → default to Pass or Conditional unless exceptional circumstances exist.
+- Below 42/70 total → default to Pass or Conditional unless exceptional circumstances exist.
 - Be honest. Anthony's time is finite.
 `.trim();
 
