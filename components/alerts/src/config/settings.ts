@@ -8,6 +8,7 @@ export const SCRIPT_PROPS = {
   STOP_LIST_TITLES:    'STOP_LIST_TITLES',    // JSON array of title strings
   SEARCH_TIME_FRAME:   'SEARCH_TIME_FRAME',   // LinkedIn time filter: r28800 (8h), r86400 (24h), r604800 (7d)
   SERPER_API_KEY:      'SERPER_API_KEY',       // serper.dev API key for Google search results
+  SEEN_JOB_IDS:        'SEEN_JOB_IDS',         // JSON Record<id, timestamp> of already-emailed jobs
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */

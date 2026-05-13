@@ -5,6 +5,7 @@ import { pause } from './clock';
 import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
 import { fetchGoogleResults } from './google';
 import { log } from './utils/logger';
+import { loadSeen, saveSeen, filterUnseen, markAsSeen } from './seen';
 import { doGet } from './webapp';
 
 function readStopList(key: string): string[] {
@@ -130,7 +131,15 @@ export function getResults(): SearchResults {
 // ---------------------------------------------------------------------------
 
 function getOpenReqs(): void {
-  notify(getResults());
+  const results = getResults();
+  const seen    = loadSeen();
+  const fresh   = filterUnseen(results, seen);
+  if (Object.keys(fresh).length === 0) {
+    log('INFO', 'No new results, skipping email');
+    return;
+  }
+  notify(fresh);
+  saveSeen(markAsSeen(fresh, seen));
 }
 
 function runGoogle(): void {
