@@ -17,6 +17,7 @@ export interface JobResult {
   info?:   string;
   url:     string;
   search:  string;
+  source?: string;
 }
 
 export type SearchResults = Record<string, JobResult>;

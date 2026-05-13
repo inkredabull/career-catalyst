@@ -3,6 +3,7 @@ import { SF_FILTER, US_FILTER, TIME_FRAME } from './config/constants';
 import { SEARCH_TITLES } from './config/titles';
 import { pause } from './clock';
 import { getSearchResultsFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
+import { fetchGoogleResults } from './google';
 import { doGet } from './webapp';
 
 function readStopList(key: string): string[] {
@@ -30,7 +31,7 @@ function formatEntry(r: JobResult, webAppUrl: string): { text: string; html: str
       ${r.info ? r.info + '<br>' : ''}
       <a href="${r.url}">${r.url}</a><br>
       <small>${r.search}</small><br>
-      <small>Source: LinkedIn</small>
+      <small>Source: ${r.source ?? 'LinkedIn'}</small>
     </div>`,
   };
 }
@@ -70,6 +71,8 @@ export function getResults(): SearchResults {
       results = fetchResults(title, results, SF_FILTER as SearchFilter, timeFrame);
       results = fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
     });
+
+  results = mergeResults(results, fetchGoogleResults(timeFrame));
 
   const totalBefore = Object.keys(results).length;
 
