@@ -68,11 +68,11 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
 
     included.forEach((raw: unknown) => {
       const item = raw as Record<string, unknown>;
-      if (Object.keys(item).length !== 30) return;
+      const urn = item.entityUrn as string | undefined;
+      if (!urn?.toLowerCase().includes('jobposting')) return;
       jobCards++;
 
-      const urn = item.entityUrn as string | undefined;
-      const id = urn?.match(/\d+/)?.[0];
+      const id = urn.match(/\d+/)?.[0];
       if (!id) return;
 
       const title = (item.title as { text?: string } | undefined)?.text;
