@@ -102,6 +102,33 @@ export function getSearchResultsFromLinkedin(filter: SearchFilter): Record<strin
   return JSON.parse(response.getContentText()) as Record<string, unknown>;
 }
 
+// Fetches the "Top Applicant" job collection across the first N pages.
+// Uses the graphql endpoint — same normalized JSON format, same auth, no time filter
+// (LinkedIn curates the list; we rely on titlePassesPatterns + stop list for filtering).
+const TOP_APPLICANT_BASE =
+  'https://www.linkedin.com/voyager/api/graphql'
+  + '?includeWebMetadata=true'
+  + '&variables=(count:25,jobCollectionSlug:top-applicant,query:(origin:GENERIC_JOB_COLLECTIONS_LANDING),start:{START})'
+  + '&queryId=voyagerJobsDashJobCards.b824e14b009b17500fbcf542cf089912';
+
+const TOP_APPLICANT_REFERER = 'https://www.linkedin.com/jobs/collections/top-applicant/';
+const TOP_APPLICANT_PAGES   = 3;
+
+export function getTopApplicantFromLinkedin(): Record<string, unknown>[] {
+  const cookie    = requireProp(SCRIPT_PROPS.LI_COOKIE);
+  const csrfToken = requireProp(SCRIPT_PROPS.LI_CSRF_TOKEN);
+  const options   = buildLiOptions(cookie, csrfToken, TOP_APPLICANT_REFERER);
+  const pages: Record<string, unknown>[] = [];
+
+  for (let page = 0; page < TOP_APPLICANT_PAGES; page++) {
+    const url      = TOP_APPLICANT_BASE.replace('{START}', String(page * 25));
+    const response = UrlFetchApp.fetch(url, options);
+    pages.push(JSON.parse(response.getContentText()) as Record<string, unknown>);
+  }
+
+  return pages;
+}
+
 export function getSearchToPerform(filter: SearchFilter): string {
   const label = [
     decodeURIComponent(filter.keywords ?? ''),

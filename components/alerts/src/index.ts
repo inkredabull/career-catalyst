@@ -2,7 +2,7 @@ import { requireProp, SCRIPT_PROPS } from './config/settings';
 import { SF_FILTER, US_FILTER, TIME_FRAME } from './config/constants';
 import { SEARCH_TITLES } from './config/titles';
 import { pause } from './clock';
-import { getSearchResultsFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
+import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
 import { fetchGoogleResults } from './google';
 import { doGet } from './webapp';
 
@@ -73,6 +73,11 @@ export function getResults(): SearchResults {
     });
 
   results = mergeResults(results, fetchGoogleResults(timeFrame));
+
+  getTopApplicantFromLinkedin().forEach(page => {
+    results = mergeResults(results, extractInfo(page as Parameters<typeof extractInfo>[0], 'Top Applicant'));
+  });
+  pause(2500);
 
   const totalBefore = Object.keys(results).length;
 
