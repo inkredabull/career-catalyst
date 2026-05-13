@@ -21,6 +21,30 @@ function isBlocked(result: JobResult, companies: string[], titles: string[]): bo
       || titles.some(t => ti.includes(t.toLowerCase()));
 }
 
+function applyStopList(results: SearchResults): SearchResults {
+  const blockedCos    = readStopList(SCRIPT_PROPS.STOP_LIST_COMPANIES);
+  const blockedTitles = readStopList(SCRIPT_PROPS.STOP_LIST_TITLES);
+  const totalBefore   = Object.keys(results).length;
+
+  if (blockedCos.length || blockedTitles.length) {
+    Object.keys(results).forEach(id => {
+      const r = results[id];
+      if (isBlocked(r, blockedCos, blockedTitles)) {
+        log('DEBUG', 'Excluded (stop list): [%s] %s — %s', r.search, r.company, r.title);
+        delete results[id];
+      }
+    });
+  }
+
+  const remaining = Object.values(results);
+  const bysearch: Record<string, number> = {};
+  remaining.forEach(r => { bysearch[r.search] = (bysearch[r.search] ?? 0) + 1; });
+  log('INFO', 'Results: %s total, %s after exclusions', totalBefore, remaining.length);
+  Object.entries(bysearch).forEach(([search, count]) => log('DEBUG', '  %s: %s', search, count));
+
+  return results;
+}
+
 function formatEntry(r: JobResult, webAppUrl: string): { text: string; html: string } {
   const banCo = `${webAppUrl}?type=company&value=${encodeURIComponent(r.company)}`;
   const banTi = `${webAppUrl}?type=title&value=${encodeURIComponent(r.title)}`;
@@ -63,8 +87,11 @@ function fetchResults(title: string, results: SearchResults, filter: SearchFilte
   return mergeResults(results, found);
 }
 
-export function getResults(): SearchResults {
-  const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
+// ---------------------------------------------------------------------------
+// Per-provider fetchers
+// ---------------------------------------------------------------------------
+
+function getLinkedinSearchResults(timeFrame: string): SearchResults {
   let results: SearchResults = {};
   Object.entries(SEARCH_TITLES)
     .filter(([, enabled]) => enabled)
@@ -72,42 +99,57 @@ export function getResults(): SearchResults {
       results = fetchResults(title, results, SF_FILTER as SearchFilter, timeFrame);
       results = fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
     });
+  return results;
+}
 
-  results = mergeResults(results, fetchGoogleResults(timeFrame));
-
+function getTopApplicantResults(): SearchResults {
+  let results: SearchResults = {};
   getTopApplicantFromLinkedin().forEach(page => {
     results = mergeResults(results, extractInfo(page as Parameters<typeof extractInfo>[0], 'Top Applicant', 'LinkedIn (Top Applicant)'));
   });
   pause(2500);
-
-  const totalBefore = Object.keys(results).length;
-
-  const blockedCos    = readStopList(SCRIPT_PROPS.STOP_LIST_COMPANIES);
-  const blockedTitles = readStopList(SCRIPT_PROPS.STOP_LIST_TITLES);
-  if (blockedCos.length || blockedTitles.length) {
-    Object.keys(results).forEach(id => {
-      const r = results[id];
-      if (isBlocked(r, blockedCos, blockedTitles)) {
-        log('DEBUG', 'Excluded (stop list): [%s] %s — %s', r.search, r.company, r.title);
-        delete results[id];
-      }
-    });
-  }
-
-  const remaining = Object.values(results);
-  const bysearch: Record<string, number> = {};
-  remaining.forEach(r => { bysearch[r.search] = (bysearch[r.search] ?? 0) + 1; });
-  log('INFO', 'Results: %s total, %s after exclusions', totalBefore, remaining.length);
-  Object.entries(bysearch).forEach(([search, count]) => log('DEBUG', '  %s: %s', search, count));
-
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// Composite
+// ---------------------------------------------------------------------------
+
+export function getResults(): SearchResults {
+  const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
+  let results: SearchResults = {};
+  results = mergeResults(results, getLinkedinSearchResults(timeFrame));
+  results = mergeResults(results, fetchGoogleResults(timeFrame));
+  results = mergeResults(results, getTopApplicantResults());
+  return applyStopList(results);
+}
+
+// ---------------------------------------------------------------------------
+// GAS entrypoints — full run + per-provider test runners
+// ---------------------------------------------------------------------------
 
 function getOpenReqs(): void {
   notify(getResults());
 }
 
+function runGoogle(): void {
+  const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
+  notify(applyStopList(fetchGoogleResults(timeFrame)));
+}
+
+function runLinkedin(): void {
+  const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
+  notify(applyStopList(getLinkedinSearchResults(timeFrame)));
+}
+
+function runTopApplicant(): void {
+  notify(applyStopList(getTopApplicantResults()));
+}
+
 // Expose to GAS runtime
 const g = global as unknown as Record<string, unknown>;
-g['getOpenReqs'] = getOpenReqs;
-g['doGet']       = doGet;
+g['getOpenReqs']     = getOpenReqs;
+g['runGoogle']       = runGoogle;
+g['runLinkedin']     = runLinkedin;
+g['runTopApplicant'] = runTopApplicant;
+g['doGet']           = doGet;
