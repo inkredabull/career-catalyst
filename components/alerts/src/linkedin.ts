@@ -59,12 +59,23 @@ export function getLinkedinURL(filter: SearchFilter): string {
   return `${baseUrl}?decorationId=${decorationId}&count=25&q=jobSearch&query=(${queryParts.join(',')})&start=0`;
 }
 
+/** Scans a LinkedIn jobInsightsV2ResolutionResults blob for applicant count.
+ *  Returns the count, treating "200+" as 201 so "> 200" comparisons work cleanly. */
+export function extractApplicantCount(insights: unknown): number | undefined {
+  if (!insights) return undefined;
+  const text = JSON.stringify(insights);
+  const match = text.match(/(\d[\d,]*)(\+)?\s*applicants?/i);
+  if (!match) return undefined;
+  const n = parseInt(match[1].replace(/,/g, ''), 10);
+  return match[2] ? n + 1 : n;
+}
+
 export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<string, unknown>, search: string, source?: string): SearchResults {
   const hashOfResults: SearchResults = {};
   const included = (data as Record<string, unknown[]>).included;
 
   if (Array.isArray(included)) {
-    let jobCards = 0, noTitle = 0, patternFiltered = 0;
+    let jobCards = 0, noTitle = 0, patternFiltered = 0, applicantFiltered = 0;
 
     included.forEach((raw: unknown) => {
       const item = raw as Record<string, unknown>;
@@ -82,6 +93,13 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
       if (!title) { noTitle++; return; }
       if (!titlePassesPatterns(title)) { patternFiltered++; return; }
 
+      const applicants = extractApplicantCount(item.jobInsightsV2ResolutionResults);
+      if (applicants !== undefined && applicants > 200) {
+        log('DEBUG', 'Excluded (>200 applicants: %s): [%s] %s', applicants, search, title);
+        applicantFiltered++;
+        return;
+      }
+
       const company = (item.primaryDescription as { text?: string } | undefined)?.text ?? '';
       const info    = (item.tertiaryDescription as { text?: string } | undefined)?.text;
 
@@ -98,9 +116,10 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
 
     const kept = Object.keys(hashOfResults).length;
     log('INFO',  'Result count: %s', kept);
-    log('DEBUG', '[%s] %s included → %s job cards → %s titled → %s passed patterns → %s kept',
+    log('DEBUG', '[%s] %s included → %s job cards → %s titled → %s passed patterns → %s passed applicant filter → %s kept',
       search, included.length, jobCards, jobCards - noTitle,
-      jobCards - noTitle - patternFiltered, kept);
+      jobCards - noTitle - patternFiltered,
+      jobCards - noTitle - patternFiltered - applicantFiltered, kept);
   }
 
   return hashOfResults;
