@@ -7,8 +7,7 @@ export const SCRIPT_PROPS = {
   STOP_LIST_COMPANIES: 'STOP_LIST_COMPANIES', // JSON array of company name strings
   STOP_LIST_TITLES:    'STOP_LIST_TITLES',    // JSON array of title strings
   SEARCH_TIME_FRAME:   'SEARCH_TIME_FRAME',   // LinkedIn time filter: r28800 (8h), r86400 (24h), r604800 (7d)
-  GOOGLE_API_KEY:      'GOOGLE_API_KEY',      // Google Cloud API key with Custom Search API enabled
-  GOOGLE_CSE_ID:       'GOOGLE_CSE_ID',       // Custom Search Engine ID (cx)
+  SERPER_API_KEY:      'SERPER_API_KEY',       // serper.dev API key for Google search results
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */

@@ -70,20 +70,19 @@ const GOOGLE_SEARCHES: GoogleSearch[] = [
 // GAS-dependent fetch
 // ---------------------------------------------------------------------------
 
-interface CseItem {
+interface SerperItem {
   title:    string;
   link:     string;
   snippet?: string;
 }
 
-interface CseResponse {
-  items?: CseItem[];
-  error?: { message: string; code: number };
+interface SerperResponse {
+  organic?: SerperItem[];
+  error?:   string;
 }
 
 export function fetchGoogleResults(timeFrame: string): SearchResults {
-  const apiKey    = requireProp(SCRIPT_PROPS.GOOGLE_API_KEY);
-  const cseId     = requireProp(SCRIPT_PROPS.GOOGLE_CSE_ID);
+  const apiKey    = requireProp(SCRIPT_PROPS.SERPER_API_KEY);
   const afterDate = timeFrameToAfterDate(timeFrame);
 
   const enabledTitles = Object.entries(SEARCH_TITLES)
@@ -96,24 +95,25 @@ export function fetchGoogleResults(timeFrame: string): SearchResults {
   GOOGLE_SEARCHES.forEach(({ label, source, prefix, suffix }) => {
     const parts = [prefix, titleClause, suffix, `after:${afterDate}`].filter(Boolean);
     const query = parts.join(' ');
-    const url   = 'https://customsearch.googleapis.com/customsearch/v1?'
-      + `key=${encodeURIComponent(apiKey)}`
-      + `&cx=${encodeURIComponent(cseId)}`
-      + `&q=${encodeURIComponent(query)}`
-      + '&num=10';
 
     log('DEBUG', 'Google search: %s (after %s)', label, afterDate);
     log('DEBUG', 'Query: %s', query);
-    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    const data     = JSON.parse(response.getContentText()) as CseResponse;
+
+    const response = UrlFetchApp.fetch('https://google.serper.dev/search', {
+      method: 'post',
+      headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+      payload: JSON.stringify({ q: query, num: 10, gl: 'us' }),
+      muteHttpExceptions: true,
+    });
+    const data = JSON.parse(response.getContentText()) as SerperResponse;
 
     if (data.error) {
-      log('WARN', 'Google CSE error [%s]: %s', label, data.error.message);
+      log('WARN', 'Serper error [%s]: %s', label, data.error);
       return;
     }
 
     let found = 0;
-    (data.items ?? []).forEach(item => {
+    (data.organic ?? []).forEach(item => {
       const { title, company } = parseResultTitle(item.title);
       if (!titlePassesPatterns(title)) {
         log('DEBUG', 'Filtered (patterns): %s', item.title);
@@ -131,7 +131,7 @@ export function fetchGoogleResults(timeFrame: string): SearchResults {
       found++;
     });
 
-    log('DEBUG', 'Google %s: %s/%s results passed filter', label, found, (data.items ?? []).length);
+    log('DEBUG', 'Google %s: %s/%s results passed filter', label, found, (data.organic ?? []).length);
   });
 
   return results;
