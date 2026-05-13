@@ -21,17 +21,28 @@ export function buildTitleClause(titles: string[]): string {
   return `(${titles.map(t => `"${t}"`).join(' OR ')})`;
 }
 
-/** Parses a raw Google result title into job title + company.
+const NOISE_SEGMENTS = new Set(['jobs', 'ashby', 'wellfound', 'linkedin', 'indeed', 'glassdoor']);
+
+/** Parses a raw Google/Serper result title into job title + company.
  *  Handles common formats:
+ *    "Head of Engineering @ Notion | Jobs"   (Ashby @ format)
+ *    "Jobs | Chief of Staff @ Superpower"    (Jobs prefix noise)
  *    "VP Engineering at Stripe | Ashby"
  *    "Head of Engineering - Acme | Wellfound"
  *    "CTO – Some Company"  */
 export function parseResultTitle(raw: string): { title: string; company: string } {
-  const withoutSite = raw.split(' | ')[0].trim();
-  const atMatch = withoutSite.match(/^(.+?)\s+at\s+(.+)$/i);
-  if (atMatch) return { title: atMatch[1].trim(), company: atMatch[2].trim() };
+  const segments = raw.split(' | ').map(s => s.trim());
+  const withoutSite = segments.find(s => !NOISE_SEGMENTS.has(s.toLowerCase())) ?? segments[0];
+
+  const atSignMatch = withoutSite.match(/^(.+?)\s*@\s*(.+)$/);
+  if (atSignMatch) return { title: atSignMatch[1].trim(), company: atSignMatch[2].trim() };
+
+  const atWordMatch = withoutSite.match(/^(.+?)\s+at\s+(.+)$/i);
+  if (atWordMatch) return { title: atWordMatch[1].trim(), company: atWordMatch[2].trim() };
+
   const dashMatch = withoutSite.match(/^(.+?)\s+[-–—]\s+(.+)$/);
   if (dashMatch) return { title: dashMatch[1].trim(), company: dashMatch[2].trim() };
+
   return { title: withoutSite, company: '' };
 }
 
@@ -56,7 +67,8 @@ const GOOGLE_SEARCHES: GoogleSearch[] = [
   {
     label:  'Web/US',
     source: 'Google',
-    suffix: '-"new grad" -"intern"',
+    suffix: '(apply OR "job description" OR "role" OR responsibilities) -"new grad" -"intern"'
+      + ' -site:reddit.com -site:news.ycombinator.com -site:medium.com -site:substack.com',
   },
   {
     label:  'Wellfound/SF',

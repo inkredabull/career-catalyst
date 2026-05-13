@@ -74,4 +74,19 @@ describe('parseResultTitle', () => {
     const r = parseResultTitle('Head of AI Engineering at Scale AI | Ashby');
     expect(r).toEqual({ title: 'Head of AI Engineering', company: 'Scale AI' });
   });
+
+  it('parses "TITLE @ COMPANY | SITE" format (Ashby)', () => {
+    const r = parseResultTitle('Head of Technical Recruiting @ Notion | Jobs');
+    expect(r).toEqual({ title: 'Head of Technical Recruiting', company: 'Notion' });
+  });
+
+  it('skips leading "Jobs" noise segment', () => {
+    const r = parseResultTitle('Jobs | Chief of Staff @ Superpower');
+    expect(r).toEqual({ title: 'Chief of Staff', company: 'Superpower' });
+  });
+
+  it('parses "TITLE @ COMPANY" without pipe segments', () => {
+    const r = parseResultTitle('VP Engineering @ Stripe');
+    expect(r).toEqual({ title: 'VP Engineering', company: 'Stripe' });
+  });
 });
