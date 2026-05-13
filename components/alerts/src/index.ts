@@ -75,7 +75,7 @@ export function getResults(): SearchResults {
   results = mergeResults(results, fetchGoogleResults(timeFrame));
 
   getTopApplicantFromLinkedin().forEach(page => {
-    results = mergeResults(results, extractInfo(page as Parameters<typeof extractInfo>[0], 'Top Applicant'));
+    results = mergeResults(results, extractInfo(page as Parameters<typeof extractInfo>[0], 'Top Applicant', 'LinkedIn (Top Applicant)'));
   });
   pause(2500);
 

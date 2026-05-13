@@ -58,7 +58,7 @@ export function getLinkedinURL(filter: SearchFilter): string {
   return `${baseUrl}?decorationId=${decorationId}&count=25&q=jobSearch&query=(${queryParts.join(',')})&start=0`;
 }
 
-export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<string, unknown>, search: string): SearchResults {
+export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<string, unknown>, search: string, source?: string): SearchResults {
   const hashOfResults: SearchResults = {};
   const included = (data as Record<string, unknown[]>).included;
   console.log('Result count: %s', included?.length);
@@ -82,7 +82,8 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
         id,
         company,
         title,
-        ...(info ? { info } : {}),
+        ...(info   ? { info }   : {}),
+        ...(source ? { source } : {}),
         url: `https://www.linkedin.com/jobs/view/${id}`,
         search,
       };
