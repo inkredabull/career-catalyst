@@ -40,6 +40,7 @@ export function parseResultTitle(raw: string): { title: string; company: string 
 
 interface GoogleSearch {
   label:   string;
+  source:  string;  // shown as "Source: X" in the email
   prefix?: string;  // site: restriction and/or location term
   suffix?: string;  // intent + exclusion terms
 }
@@ -47,15 +48,18 @@ interface GoogleSearch {
 const GOOGLE_SEARCHES: GoogleSearch[] = [
   {
     label:  'Ashby/SF',
+    source: 'Ashby',
     prefix: 'site:jobs.ashbyhq.com ("San Francisco")',
     suffix: '(apply OR "job description" OR "role" OR responsibilities) -"new grad" -"intern"',
   },
   {
     label:  'Web/US',
+    source: 'Google',
     suffix: '-"new grad" -"intern"',
   },
   {
     label:  'Wellfound/SF',
+    source: 'Wellfound',
     prefix: 'site:wellfound.com ("San Francisco")',
     suffix: '(apply OR "job description" OR "role" OR responsibilities) -"new grad" -"intern"',
   },
@@ -88,7 +92,7 @@ export function fetchGoogleResults(timeFrame: string): SearchResults {
 
   const results: SearchResults = {};
 
-  GOOGLE_SEARCHES.forEach(({ label, prefix, suffix }) => {
+  GOOGLE_SEARCHES.forEach(({ label, source, prefix, suffix }) => {
     const parts = [prefix, titleClause, suffix, `after:${afterDate}`].filter(Boolean);
     const query = parts.join(' ');
     const url   = 'https://customsearch.googleapis.com/customsearch/v1?'
@@ -117,7 +121,7 @@ export function fetchGoogleResults(timeFrame: string): SearchResults {
         title,
         url:     item.link,
         search:  label,
-        source:  'Google CSE',
+        source,
       };
       found++;
     });
