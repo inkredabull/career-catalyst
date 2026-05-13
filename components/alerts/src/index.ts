@@ -49,10 +49,11 @@ function formatEntry(r: JobResult, webAppUrl: string): { text: string; html: str
   const banCo = `${webAppUrl}?type=company&value=${encodeURIComponent(r.company)}`;
   const banTi = `${webAppUrl}?type=title&value=${encodeURIComponent(r.title)}`;
   return {
-    text: [r.company, r.title, r.info, r.url, r.search, '***'].filter(Boolean).join('\n'),
+    text: [r.company, r.title, r.location, r.info, r.url, r.search, '***'].filter(Boolean).join('\n'),
     html: `<div style="margin-bottom:12px;padding:8px;border-left:3px solid #ccc">
       <strong>${r.company}</strong> <a href="${banCo}">👎</a><br>
       ${r.title} <a href="${banTi}">👎</a><br>
+      ${r.location ? `<small>${r.location}</small><br>` : ''}
       ${r.info ? r.info + '<br>' : ''}
       <a href="${r.url}">${r.url}</a><br>
       <small>${r.search}</small><br>

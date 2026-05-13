@@ -12,13 +12,14 @@ export interface SearchFilter {
 }
 
 export interface JobResult {
-  id:      string;
-  company: string;
-  title:   string;
-  info?:   string;
-  url:     string;
-  search:  string;
-  source?: string;
+  id:       string;
+  company:  string;
+  title:    string;
+  location?: string;
+  info?:    string;
+  url:      string;
+  search:   string;
+  source?:  string;
 }
 
 export type SearchResults = Record<string, JobResult>;
@@ -100,15 +101,17 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
         return;
       }
 
-      const company = (item.primaryDescription as { text?: string } | undefined)?.text ?? '';
-      const info    = (item.tertiaryDescription as { text?: string } | undefined)?.text;
+      const company  = (item.primaryDescription   as { text?: string } | undefined)?.text ?? '';
+      const location = (item.secondaryDescription as { text?: string } | undefined)?.text;
+      const info     = (item.tertiaryDescription  as { text?: string } | undefined)?.text;
 
       hashOfResults[id] = {
         id,
         company,
         title,
-        ...(info   ? { info }   : {}),
-        ...(source ? { source } : {}),
+        ...(location ? { location } : {}),
+        ...(info     ? { info }     : {}),
+        ...(source   ? { source }   : {}),
         url: `https://www.linkedin.com/jobs/view/${id}`,
         search,
       };
