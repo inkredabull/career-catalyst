@@ -4,6 +4,7 @@ import { SEARCH_TITLES } from './config/titles';
 import { pause } from './clock';
 import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
 import { fetchGoogleResults } from './google';
+import { log } from './utils/logger';
 import { doGet } from './webapp';
 
 function readStopList(key: string): string[] {
@@ -46,7 +47,7 @@ function notify(results: SearchResults): void {
     entries.map(e => e.text).join('\n\n'),
     { htmlBody: entries.map(e => e.html).join('') }
   );
-  console.log('Email sent! (%s results)', entries.length);
+  log('INFO', 'Email sent! (%s results)', entries.length);
 }
 
 export function mergeResults(results: SearchResults, searchResults: SearchResults): SearchResults {
@@ -87,7 +88,7 @@ export function getResults(): SearchResults {
     Object.keys(results).forEach(id => {
       const r = results[id];
       if (isBlocked(r, blockedCos, blockedTitles)) {
-        console.log('Excluded (stop list): [%s] %s — %s', r.search, r.company, r.title);
+        log('DEBUG', 'Excluded (stop list): [%s] %s — %s', r.search, r.company, r.title);
         delete results[id];
       }
     });
@@ -96,8 +97,8 @@ export function getResults(): SearchResults {
   const remaining = Object.values(results);
   const bysearch: Record<string, number> = {};
   remaining.forEach(r => { bysearch[r.search] = (bysearch[r.search] ?? 0) + 1; });
-  console.log('Results: %s total, %s after exclusions', totalBefore, remaining.length);
-  Object.entries(bysearch).forEach(([search, count]) => console.log('  %s: %s', search, count));
+  log('INFO', 'Results: %s total, %s after exclusions', totalBefore, remaining.length);
+  Object.entries(bysearch).forEach(([search, count]) => log('DEBUG', '  %s: %s', search, count));
 
   return results;
 }

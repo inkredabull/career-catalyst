@@ -2,6 +2,7 @@ import { requireProp, SCRIPT_PROPS } from './config/settings';
 import { SEARCH_TITLES } from './config/titles';
 import { titlePassesPatterns } from './filters';
 import { SearchResults } from './linkedin';
+import { log } from './utils/logger';
 
 // ---------------------------------------------------------------------------
 // Pure helpers — exported for unit tests
@@ -101,19 +102,23 @@ export function fetchGoogleResults(timeFrame: string): SearchResults {
       + `&q=${encodeURIComponent(query)}`
       + '&num=10';
 
-    console.log('Google search: %s (after %s)', label, afterDate);
+    log('DEBUG', 'Google search: %s (after %s)', label, afterDate);
+    log('DEBUG', 'Query: %s', query);
     const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     const data     = JSON.parse(response.getContentText()) as CseResponse;
 
     if (data.error) {
-      console.log('Google CSE error [%s]: %s', label, data.error.message);
+      log('WARN', 'Google CSE error [%s]: %s', label, data.error.message);
       return;
     }
 
     let found = 0;
     (data.items ?? []).forEach(item => {
       const { title, company } = parseResultTitle(item.title);
-      if (!titlePassesPatterns(title)) return;
+      if (!titlePassesPatterns(title)) {
+        log('DEBUG', 'Filtered (patterns): %s', item.title);
+        return;
+      }
 
       results[item.link] = {
         id:      item.link,
@@ -126,7 +131,7 @@ export function fetchGoogleResults(timeFrame: string): SearchResults {
       found++;
     });
 
-    console.log('Google %s: %s/%s results passed filter', label, found, (data.items ?? []).length);
+    log('DEBUG', 'Google %s: %s/%s results passed filter', label, found, (data.items ?? []).length);
   });
 
   return results;

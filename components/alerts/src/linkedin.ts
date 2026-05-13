@@ -1,6 +1,7 @@
 import { requireProp, SCRIPT_PROPS } from './config/settings';
 import { GEOS } from './config/constants';
 import { titlePassesPatterns } from './filters';
+import { log } from './utils/logger';
 
 export interface SearchFilter {
   origin: string;
@@ -61,19 +62,22 @@ export function getLinkedinURL(filter: SearchFilter): string {
 export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<string, unknown>, search: string, source?: string): SearchResults {
   const hashOfResults: SearchResults = {};
   const included = (data as Record<string, unknown[]>).included;
-  console.log('Result count: %s', included?.length);
 
   if (Array.isArray(included)) {
+    let jobCards = 0, noTitle = 0, patternFiltered = 0;
+
     included.forEach((raw: unknown) => {
       const item = raw as Record<string, unknown>;
       if (Object.keys(item).length !== 30) return;
+      jobCards++;
 
       const urn = item.entityUrn as string | undefined;
       const id = urn?.match(/\d+/)?.[0];
       if (!id) return;
 
       const title = (item.title as { text?: string } | undefined)?.text;
-      if (!title || !titlePassesPatterns(title)) return;
+      if (!title) { noTitle++; return; }
+      if (!titlePassesPatterns(title)) { patternFiltered++; return; }
 
       const company = (item.primaryDescription as { text?: string } | undefined)?.text ?? '';
       const info    = (item.tertiaryDescription as { text?: string } | undefined)?.text;
@@ -88,6 +92,12 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
         search,
       };
     });
+
+    const kept = Object.keys(hashOfResults).length;
+    log('INFO',  'Result count: %s', kept);
+    log('DEBUG', '[%s] %s included → %s job cards → %s titled → %s passed patterns → %s kept',
+      search, included.length, jobCards, jobCards - noTitle,
+      jobCards - noTitle - patternFiltered, kept);
   }
 
   return hashOfResults;
@@ -99,6 +109,7 @@ export function getSearchResultsFromLinkedin(filter: SearchFilter): Record<strin
   const url       = getLinkedinURL(filter);
   const referer   = `https://www.linkedin.com/jobs/search/?geoId=${filter.locationUnion.geoId}`;
 
+  log('DEBUG', 'GET %s', url);
   const response = UrlFetchApp.fetch(url, buildLiOptions(cookie, csrfToken, referer));
   return JSON.parse(response.getContentText()) as Record<string, unknown>;
 }
@@ -123,6 +134,7 @@ export function getTopApplicantFromLinkedin(): Record<string, unknown>[] {
 
   for (let page = 0; page < TOP_APPLICANT_PAGES; page++) {
     const url      = TOP_APPLICANT_BASE.replace('{START}', String(page * 25));
+    log('DEBUG', 'Top Applicant page %s/%s: GET %s', page + 1, TOP_APPLICANT_PAGES, url);
     const response = UrlFetchApp.fetch(url, options);
     pages.push(JSON.parse(response.getContentText()) as Record<string, unknown>);
   }
@@ -136,6 +148,6 @@ export function getSearchToPerform(filter: SearchFilter): string {
     ', ',
     GEOS[filter.locationUnion.geoId] ?? filter.locationUnion.geoId,
   ].join('').toUpperCase();
-  console.log('Fetching results for: %s', label);
+  log('INFO', 'Fetching results for: %s', label);
   return label;
 }

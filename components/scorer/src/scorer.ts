@@ -9,42 +9,47 @@ export const CV = readFileSync(cvPath, "utf8").trim();
 
 // ─── SCORING RUBRIC ───────────────────────────────────────────────────────────
 export const RUBRIC = `
-## 14-Dimension Scoring Rubric (1–5 each)
+## 14-Dimension Scoring Rubric
 
-Score each dimension for Anthony specifically:
+### Primary dimensions (1–5 each, count toward total, max 40)
+These are the direct pursue/pass drivers. Score honestly.
 - 5 = Exceptional fit, exceeds bar
 - 4 = Strong fit, clearly qualifies
 - 3 = Adequate fit, some gaps or unknowns
 - 2 = Weak fit, meaningful misalignment (🟡 Yellow flag)
 - 1 = Poor fit or dealbreaker (🔴 Red flag)
 
-Dimensions:
-1. Skills & Strengths Alignment — Does the role leverage AI-native systems, RAG, LLMs, platform/infra, 0-to-1 building?
-2. Role Availability & Growth — Clear mandate and upward path? Avoid IC-heavy or purely operational roles.
+1. Skills & Strengths Alignment — Evaluate the role's actual day-to-day mandate, not the company's age or size. Does this specific role require AI-native systems, RAG, LLMs, platform/infra, or 0-to-1 building? A "Director of AI Engineering" inside a large company can score 4 if the mandate is genuine. A startup role that's really legacy maintenance scores 2.
+2. Role Availability & Growth — Clear mandate and upward path? Avoid IC-heavy or purely operational roles. Note: CPTO or CTO/CPO compound titles with genuine product+tech authority score 4–5 regardless of company type (startup, PE-backed, public). Evaluate actual decision-making scope, not just the title tier.
 3. Values & Mission Fit — Does the company's mission connect to Anthony's long-term arc?
-4. Compensation & Stability — Target: $225K+ base salary. Flag if not disclosed or likely below target.
-5. Learning & Innovation — Will Anthony be stretched technically and strategically?
-6. Company Culture Norms — Evidence of async-first, high-trust, low-bureaucracy culture?
-7. Lifestyle & Flexibility — Remote-friendly preferred; in-person in San Francisco is acceptable. Only flag roles requiring relocation or outside SF Bay Area.
-8. Network & Access — Does this company or exec team open doors Anthony doesn't already have?
-9. Personal Excitement & Curiosity — Would Anthony be energized by this problem space?
-10. Leadership Reputation — Any signals on the exec team (prior exits, public presence, employee sentiment)?
-11. Glassdoor / Employee Sentiment — If company is known, any public signals worth noting?
-12. Recent News / Growth Direction — Is the company on an upward trajectory?
-13. Internal Mobility — Could this role evolve into a true CTO mandate over time?
+4. Compensation & Stability — Target: $225K+ base salary. Score 1 ONLY if comp is explicitly stated below $225K base, or the role is equity-only / deferred comp. Undisclosed comp at a small or bootstrapped company = score 2 (yellow flag, verify) — not automatic 1. Public company RSU bands verifiable from market data are a positive stability signal.
+5. Company Culture Norms — Look for specific red flags: mandatory in-office culture, known process-heavy bureaucracy explicitly described in the JD, recent layoffs, or role descriptions that read as maintenance not innovation. Do NOT penalize a company categorically for being large or established — evaluate the signals in the JD itself.
+6. Lifestyle & Flexibility — Remote-friendly preferred; SF Bay Area in-person acceptable. If a role is outside SF Bay Area but the JD is ambiguous on remote flexibility, score 2 (flag for verification) — do not score 1 unless the JD explicitly states in-office required with no remote option. Relocation required + confirmed non-remote = score 1.
+7. Personal Excitement & Curiosity — Would Anthony be energized by this problem space?
+8. Internal Mobility — Could this role evolve into a true CTO mandate over time?
+
+### Context dimensions (1–3 each, informational, max 18)
+Score 3 = positive signal, 2 = minor concern, 1 = notable gap. Cap at 3 — these provide color but don't drive the verdict alone.
+
+9.  Learning & Innovation — Will Anthony be stretched technically and strategically?
+10. Network & Access — Does this company or exec team open doors Anthony doesn't already have?
+11. Leadership Reputation — Any signals on the exec team (prior exits, public presence, employee sentiment)?
+12. Glassdoor / Employee Sentiment — If company is known, any public signals worth noting?
+13. Recent News / Growth Direction — Is the company on an upward trajectory?
 14. Recruiter Responsiveness — Default 3 if not yet engaged.
 
 Hard filters (score 1 if triggered):
-- Comp ceiling clearly below $225K base salary
-- Full-time in-office outside San Francisco Bay Area (requires relocation)
+- Comp is explicitly stated below $225K base, or the role is equity-only / deferred
+- Role is explicitly full-time in-office with no remote option, outside SF Bay Area (confirmed relocation required)
 - IC-heavy with no direct reports or org-building mandate
-- No AI/ML component to the product or platform
+- Role has no technical leadership or AI/ML innovation mandate (ask: would Anthony's AI expertise grow or be used here?)
 
-Soft filters (flag if absent):
+Soft filters (flag as yellow if absent):
 - React / Python / TypeScript in the stack
 - GCP as primary cloud
-- Series A or B stage (sweet spot)
+- Series A–B stage or public company with verified strong TC band
 - Executive team with at least one prior exit
+- Undisclosed comp at a company with no verifiable market data
 
 If information is missing from the JD, score 3 and note "Not disclosed — verify before advancing."
 
@@ -66,7 +71,7 @@ Produce a scorecard in this exact structure:
 | 1 | Skills & Strengths Alignment | X | | |
 ... (all 15 rows) ...
 
-**Total: XX / 70**
+**Total: XX / 58** (primary: XX/40 | context: XX/18)
 
 #### 🔴 Red Flags
 - [List scores of 1 or hard filter failures, or "None" if clean]
@@ -98,7 +103,8 @@ One of:
 
 Scoring notes:
 - A 3.5/5 average is NOT a Strong Fit.
-- Below 42/70 total → default to Pass or Conditional unless exceptional circumstances exist.
+- Below 35/58 total → default to Pass or Conditional unless exceptional circumstances exist.
+- Primary score below 20/40 → near-automatic Pass regardless of context scores.
 - Be honest. Anthony's time is finite.
 `.trim();
 
