@@ -75,7 +75,10 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
       const id = urn.match(/\d+/)?.[0];
       if (!id) return;
 
-      const title = (item.title as { text?: string } | undefined)?.text;
+      const titleRaw = item.title;
+      const title = typeof titleRaw === 'string'
+        ? titleRaw
+        : (titleRaw as { text?: string } | undefined)?.text;
       if (!title) { noTitle++; return; }
       if (!titlePassesPatterns(title)) { patternFiltered++; return; }
 
@@ -124,7 +127,7 @@ const TOP_APPLICANT_BASE =
   + '&queryId=voyagerJobsDashJobCards.b824e14b009b17500fbcf542cf089912';
 
 const TOP_APPLICANT_REFERER = 'https://www.linkedin.com/jobs/collections/top-applicant/';
-const TOP_APPLICANT_PAGES   = 3;
+const TOP_APPLICANT_PAGES   = 2;
 
 export function getTopApplicantFromLinkedin(): Record<string, unknown>[] {
   const cookie    = requireProp(SCRIPT_PROPS.LI_COOKIE);
