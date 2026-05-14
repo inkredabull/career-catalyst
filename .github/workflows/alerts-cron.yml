@@ -1,0 +1,13 @@
+name: Alerts Cron
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger alerts
+        run: |
+          curl --fail -X GET "${{ secrets.ALERTS_URL }}/api/cron" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
