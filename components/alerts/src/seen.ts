@@ -1,7 +1,14 @@
-import { SCRIPT_PROPS } from './config/settings';
+import { put, list } from '@vercel/blob';
 import { SearchResults } from './linkedin';
 
 export const SEEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const SEEN_PATH       = 'alerts/seen.json';
+const STOP_LISTS_PATH = 'alerts/stop-lists.json';
+
+// ---------------------------------------------------------------------------
+// Pure helpers — unchanged, exported for unit tests
+// ---------------------------------------------------------------------------
 
 export function filterUnseen(results: SearchResults, seen: Record<string, number>): SearchResults {
   const out: SearchResults = {};
@@ -34,17 +41,49 @@ export function pruneSeen(
   return out;
 }
 
-export function loadSeen(): Record<string, number> {
-  try {
-    const raw = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEEN_JOB_IDS);
-    return raw ? JSON.parse(raw) as Record<string, number> : {};
-  } catch { return {}; }
+// ---------------------------------------------------------------------------
+// Blob I/O helpers
+// ---------------------------------------------------------------------------
+
+async function readBlob<T>(pathname: string, fallback: T): Promise<T> {
+  const { blobs } = await list({ prefix: pathname, limit: 1 });
+  if (blobs.length === 0) return fallback;
+  const res = await fetch(blobs[0].url);
+  return JSON.parse(await res.text()) as T;
 }
 
-export function saveSeen(seen: Record<string, number>): void {
-  const pruned = pruneSeen(seen);
-  PropertiesService.getScriptProperties().setProperty(
-    SCRIPT_PROPS.SEEN_JOB_IDS,
-    JSON.stringify(pruned)
-  );
+async function writeBlob(pathname: string, data: unknown): Promise<void> {
+  await put(pathname, JSON.stringify(data), {
+    access: 'public',
+    addRandomSuffix: false,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Seen IDs
+// ---------------------------------------------------------------------------
+
+export async function loadSeen(): Promise<Record<string, number>> {
+  return readBlob<Record<string, number>>(SEEN_PATH, {});
+}
+
+export async function saveSeen(seen: Record<string, number>): Promise<void> {
+  await writeBlob(SEEN_PATH, pruneSeen(seen));
+}
+
+// ---------------------------------------------------------------------------
+// Stop lists
+// ---------------------------------------------------------------------------
+
+export async function loadStopLists(): Promise<{ companies: string[]; titles: string[] }> {
+  return readBlob(STOP_LISTS_PATH, { companies: [], titles: [] });
+}
+
+export async function addToStopList(type: 'company' | 'title', value: string): Promise<void> {
+  const current = await loadStopLists();
+  const list = type === 'company' ? current.companies : current.titles;
+  if (!list.some(s => s.toLowerCase() === value.toLowerCase())) {
+    list.push(value);
+  }
+  await writeBlob(STOP_LISTS_PATH, current);
 }

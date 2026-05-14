@@ -1,19 +1,13 @@
-import { requireProp, SCRIPT_PROPS } from './config/settings';
+import { ENV } from './config/settings';
 import { SF_FILTER, US_FILTER, TIME_FRAME } from './config/constants';
 import { SEARCH_TITLES } from './config/titles';
 import { pause } from './clock';
 import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
 import { fetchGoogleResults } from './google';
 import { log } from './utils/logger';
-import { loadSeen, saveSeen, filterUnseen, markAsSeen } from './seen';
-import { doGet } from './webapp';
-
-function readStopList(key: string): string[] {
-  try {
-    const raw = PropertiesService.getScriptProperties().getProperty(key);
-    return raw ? JSON.parse(raw) as string[] : [];
-  } catch { return []; }
-}
+import { loadSeen, saveSeen, filterUnseen, markAsSeen, loadStopLists } from './seen';
+import { notify } from './notify';
+import { scoreJob } from './scoring';
 
 function isBlocked(result: JobResult, companies: string[], titles: string[]): boolean {
   const co = result.company.toLowerCase();
@@ -22,19 +16,18 @@ function isBlocked(result: JobResult, companies: string[], titles: string[]): bo
       || titles.some(t => ti.includes(t.toLowerCase()));
 }
 
-function applyStopList(results: SearchResults): SearchResults {
-  const blockedCos    = readStopList(SCRIPT_PROPS.STOP_LIST_COMPANIES);
-  const blockedTitles = readStopList(SCRIPT_PROPS.STOP_LIST_TITLES);
-  const totalBefore   = Object.keys(results).length;
+async function applyStopList(results: SearchResults): Promise<SearchResults> {
+  const { companies: blockedCos, titles: blockedTitles } = await loadStopLists();
+  const totalBefore = Object.keys(results).length;
 
   if (blockedCos.length || blockedTitles.length) {
-    Object.keys(results).forEach(id => {
+    for (const id of Object.keys(results)) {
       const r = results[id];
       if (isBlocked(r, blockedCos, blockedTitles)) {
         log('DEBUG', 'Excluded (stop list): [%s] %s — %s', r.search, r.company, r.title);
         delete results[id];
       }
-    });
+    }
   }
 
   const remaining = Object.values(results);
@@ -46,120 +39,89 @@ function applyStopList(results: SearchResults): SearchResults {
   return results;
 }
 
-function formatEntry(r: JobResult, webAppUrl: string): { text: string; html: string } {
-  const banCo = `${webAppUrl}?type=company&value=${encodeURIComponent(r.company)}`;
-  const banTi = `${webAppUrl}?type=title&value=${encodeURIComponent(r.title)}`;
-  return {
-    text: [r.company, r.title, r.location, r.info, r.url, r.search, '***'].filter(Boolean).join('\n'),
-    html: `<div style="margin-bottom:12px;padding:8px;border-left:3px solid #ccc">
-      <strong>${r.company}</strong> <a href="${banCo}">👎</a><br>
-      ${r.title} <a href="${banTi}">👎</a><br>
-      ${r.location ? `<small>${r.location}</small><br>` : ''}
-      ${r.info ? r.info + '<br>' : ''}
-      <a href="${r.url}">${r.url}</a><br>
-      <small>${r.search}</small><br>
-      <small>Source: ${r.source ?? 'LinkedIn'}</small>
-    </div>`,
-  };
-}
-
-function notify(results: SearchResults): void {
-  const email     = requireProp(SCRIPT_PROPS.MY_EMAIL);
-  const webAppUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.WEB_APP_URL) ?? '';
-  const entries   = Object.values(results).map(r => formatEntry(r, webAppUrl));
-  MailApp.sendEmail(
-    email,
-    `Jobs for ${new Date().toLocaleDateString()}`,
-    entries.map(e => e.text).join('\n\n'),
-    { htmlBody: entries.map(e => e.html).join('') }
-  );
-  log('INFO', 'Email sent! (%s results)', entries.length);
-}
-
 export function mergeResults(results: SearchResults, searchResults: SearchResults): SearchResults {
   return { ...results, ...searchResults };
 }
 
-function fetchResults(title: string, results: SearchResults, filter: SearchFilter, timeFrame: string): SearchResults {
+async function fetchResults(title: string, results: SearchResults, filter: SearchFilter, timeFrame: string): Promise<SearchResults> {
   const f = { ...filter, keywords: encodeURIComponent(title), timePostedRange: [timeFrame] } as SearchFilter;
   const search = getSearchToPerform(f);
-  const data   = getSearchResultsFromLinkedin(f);
-  const found  = extractInfo(data as Parameters<typeof extractInfo>[0], search);
-  pause(2500);
+  const data   = await getSearchResultsFromLinkedin(f);
+  const found  = extractInfo(data, search);
+  await pause(2500);
   return mergeResults(results, found);
 }
 
-// ---------------------------------------------------------------------------
-// Per-provider fetchers
-// ---------------------------------------------------------------------------
-
-function getLinkedinSearchResults(timeFrame: string): SearchResults {
+async function getLinkedinSearchResults(timeFrame: string): Promise<SearchResults> {
   let results: SearchResults = {};
-  Object.entries(SEARCH_TITLES)
+  const enabledTitles = Object.entries(SEARCH_TITLES)
     .filter(([, enabled]) => enabled)
-    .forEach(([title]) => {
-      results = fetchResults(title, results, SF_FILTER as SearchFilter, timeFrame);
-      results = fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
-    });
+    .map(([title]) => title);
+
+  for (const title of enabledTitles) {
+    results = await fetchResults(title, results, SF_FILTER as SearchFilter, timeFrame);
+    results = await fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
+  }
   return results;
 }
 
-function getTopApplicantResults(): SearchResults {
+async function getTopApplicantResults(): Promise<SearchResults> {
   let results: SearchResults = {};
-  getTopApplicantFromLinkedin().forEach(page => {
-    results = mergeResults(results, extractInfo(page as Parameters<typeof extractInfo>[0], 'Top Applicant', 'LinkedIn (Top Applicant)'));
-  });
-  pause(2500);
+  const pages = await getTopApplicantFromLinkedin();
+  for (const page of pages) {
+    results = mergeResults(results, extractInfo(page, 'Top Applicant', 'LinkedIn (Top Applicant)'));
+  }
+  await pause(2500);
   return results;
 }
 
-// ---------------------------------------------------------------------------
-// Composite
-// ---------------------------------------------------------------------------
-
-export function getResults(): SearchResults {
-  const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
+export async function getResults(): Promise<SearchResults> {
+  const timeFrame = process.env[ENV.SEARCH_TIME_FRAME] ?? TIME_FRAME;
   let results: SearchResults = {};
-  results = mergeResults(results, getLinkedinSearchResults(timeFrame));
-  results = mergeResults(results, fetchGoogleResults(timeFrame));
-  results = mergeResults(results, getTopApplicantResults());
+  results = mergeResults(results, await getLinkedinSearchResults(timeFrame));
+  results = mergeResults(results, await fetchGoogleResults(timeFrame));
+  results = mergeResults(results, await getTopApplicantResults());
   return applyStopList(results);
 }
 
-// ---------------------------------------------------------------------------
-// GAS entrypoints — full run + per-provider test runners
-// ---------------------------------------------------------------------------
-
-function getOpenReqs(): void {
-  const results = getResults();
-  const seen    = loadSeen();
+export async function getOpenReqs(webAppUrl: string): Promise<void> {
+  const results = await getResults();
+  const seen    = await loadSeen();
   const fresh   = filterUnseen(results, seen);
+
   if (Object.keys(fresh).length === 0) {
     log('INFO', 'No new results, skipping email');
     return;
   }
-  notify(fresh);
-  saveSeen(markAsSeen(fresh, seen));
+
+  log('INFO', 'Scoring %s fresh jobs...', Object.keys(fresh).length);
+  await Promise.all(
+    Object.values(fresh).map(async (job) => {
+      job.judgment = await scoreJob(job);
+      log('DEBUG', 'Scored [%s]: %s — %s', job.judgment, job.company, job.title);
+    })
+  );
+
+  await notify(fresh, webAppUrl);
+  await saveSeen(markAsSeen(fresh, seen));
 }
 
-function runGoogle(): void {
-  const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
-  notify(applyStopList(fetchGoogleResults(timeFrame)));
+export async function runGoogle(): Promise<void> {
+  const timeFrame = process.env[ENV.SEARCH_TIME_FRAME] ?? TIME_FRAME;
+  const results = await applyStopList(await fetchGoogleResults(timeFrame));
+  const webAppUrl = process.env['WEB_APP_URL'] ?? '';
+  await notify(results, webAppUrl);
 }
 
-function runLinkedin(): void {
-  const timeFrame = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SEARCH_TIME_FRAME) ?? TIME_FRAME;
-  notify(applyStopList(getLinkedinSearchResults(timeFrame)));
+export async function runLinkedin(): Promise<void> {
+  const timeFrame = process.env[ENV.SEARCH_TIME_FRAME] ?? TIME_FRAME;
+  const results = await applyStopList(await getLinkedinSearchResults(timeFrame));
+  const webAppUrl = process.env['WEB_APP_URL'] ?? '';
+  await notify(results, webAppUrl);
 }
 
-function runTopApplicant(): void {
-  notify(applyStopList(getTopApplicantResults()));
+export async function runTopApplicant(): Promise<void> {
+  const results = await applyStopList(await getTopApplicantResults());
+  const webAppUrl = process.env['WEB_APP_URL'] ?? '';
+  await notify(results, webAppUrl);
 }
-
-// Expose to GAS runtime
-const g = global as unknown as Record<string, unknown>;
-g['getOpenReqs']     = getOpenReqs;
-g['runGoogle']       = runGoogle;
-g['runLinkedin']     = runLinkedin;
-g['runTopApplicant'] = runTopApplicant;
-g['doGet']           = doGet;

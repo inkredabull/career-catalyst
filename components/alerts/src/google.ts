@@ -1,4 +1,4 @@
-import { requireProp, SCRIPT_PROPS } from './config/settings';
+import { requireEnv, ENV } from './config/settings';
 import { SEARCH_TITLES } from './config/titles';
 import { titlePassesPatterns } from './filters';
 import { SearchResults } from './linkedin';
@@ -64,9 +64,9 @@ export function parseResultTitle(raw: string): { title: string; company: string 
 
 interface GoogleSearch {
   label:   string;
-  source:  string;  // shown as "Source: X" in the email
-  prefix?: string;  // site: restriction and/or location term
-  suffix?: string;  // intent + exclusion terms
+  source:  string;
+  prefix?: string;
+  suffix?: string;
 }
 
 const GOOGLE_SEARCHES: GoogleSearch[] = [
@@ -91,7 +91,7 @@ const GOOGLE_SEARCHES: GoogleSearch[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// GAS-dependent fetch
+// Fetch
 // ---------------------------------------------------------------------------
 
 interface SerperItem {
@@ -105,8 +105,8 @@ interface SerperResponse {
   error?:   string;
 }
 
-export function fetchGoogleResults(timeFrame: string): SearchResults {
-  const apiKey    = requireProp(SCRIPT_PROPS.SERPER_API_KEY);
+export async function fetchGoogleResults(timeFrame: string): Promise<SearchResults> {
+  const apiKey    = requireEnv(ENV.SERPER_API_KEY);
   const afterDate = timeFrameToAfterDate(timeFrame);
 
   const enabledTitles = Object.entries(SEARCH_TITLES)
@@ -116,32 +116,31 @@ export function fetchGoogleResults(timeFrame: string): SearchResults {
 
   const results: SearchResults = {};
 
-  GOOGLE_SEARCHES.forEach(({ label, source, prefix, suffix }) => {
+  for (const { label, source, prefix, suffix } of GOOGLE_SEARCHES) {
     const parts = [prefix, titleClause, suffix, `after:${afterDate}`].filter(Boolean);
     const query = parts.join(' ');
 
     log('DEBUG', 'Google search: %s (after %s)', label, afterDate);
     log('DEBUG', 'Query: %s', query);
 
-    const response = UrlFetchApp.fetch('https://google.serper.dev/search', {
-      method: 'post',
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
       headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
-      payload: JSON.stringify({ q: query, num: 10, gl: 'us' }),
-      muteHttpExceptions: true,
+      body: JSON.stringify({ q: query, num: 10, gl: 'us' }),
     });
-    const data = JSON.parse(response.getContentText()) as SerperResponse;
+    const data = JSON.parse(await response.text()) as SerperResponse;
 
     if (data.error) {
       log('WARN', 'Serper error [%s]: %s', label, data.error);
-      return;
+      continue;
     }
 
     let found = 0;
-    (data.organic ?? []).forEach(item => {
+    for (const item of (data.organic ?? [])) {
       const { title, company } = parseResultTitle(item.title);
       if (!titlePassesPatterns(title)) {
         log('DEBUG', 'Filtered (patterns): %s', item.title);
-        return;
+        continue;
       }
 
       results[item.link] = {
@@ -153,10 +152,10 @@ export function fetchGoogleResults(timeFrame: string): SearchResults {
         source,
       };
       found++;
-    });
+    }
 
     log('DEBUG', 'Google %s: %s/%s results passed filter', label, found, (data.organic ?? []).length);
-  });
+  }
 
   return results;
 }

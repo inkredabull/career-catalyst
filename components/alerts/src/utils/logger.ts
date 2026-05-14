@@ -2,12 +2,8 @@ export type Level = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 const LEVELS: Record<Level, number> = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
 
 function currentLevel(): number {
-  try {
-    const raw = PropertiesService.getScriptProperties().getProperty('LOG_LEVEL') ?? 'INFO';
-    return LEVELS[raw.toUpperCase() as Level] ?? LEVELS.INFO;
-  } catch {
-    return LEVELS.INFO;
-  }
+  const raw = process.env['LOG_LEVEL'] ?? 'INFO';
+  return LEVELS[raw.toUpperCase() as Level] ?? LEVELS.INFO;
 }
 
 export function log(level: Level, msg: string, ...args: unknown[]): void {

@@ -1,4 +1,4 @@
-import { requireProp, SCRIPT_PROPS } from './config/settings';
+import { requireEnv, ENV } from './config/settings';
 import { GEOS } from './config/constants';
 import { titlePassesPatterns } from './filters';
 import { log } from './utils/logger';
@@ -12,34 +12,30 @@ export interface SearchFilter {
 }
 
 export interface JobResult {
-  id:       string;
-  company:  string;
-  title:    string;
+  id:        string;
+  company:   string;
+  title:     string;
   location?: string;
-  info?:    string;
-  url:      string;
-  search:   string;
-  source?:  string;
+  info?:     string;
+  url:       string;
+  search:    string;
+  source?:   string;
+  judgment?: string;
 }
 
 export type SearchResults = Record<string, JobResult>;
 
 
-function buildLiOptions(cookie: string, csrfToken: string, referer: string): GoogleAppsScript.URL_Fetch.URLFetchRequestOptions {
+function buildLiHeaders(cookie: string, csrfToken: string, referer: string): Record<string, string> {
   return {
-    method: 'get',
-    headers: {
-      'accept': 'application/vnd.linkedin.normalized+json+2.1',
-      'accept-language': 'en-US,en;q=0.9',
-      'csrf-token': csrfToken,
-      'x-li-lang': 'en_US',
-      'x-restli-protocol-version': '2.0.0',
-      'cookie': cookie,
-      'Referer': referer,
-      'Referrer-Policy': 'strict-origin-when-cross-origin',
-    },
-    muteHttpExceptions: true,
-    contentType: 'application/json',
+    'accept':                      'application/vnd.linkedin.normalized+json+2.1',
+    'accept-language':             'en-US,en;q=0.9',
+    'csrf-token':                  csrfToken,
+    'x-li-lang':                   'en_US',
+    'x-restli-protocol-version':   '2.0.0',
+    'cookie':                      cookie,
+    'Referer':                     referer,
+    'Referrer-Policy':             'strict-origin-when-cross-origin',
   };
 }
 
@@ -71,7 +67,7 @@ export function extractApplicantCount(insights: unknown): number | undefined {
   return match[2] ? n + 1 : n;
 }
 
-export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<string, unknown>, search: string, source?: string): SearchResults {
+export function extractInfo(data: Record<string, unknown>, search: string, source?: string): SearchResults {
   const hashOfResults: SearchResults = {};
   const included = (data as Record<string, unknown[]>).included;
 
@@ -128,20 +124,21 @@ export function extractInfo(data: GoogleAppsScript.Content.TextOutput | Record<s
   return hashOfResults;
 }
 
-export function getSearchResultsFromLinkedin(filter: SearchFilter): Record<string, unknown> {
-  const cookie    = requireProp(SCRIPT_PROPS.LI_COOKIE);
-  const csrfToken = requireProp(SCRIPT_PROPS.LI_CSRF_TOKEN);
+export async function getSearchResultsFromLinkedin(filter: SearchFilter): Promise<Record<string, unknown>> {
+  const cookie    = requireEnv(ENV.LI_COOKIE);
+  const csrfToken = requireEnv(ENV.LI_CSRF_TOKEN);
   const url       = getLinkedinURL(filter);
   const referer   = `https://www.linkedin.com/jobs/search/?geoId=${filter.locationUnion.geoId}`;
 
   log('DEBUG', 'GET %s', url);
-  const response = UrlFetchApp.fetch(url, buildLiOptions(cookie, csrfToken, referer));
-  return JSON.parse(response.getContentText()) as Record<string, unknown>;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: buildLiHeaders(cookie, csrfToken, referer),
+  });
+  const text = await response.text();
+  return JSON.parse(text) as Record<string, unknown>;
 }
 
-// Fetches the "Top Applicant" job collection across the first N pages.
-// Uses the graphql endpoint — same normalized JSON format, same auth, no time filter
-// (LinkedIn curates the list; we rely on titlePassesPatterns + stop list for filtering).
 const TOP_APPLICANT_BASE =
   'https://www.linkedin.com/voyager/api/graphql'
   + '?includeWebMetadata=true'
@@ -151,17 +148,17 @@ const TOP_APPLICANT_BASE =
 const TOP_APPLICANT_REFERER = 'https://www.linkedin.com/jobs/collections/top-applicant/';
 const TOP_APPLICANT_PAGES   = 2;
 
-export function getTopApplicantFromLinkedin(): Record<string, unknown>[] {
-  const cookie    = requireProp(SCRIPT_PROPS.LI_COOKIE);
-  const csrfToken = requireProp(SCRIPT_PROPS.LI_CSRF_TOKEN);
-  const options   = buildLiOptions(cookie, csrfToken, TOP_APPLICANT_REFERER);
+export async function getTopApplicantFromLinkedin(): Promise<Record<string, unknown>[]> {
+  const cookie    = requireEnv(ENV.LI_COOKIE);
+  const csrfToken = requireEnv(ENV.LI_CSRF_TOKEN);
+  const headers   = buildLiHeaders(cookie, csrfToken, TOP_APPLICANT_REFERER);
   const pages: Record<string, unknown>[] = [];
 
   for (let page = 0; page < TOP_APPLICANT_PAGES; page++) {
-    const url      = TOP_APPLICANT_BASE.replace('{START}', String(page * 25));
+    const url = TOP_APPLICANT_BASE.replace('{START}', String(page * 25));
     log('DEBUG', 'Top Applicant page %s/%s: GET %s', page + 1, TOP_APPLICANT_PAGES, url);
-    const response = UrlFetchApp.fetch(url, options);
-    pages.push(JSON.parse(response.getContentText()) as Record<string, unknown>);
+    const response = await fetch(url, { method: 'GET', headers });
+    pages.push(JSON.parse(await response.text()) as Record<string, unknown>);
   }
 
   return pages;

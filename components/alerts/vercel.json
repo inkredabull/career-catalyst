@@ -1,0 +1,9 @@
+{
+  "crons": [
+    { "path": "/api/cron", "schedule": "0 */4 * * *" }
+  ],
+  "functions": {
+    "api/cron.ts":  { "maxDuration": 300 },
+    "api/block.ts": { "maxDuration": 10  }
+  }
+}

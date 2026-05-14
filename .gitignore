@@ -120,6 +120,7 @@ jspm_packages/
 !tsconfig.json
 !tsconfig.webpack.json
 !appsscript.json
+!vercel.json
 !extension/manifest.json
 !packages/chrome-extension/extension/manifest.json
 !components/chrome-extension/extension/manifest.json
