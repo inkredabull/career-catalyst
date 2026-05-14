@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { list } from '@vercel/blob';
 import { ENV } from './config/settings';
 import { JobResult } from './linkedin';
 import { log } from './utils/logger';
@@ -46,28 +45,6 @@ Judgment labels (pick exactly one):
 `.trim();
 
 // ---------------------------------------------------------------------------
-// CV — loaded once from Vercel Blob (alerts/cv.txt); cached for the process lifetime
-// ---------------------------------------------------------------------------
-
-let cvCache: string | null = null;
-
-async function loadCV(): Promise<string> {
-  if (cvCache !== null) return cvCache;
-  try {
-    const { blobs } = await list({ prefix: 'alerts/cv.txt', limit: 1 });
-    if (blobs.length > 0) {
-      const res = await fetch(blobs[0].url);
-      cvCache = await res.text();
-      return cvCache;
-    }
-  } catch (err) {
-    log('WARN', 'Could not load CV from Blob: %s', (err as Error).message);
-  }
-  cvCache = '';
-  return cvCache;
-}
-
-// ---------------------------------------------------------------------------
 // JD fetch via Jina Reader
 // ---------------------------------------------------------------------------
 
@@ -95,10 +72,9 @@ export async function scoreJob(job: JobResult): Promise<'🟢' | '🟡' | '🔴'
     return '?';
   }
 
-  const [cv, jdText] = await Promise.all([loadCV(), fetchJD(job.url)]);
+  const jdText = await fetchJD(job.url);
 
   const userMessage = [
-    cv ? `## Candidate Profile\n${cv}` : '',
     `## Scoring Rubric\n${RUBRIC}`,
     `## Job`,
     `Company: ${job.company}`,
