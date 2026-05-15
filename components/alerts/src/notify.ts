@@ -3,8 +3,9 @@ import { requireEnv, ENV } from './config/settings';
 import { JobResult, SearchResults } from './linkedin';
 
 function formatEntry(r: JobResult, webAppUrl: string): { text: string; html: string } {
-  const banCo = `${webAppUrl}?type=company&value=${encodeURIComponent(r.company)}`;
-  const banTi = `${webAppUrl}?type=title&value=${encodeURIComponent(r.title)}`;
+  const base  = webAppUrl.replace(/\/$/, '') + '/api/block';
+  const banCo = `${base}?type=company&value=${encodeURIComponent(r.company)}`;
+  const banTi = `${base}?type=title&value=${encodeURIComponent(r.title)}`;
   const judgment = r.judgment ? `${r.judgment} ` : '';
   return {
     text: [r.judgment, r.company, r.title, r.location, r.info, r.url, r.search, '***'].filter(Boolean).join('\n'),
