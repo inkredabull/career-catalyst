@@ -1,4 +1,4 @@
-import { put, list, getDownloadUrl } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 import { SearchResults } from './linkedin';
 
 export const SEEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -48,8 +48,11 @@ export function pruneSeen(
 async function readBlob<T>(pathname: string, fallback: T): Promise<T> {
   const { blobs } = await list({ prefix: pathname, limit: 1 });
   if (blobs.length === 0) return fallback;
-  const downloadUrl = await getDownloadUrl(blobs[0].url);
-  const res = await fetch(downloadUrl);
+  const token = process.env['BLOB_READ_WRITE_TOKEN'] ?? '';
+  const res = await fetch(blobs[0].url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Blob read failed: ${res.status} ${res.statusText}`);
   return JSON.parse(await res.text()) as T;
 }
 
