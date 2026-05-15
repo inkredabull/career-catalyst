@@ -12,8 +12,8 @@ import { scoreJob } from './scoring';
 function isBlocked(result: JobResult, companies: string[], titles: string[]): boolean {
   const co = result.company.toLowerCase();
   const ti = result.title.toLowerCase();
-  return companies.some(c => co.includes(c.toLowerCase()))
-      || titles.some(t => ti.includes(t.toLowerCase()));
+  return companies.some(c => co.includes(c.toLowerCase().trim()))
+      || titles.some(t => ti.includes(t.toLowerCase().trim()));
 }
 
 async function applyStopList(results: SearchResults): Promise<SearchResults> {
