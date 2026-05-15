@@ -2,9 +2,13 @@
  * One-time migration: seeds alerts/stop-lists.json in Vercel Blob with
  * the existing GAS Script Properties stop-list data.
  *
- * Run: npx dotenv -e .env.local -- npx ts-node scripts/seed-stop-lists.ts
+ * Run from components/alerts/: npx ts-node scripts/seed-stop-lists.ts
  * Requires BLOB_READ_WRITE_TOKEN in .env.local (run `vercel env pull .env.local` first).
  */
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '..', '.env.local') });
+
 import { put } from '@vercel/blob';
 
 const data = {
@@ -99,7 +103,7 @@ const data = {
 async function main(): Promise<void> {
   console.log(`Seeding stop lists (${data.companies.length} companies, ${data.titles.length} titles)...`);
   const blob = await put('alerts/stop-lists.json', JSON.stringify(data), {
-    access: 'public',
+    access: 'private',
     addRandomSuffix: false,
   });
   console.log(`Done: ${blob.url}`);
