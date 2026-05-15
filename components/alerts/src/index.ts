@@ -102,6 +102,8 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
     })
   );
 
+  const judgmentSummary = Object.values(fresh).map(j => j.judgment ?? '?').join(' ');
+  log('INFO', 'Judgments before notify: %s', judgmentSummary);
   log('INFO', 'Sending email for %s jobs...', Object.keys(fresh).length);
   await notify(fresh, webAppUrl);
   log('INFO', 'Email sent, saving seen...');
