@@ -41,7 +41,7 @@ export async function notify(results: SearchResults, webAppUrl: string): Promise
   await resend.emails.send({
     from:    'alerts@bluxomelabs.com',
     to:      email,
-    subject: `Jobs for ${new Date().toLocaleDateString()}`,
+    subject: `Jobs for ${new Date().toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`,
     text:    entries.map(e => e.text).join('\n\n'),
     html:    entries.map(e => e.html).join(''),
   });
