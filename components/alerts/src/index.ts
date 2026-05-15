@@ -102,8 +102,11 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
     })
   );
 
+  log('INFO', 'Sending email for %s jobs...', Object.keys(fresh).length);
   await notify(fresh, webAppUrl);
+  log('INFO', 'Email sent, saving seen...');
   await saveSeen(markAsSeen(fresh, seen));
+  log('INFO', 'Done.');
 }
 
 export async function runGoogle(): Promise<void> {
