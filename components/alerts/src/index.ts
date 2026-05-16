@@ -5,7 +5,7 @@ import { pause } from './clock';
 import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
 import { fetchGoogleResults } from './google';
 import { log } from './utils/logger';
-import { loadSeen, saveSeen, filterUnseen, markAsSeen, loadStopLists } from './seen';
+import { loadSeen, saveSeen, filterUnseen, markAsSeen, loadStopLists, saveScore } from './seen';
 import { notify } from './notify';
 import { scoreJob } from './scoring';
 
@@ -97,8 +97,10 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
   log('INFO', 'Scoring %s fresh jobs...', Object.keys(fresh).length);
   await Promise.all(
     Object.values(fresh).map(async (job) => {
-      job.judgment = await scoreJob(job);
-      log('DEBUG', 'Scored [%s]: %s — %s', job.judgment, job.company, job.title);
+      const { verdict, reasoning } = await scoreJob(job);
+      job.judgment = verdict;
+      await saveScore(job.id, { job, verdict, reasoning, scoredAt: new Date().toISOString() });
+      log('DEBUG', 'Scored [%s]: %s — %s', verdict, job.company, job.title);
     })
   );
 

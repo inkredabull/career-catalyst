@@ -1,5 +1,5 @@
 import { put, list } from '@vercel/blob';
-import { SearchResults } from './linkedin';
+import { JobResult, SearchResults } from './linkedin';
 
 export const SEEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -91,4 +91,30 @@ export async function addToStopList(type: 'company' | 'title', value: string): P
     list.push(value);
   }
   await writeBlob(STOP_LISTS_PATH, current);
+}
+
+// ---------------------------------------------------------------------------
+// Scores
+// ---------------------------------------------------------------------------
+
+export interface ScoreRecord {
+  job:       JobResult;
+  verdict:   string;
+  reasoning: string;
+  scoredAt:  string;
+}
+
+const SCORES_PREFIX = 'alerts/scores/';
+
+export async function saveScore(jobId: string, record: ScoreRecord): Promise<void> {
+  await writeBlob(`${SCORES_PREFIX}${jobId}.json`, record);
+}
+
+export async function loadScore(jobId: string): Promise<ScoreRecord | null> {
+  const { blobs } = await list({ prefix: `${SCORES_PREFIX}${jobId}.json`, limit: 1 });
+  if (blobs.length === 0) return null;
+  const token = process.env['BLOB_READ_WRITE_TOKEN'] ?? '';
+  const res = await fetch(blobs[0].url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  return JSON.parse(await res.text()) as ScoreRecord;
 }

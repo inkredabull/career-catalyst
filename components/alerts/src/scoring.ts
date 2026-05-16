@@ -65,11 +65,16 @@ async function fetchJD(url: string): Promise<string> {
 // Scorer
 // ---------------------------------------------------------------------------
 
-export async function scoreJob(job: JobResult): Promise<'🟢' | '🟡' | '🔴' | '?'> {
+export interface ScoreResult {
+  verdict:   '🟢' | '🟡' | '🔴' | '?';
+  reasoning: string;
+}
+
+export async function scoreJob(job: JobResult): Promise<ScoreResult> {
   const apiKey = process.env[ENV.ANTHROPIC_API_KEY];
   if (!apiKey) {
     log('WARN', 'ANTHROPIC_API_KEY not set — skipping scoring');
-    return '?';
+    return { verdict: '?', reasoning: '' };
   }
 
   const jdText = await fetchJD(job.url);
@@ -82,15 +87,17 @@ export async function scoreJob(job: JobResult): Promise<'🟢' | '🟡' | '🔴'
     job.location ? `Location: ${job.location}` : '',
     `URL: ${job.url}`,
     jdText ? `\n## Job Description\n${jdText}` : '',
-    '\nRespond with ONLY one line:\nVerdict: [🟢 Strong Fit — Pursue Actively | 🟡 Conditional Fit — Dig Deeper Before Committing | 🔴 Pass — Meaningful Misalignment]',
+    `\nScore each of the 14 dimensions with a brief 1-2 sentence assessment and numeric score.
+Format each line as: N. Dimension Name: [score] — assessment
+End with a blank line then: Verdict: [🟢 Strong Fit — Pursue Actively | 🟡 Conditional Fit — Dig Deeper Before Committing | 🔴 Pass — Meaningful Misalignment]`,
   ].filter(Boolean).join('\n');
 
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 150,
-      system: 'You are a job scoring assistant for a VP Engineering / CTO candidate. Score the job and respond with the verdict line only.',
+      max_tokens: 1500,
+      system: 'You are a job scoring assistant for a VP Engineering / CTO candidate. Score each dimension and end with the verdict.',
       messages: [{ role: 'user', content: userMessage }],
     });
 
@@ -99,13 +106,15 @@ export async function scoreJob(job: JobResult): Promise<'🟢' | '🟡' | '🔴'
       .map(b => b.text)
       .join('');
 
-    if (text.includes('🟢')) return '🟢';
-    if (text.includes('🟡')) return '🟡';
-    if (text.includes('🔴')) return '🔴';
-    log('WARN', 'Could not parse verdict for %s — %s: "%s"', job.company, job.title, text.slice(0, 100));
-    return '?';
+    let verdict: ScoreResult['verdict'] = '?';
+    if (text.includes('🟢')) verdict = '🟢';
+    else if (text.includes('🟡')) verdict = '🟡';
+    else if (text.includes('🔴')) verdict = '🔴';
+    else log('WARN', 'Could not parse verdict for %s — %s: "%s"', job.company, job.title, text.slice(0, 100));
+
+    return { verdict, reasoning: text };
   } catch (err) {
     log('WARN', 'Scoring failed for %s — %s: %s', job.company, job.title, (err as Error).message);
-    return '?';
+    return { verdict: '?', reasoning: '' };
   }
 }

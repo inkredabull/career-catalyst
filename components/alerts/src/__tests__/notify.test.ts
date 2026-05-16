@@ -52,6 +52,13 @@ describe('formatEntry', () => {
     expect(html).toContain(`/api/block?type=title&value=${encodeURIComponent(job.title)}`);
   });
 
+  it('includes score link in both text and html', () => {
+    const job = makeJob({ id: 'abc123' });
+    const { text, html } = formatEntry(job, BASE_URL);
+    expect(text).toContain('/api/score?id=abc123');
+    expect(html).toContain('/api/score?id=abc123');
+  });
+
   it('renders location and info when present', () => {
     const job = makeJob({ location: 'Remote', info: '$200K/yr' });
     const { text, html } = formatEntry(job, BASE_URL);
