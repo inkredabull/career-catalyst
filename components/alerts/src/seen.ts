@@ -1,4 +1,4 @@
-import { put, list } from '@vercel/blob';
+import { put, list, del } from '@vercel/blob';
 import { JobResult, SearchResults } from './linkedin';
 
 export const SEEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,10 +57,12 @@ async function readBlob<T>(pathname: string, fallback: T): Promise<T> {
 }
 
 async function writeBlob(pathname: string, data: unknown): Promise<void> {
+  // Private stores don't reliably support allowOverwrite; delete first
+  const { blobs } = await list({ prefix: pathname, limit: 1 });
+  if (blobs.length > 0) await del(blobs[0].url);
   await put(pathname, JSON.stringify(data), {
     access: 'private',
     addRandomSuffix: false,
-    allowOverwrite: true,
   });
 }
 
