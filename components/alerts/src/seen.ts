@@ -108,12 +108,16 @@ export interface ScoreRecord {
 
 const SCORES_PREFIX = 'alerts/scores/';
 
+function scoreKey(jobId: string): string {
+  return `${SCORES_PREFIX}${jobId.replace(/\//g, '_')}.json`;
+}
+
 export async function saveScore(jobId: string, record: ScoreRecord): Promise<void> {
-  await writeBlob(`${SCORES_PREFIX}${jobId}.json`, record);
+  await writeBlob(scoreKey(jobId), record);
 }
 
 export async function loadScore(jobId: string): Promise<ScoreRecord | null> {
-  const { blobs } = await list({ prefix: `${SCORES_PREFIX}${jobId}.json`, limit: 1 });
+  const { blobs } = await list({ prefix: scoreKey(jobId), limit: 1 });
   if (blobs.length === 0) return null;
   const token = process.env['BLOB_READ_WRITE_TOKEN'] ?? '';
   const res = await fetch(blobs[0].url, { headers: { Authorization: `Bearer ${token}` } });
