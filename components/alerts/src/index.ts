@@ -1,5 +1,5 @@
 import { ENV } from './config/settings';
-import { SF_FILTER, US_FILTER, TIME_FRAME } from './config/constants';
+import { SF_FILTER, TIME_FRAME } from './config/constants';
 import { SEARCH_TITLES } from './config/titles';
 import { pause } from './clock';
 import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
@@ -60,7 +60,7 @@ async function getLinkedinSearchResults(timeFrame: string): Promise<SearchResult
 
   for (const title of enabledTitles) {
     results = await fetchResults(title, results, SF_FILTER as SearchFilter, timeFrame);
-    results = await fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
+    // results = await fetchResults(title, results, US_FILTER as SearchFilter, timeFrame);
   }
   return results;
 }
