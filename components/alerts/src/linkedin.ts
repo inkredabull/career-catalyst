@@ -114,7 +114,7 @@ export function extractInfo(data: Record<string, unknown>, search: string, sourc
     });
 
     const kept = Object.keys(hashOfResults).length;
-    log('INFO',  'Result count: %s', kept);
+    log('INFO',  '[%s] Result count: %s', search, kept);
     log('DEBUG', '[%s] %s included → %s job cards → %s titled → %s passed patterns → %s passed applicant filter → %s kept',
       search, included.length, jobCards, jobCards - noTitle,
       jobCards - noTitle - patternFiltered,
