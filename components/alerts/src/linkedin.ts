@@ -136,6 +136,9 @@ export async function getSearchResultsFromLinkedin(filter: SearchFilter): Promis
     headers: buildLiHeaders(cookie, csrfToken, referer),
   });
   const text = await response.text();
+  if (!response.ok) {
+    log('WARN', 'LinkedIn HTTP %s for [%s]: %s', response.status, url.slice(0, 80), text.slice(0, 300));
+  }
   return JSON.parse(text) as Record<string, unknown>;
 }
 
@@ -158,7 +161,11 @@ export async function getTopApplicantFromLinkedin(): Promise<Record<string, unkn
     const url = TOP_APPLICANT_BASE.replace('{START}', String(page * 25));
     log('DEBUG', 'Top Applicant page %s/%s: GET %s', page + 1, TOP_APPLICANT_PAGES, url);
     const response = await fetch(url, { method: 'GET', headers });
-    pages.push(JSON.parse(await response.text()) as Record<string, unknown>);
+    const text = await response.text();
+    if (!response.ok) {
+      log('WARN', 'LinkedIn Top Applicant HTTP %s (page %s): %s', response.status, page + 1, text.slice(0, 300));
+    }
+    pages.push(JSON.parse(text) as Record<string, unknown>);
   }
 
   return pages;
