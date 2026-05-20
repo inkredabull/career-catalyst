@@ -34,16 +34,23 @@ export function formatEntry(r: JobResult, webAppUrl: string): { text: string; ht
   };
 }
 
-export async function notify(results: SearchResults, webAppUrl: string): Promise<void> {
+export async function notify(results: SearchResults, webAppUrl: string, durationMs?: number): Promise<void> {
   const email  = requireEnv(ENV.MY_EMAIL);
   const resend = new Resend(requireEnv(ENV.RESEND_API_KEY));
   const entries = Object.values(results).map(r => formatEntry(r, webAppUrl));
+
+  const durationFooter = durationMs !== undefined
+    ? `\n\nCompleted in ${(durationMs / 1000).toFixed(1)}s`
+    : '';
+  const durationHtml = durationMs !== undefined
+    ? `<div style="font-size:12px;color:#9ca3af;margin-top:16px">Completed in ${(durationMs / 1000).toFixed(1)}s</div>`
+    : '';
 
   await resend.emails.send({
     from:    'alerts@bluxomelabs.com',
     to:      email,
     subject: `Jobs for ${new Date().toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`,
-    text:    entries.map(e => e.text).join('\n\n'),
-    html:    entries.map(e => e.html).join(''),
+    text:    entries.map(e => e.text).join('\n\n') + durationFooter,
+    html:    entries.map(e => e.html).join('') + durationHtml,
   });
 }

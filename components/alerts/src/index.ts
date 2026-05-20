@@ -85,6 +85,7 @@ export async function getResults(): Promise<SearchResults> {
 }
 
 export async function getOpenReqs(webAppUrl: string): Promise<void> {
+  const startedAt = Date.now();
   const results = await getResults();
   const seen    = await loadSeen();
   const fresh   = filterUnseen(results, seen);
@@ -111,7 +112,7 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
   const judgmentSummary = Object.values(fresh).map(j => j.judgment ?? '?').join(' ');
   log('INFO', 'Judgments before notify: %s', judgmentSummary);
   log('INFO', 'Sending email for %s jobs...', Object.keys(fresh).length);
-  await notify(fresh, webAppUrl);
+  await notify(fresh, webAppUrl, Date.now() - startedAt);
   log('INFO', 'Email sent, saving seen...');
   await saveSeen(markAsSeen(fresh, seen));
   log('INFO', 'Done.');
