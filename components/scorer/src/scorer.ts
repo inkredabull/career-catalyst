@@ -20,7 +20,7 @@ These are the direct pursue/pass drivers. Score honestly.
 - 1 = Poor fit or dealbreaker (🔴 Red flag)
 
 1. Skills & Strengths Alignment — Evaluate the role's actual day-to-day mandate, not the company's age or size. Does this specific role require AI-native systems, RAG, LLMs, platform/infra, or 0-to-1 building? A "Director of AI Engineering" inside a large company can score 4 if the mandate is genuine. A startup role that's really legacy maintenance scores 2.
-2. Role Availability & Growth — Clear mandate and upward path? Avoid IC-heavy or purely operational roles. Note: CPTO or CTO/CPO compound titles with genuine product+tech authority score 4–5 regardless of company type (startup, PE-backed, public). Evaluate actual decision-making scope, not just the title tier.
+2. Role Availability & Growth — Clear mandate and upward path? Avoid IC-heavy or purely operational roles. Note: CPTO or CTO/CPO compound titles with genuine product+tech authority score 4–5 regardless of company type (startup, PE-backed, public). Evaluate actual decision-making scope, not just the title tier. CRITICAL: Check whether responsibilities are written as things Anthony *personally does* vs. things *Anthony's org owns*. Language like "you will write code", "you will conduct code review", "you will recruit" (vs. "your team will...") signals IC-leadership conflation. Score 1 and flag as scope creep if two or more IC-level verbs are directed personally at the role holder alongside management duties.
 3. Values & Mission Fit — Does the company's mission connect to Anthony's long-term arc?
 4. Compensation & Stability — Target: $225K+ base salary. Score 1 ONLY if comp is explicitly stated below $225K base, or the role is equity-only / deferred comp. Undisclosed comp at a small or bootstrapped company = score 2 (yellow flag, verify) — not automatic 1. Public company RSU bands verifiable from market data are a positive stability signal.
 5. Company Culture Norms — Look for specific red flags: mandatory in-office culture, known process-heavy bureaucracy explicitly described in the JD, recent layoffs, or role descriptions that read as maintenance not innovation. Do NOT penalize a company categorically for being large or established — evaluate the signals in the JD itself.
@@ -38,11 +38,12 @@ Score 3 = positive signal, 2 = minor concern, 1 = notable gap. Cap at 3 — thes
 13. Recent News / Growth Direction — Is the company on an upward trajectory?
 14. Recruiter Responsiveness — Default 3 if not yet engaged.
 
-Hard filters (score 1 if triggered):
+Hard filters (score 1 on the relevant dimension if triggered):
 - Comp is explicitly stated below $225K base, or the role is equity-only / deferred
 - Role is explicitly full-time in-office with no remote option, outside SF Bay Area (confirmed relocation required)
 - IC-heavy with no direct reports or org-building mandate
 - Role has no technical leadership or AI/ML innovation mandate (ask: would Anthony's AI expertise grow or be used here?)
+- Scope Creep: role asks one person to personally own all three of — (1) deep IC work (coding, code review, architecture ownership), (2) org-building and team management, and (3) high-bar technical recruiting. When all three appear as personal duties directed at the role holder, score Dimension 2 as 1 and note: "Unicorn scope — leadership, IC, and recruiting collapsed into one seat. Likely founder ambiguity."
 
 Soft filters (flag as yellow if absent):
 - React / Python / TypeScript in the stack
@@ -50,8 +51,30 @@ Soft filters (flag as yellow if absent):
 - Series A–B stage or public company with verified strong TC band
 - Executive team with at least one prior exit
 - Undisclosed comp at a company with no verifiable market data
+- No comp band disclosed → note "Unanchored negotiation risk"
+- "You will recruit" alongside IC and leadership duties with no mention of TA partnership or sourcing support → note "Recruiting scope collapse"
 
 If information is missing from the JD, score 3 and note "Not disclosed — verify before advancing."
+
+## JD Language Signals
+
+After scoring, scan the full JD text for these patterns and report matches in the output:
+
+Pedigree dog whistles (🟡 soft flag — may signal bar misalignment):
+- "Tier 1" companies or schools referenced without context
+- "World-class", "top 1%", "elite" as descriptors for the team or candidate bar
+- Specific school callouts (Stanford, MIT, CMU) in requirements
+
+IC-leadership conflation (🔴 hard flag if 2 or more present — triggers Dimension 2 score of 1):
+- "You will write code" / "hands-on coding required" in a Head/VP/Director role
+- "Code review" listed as a personal responsibility of the role holder (not a process the org runs)
+- "Live coding" or "systems design" in the interview process for a leadership role
+- Architecture ownership described as personal work, not delegated judgment
+- "Deep technical" used to describe the candidate rather than the team they lead
+
+Recruiting scope collapse (🟡 soft flag):
+- "You will recruit" alongside IC and leadership duties with no TA mention
+- Bar-setting described as personal interviewing load rather than process design
 
 ## Output Format
 
@@ -69,15 +92,25 @@ Produce a scorecard in this exact structure:
 | # | Dimension | Score | Flag | Notes |
 |---|-----------|:-----:|------|-------|
 | 1 | Skills & Strengths Alignment | X | | |
-... (all 15 rows) ...
+... (all 14 rows) ...
 
 **Total: XX / 58** (primary: XX/40 | context: XX/18)
+
+#### JD Language Signals
+
+| Signal | Found | Flag |
+|--------|-------|------|
+| IC verb count in responsibilities (2+) | [yes/no — list verbs if yes] | 🔴 Scope creep / — |
+| Pedigree language (Tier 1, elite, school callouts) | [yes/no — quote if yes] | 🟡 Bar may be misaligned / — |
+| No comp band disclosed | [yes/no] | 🟡 Unanchored / — |
+| Recruiting scope collapse | [yes/no] | 🟡 TA support unclear / — |
+| Live coding / systems design in leadership eval loop | [yes/no] | 🔴 IC-level eval for leadership role / — |
 
 #### 🔴 Red Flags
 - [List scores of 1 or hard filter failures, or "None" if clean]
 
 #### 🟡 Yellow Flags
-- [List scores of 2 or soft filter gaps, or "None" if clean]
+- [List scores of 2, soft filter gaps, or 🟡 language signals, or "None" if clean]
 
 ---
 
@@ -106,6 +139,7 @@ Scoring notes:
 - Below 35/58 total → default to Pass or Conditional unless exceptional circumstances exist.
 - Primary score below 20/40 → near-automatic Pass regardless of context scores.
 - Be honest. Anthony's time is finite.
+- Stage calibration for scope creep: Seed/pre-A roles often collapse scope — flag it but don't auto-fail; note "Broad scope consistent with stage — confirm intentional vs. founder confusion." Series A/growth-stage scope creep is a red flag (org design immaturity). Series B+ scope creep is a hard 🔴 — the role is misleveled or the hiring manager doesn't understand the function.
 `.trim();
 
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
