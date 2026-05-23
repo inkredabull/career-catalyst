@@ -338,7 +338,8 @@ async function extractMutualConnectionNames() {
 
     // LinkedIn renders its SPA content inside a full-viewport same-origin iframe
     // (data-testid="interop-iframe", src="/preload/"). We must query that document.
-    var RESULT_SELECTOR = '[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"]';
+    // Third selector covers 2025+ LinkedIn DOM where data attributes were removed.
+    var RESULT_SELECTOR = '[data-chameleon-result-urn], [data-view-name="search-entity-result-universal-template"], div[role="listitem"]:has(a[href*="/in/"])';
 
     async function findSearchDocument(timeoutMs) {
       var deadline = Date.now() + timeoutMs;
@@ -395,11 +396,19 @@ async function extractMutualConnectionNames() {
         for (var link of links) {
           var href = link.href || '';
           if (seenHrefs.has(href)) continue;
-          // Look for span[dir="ltr"] > span[aria-hidden="true"] which holds just the name
+          // Old DOM: span[dir="ltr"] > span[aria-hidden="true"] held just the name.
+          // New DOM (2025+): name is a direct text node inside the anchor — no aria-hidden span.
           var nameSpan = link.querySelector('span[dir="ltr"] span[aria-hidden="true"]') ||
                          link.querySelector('span[aria-hidden="true"]');
-          if (!nameSpan) continue;
-          var text = (nameSpan.textContent || '').replace(/<!---->/g, '').trim();
+          var text;
+          if (nameSpan) {
+            text = (nameSpan.textContent || '').replace(/<!---->/g, '').trim();
+          } else {
+            text = Array.from(link.childNodes)
+              .filter(function(n) { return n.nodeType === Node.TEXT_NODE; })
+              .map(function(n) { return n.textContent; })
+              .join('').trim();
+          }
           // Skip degree badges ("• 1st", "• 2nd"), empty strings, and UI labels
           if (!text || text.startsWith('•') || text.toLowerCase().includes('view ')) continue;
           seenHrefs.add(href);
