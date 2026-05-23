@@ -54,6 +54,7 @@ async function fetchJD(url: string): Promise<string> {
       headers: { Accept: 'text/plain' },
       signal: AbortSignal.timeout(15_000),
     });
+    log('DEBUG', 'Jina HTTP %s for %s', res.status, url.slice(0, 80));
     const text = await res.text();
     return text.slice(0, 12_000);
   } catch {

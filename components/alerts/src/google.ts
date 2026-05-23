@@ -128,6 +128,11 @@ export async function fetchGoogleResults(timeFrame: string): Promise<SearchResul
       headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: query, num: 10, gl: 'us' }),
     });
+    log('DEBUG', 'Serper HTTP %s [%s]', response.status, label);
+    if (!response.ok) {
+      log('WARN', 'Serper HTTP %s [%s]: %s', response.status, label, (await response.text()).slice(0, 200));
+      continue;
+    }
     const data = JSON.parse(await response.text()) as SerperResponse;
 
     if (data.error) {

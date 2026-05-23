@@ -1,5 +1,6 @@
 import { put, list, del } from '@vercel/blob';
 import { JobResult, SearchResults } from './linkedin';
+import { log } from './utils/logger';
 
 export const SEEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -52,6 +53,7 @@ async function readBlob<T>(pathname: string, fallback: T): Promise<T> {
   const res = await fetch(blobs[0].url, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  log('DEBUG', 'Blob read HTTP %s [%s]', res.status, pathname);
   if (!res.ok) throw new Error(`Blob read failed: ${res.status} ${res.statusText}`);
   return JSON.parse(await res.text()) as T;
 }

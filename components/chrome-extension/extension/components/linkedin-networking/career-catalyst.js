@@ -1,5 +1,7 @@
-// LinkedIn Networking Component - Content Script
+// Career Catalyst - LinkedIn Networking Content Script
 // Handles LinkedIn connection extraction, mutual connections, and feed post saves
+
+const log = (...a) => console.log('[CAREER CATALYST]', ...a);
 
 // Track if extraction is already running to avoid duplicates
 let linkedInExtractionRunning = false;
@@ -51,7 +53,7 @@ function detectLinkedInCompanyPeople() {
 
 function runLinkedInConnectionExtraction() {
 
-  console.log("LinkedIn Connection Extractor - Starting profile clicks...");
+  log("LinkedIn Connection Extractor - Starting profile clicks...");
 
   // Try multiple selectors to find LinkedIn profile cards
   var clickableElements = [];
@@ -76,7 +78,7 @@ function runLinkedInConnectionExtraction() {
   // Try each selector pattern
   for (let pattern of selectorPatterns) {
     var foundElements = document.querySelectorAll(pattern);
-    console.log(`Trying selector "${pattern}": found ${foundElements.length} elements`);
+    log(`Trying selector "${pattern}": found ${foundElements.length} elements`);
 
     if (foundElements.length > 0) {
       for (let i = 0; i < foundElements.length; i++) {
@@ -97,7 +99,7 @@ function runLinkedInConnectionExtraction() {
         var name = nameElement ? nameElement.innerText.trim() : `Profile ${clickableElements.length + 1}`;
         var headline = headlineElement ? headlineElement.innerText.trim() : "";
 
-        console.log(`Found unique connection: ${name} - ${headline}`);
+        log(`Found unique connection: ${name} - ${headline}`);
         clickableElements.push({
             element: profileLink,
             name: name,
@@ -108,13 +110,13 @@ function runLinkedInConnectionExtraction() {
     }
   }
 
-  console.log(`Found ${clickableElements.length} connection profiles.`);
+  log(`Found ${clickableElements.length} connection profiles.`);
 
   if (clickableElements.length > 0) {
-    console.log(`LinkedIn networking: Found ${clickableElements.length} profiles. Use context menu to extract.`);
+    log(`LinkedIn networking: Found ${clickableElements.length} profiles. Use context menu to extract.`);
     linkedInExtractionRunning = false;
   } else {
-    console.log("No clickable connection profiles found with any selector pattern.");
+    log("No clickable connection profiles found with any selector pattern.");
     linkedInExtractionRunning = false;
   }
 }
@@ -126,7 +128,7 @@ function checkForLinkedInExtraction() {
       linkedInExtractionRunning = true;
       // Clear previous session's prompted profiles when starting fresh extraction
       promptedProfiles.clear();
-      console.log('LinkedIn company people page detected - waiting 5 seconds before extraction...');
+      log('LinkedIn company people page detected - waiting 5 seconds before extraction...');
       setTimeout(() => {
         runLinkedInConnectionExtraction();
       }, 5000);
@@ -181,45 +183,57 @@ function getProfilePersonName() {
 
     return 'Unknown Profile';
   } catch (error) {
-    console.log('Error getting profile person name:', error);
+    log('Error getting profile person name:', error);
     return 'Unknown Profile';
   }
 }
 
 function findAndClickMutualConnections() {
 
-  console.log('Looking for mutual connections link...');
+  log('Looking for mutual connections link...');
 
   // Don't run on search results pages
   if (window.location.href.includes('/search/results/')) {
-    console.log('Skipping mutual connections search - already on search results page');
+    log('Skipping mutual connections search - already on search results page');
     return;
   }
 
   // Get the current profile person's name from the page
   var profileName = getProfilePersonName();
-  console.log(`Profile person name: "${profileName}"`);
+  log(`Profile person name: "${profileName}"`);
 
   // Find the mutual connections link — covers all cases:
   //   "Sandra and Josh are mutual connections"  (2 connections, no "other")
   //   "Jane and 5 other mutual connections"     (many connections)
   //   "Jane is a mutual connection"             (1 connection)
+  //   "X connections in common"                (alternate LinkedIn phrasing)
   var mutualConnectionLink = null;
 
   var allLinks = document.querySelectorAll('a');
+  var connectionLinkCandidates = [];
   for (let link of allLinks) {
     var linkText = (link.innerText || link.textContent || '').replace(/\s+/g, ' ').trim();
-    // Must contain "mutual connection" and must NOT be a plain profile /in/ link
-    if (linkText.toLowerCase().includes('mutual connection') && !link.href.includes('/in/')) {
+    var lt = linkText.toLowerCase();
+    // Must NOT be a plain profile /in/ link
+    if (link.href.includes('/in/')) continue;
+    if (lt.includes('mutual connection') || lt.includes('connections in common') || lt.includes('connection in common')) {
       mutualConnectionLink = link;
-      console.log(`Found mutual connections link: "${linkText.slice(0, 80)}"`);
+      log(`Found mutual connections link: "${linkText.slice(0, 80)}"`);
       break;
+    }
+    // Collect any link that mentions "connection" for diagnostics
+    if (lt.includes('connection')) {
+      connectionLinkCandidates.push(`"${linkText.slice(0, 60)}" → ${link.href.slice(0, 80)}`);
     }
   }
 
+  if (!mutualConnectionLink && connectionLinkCandidates.length > 0) {
+    log('No exact mutual-connections link found. Nearby "connection" links:', connectionLinkCandidates.join(' | '));
+  }
+
   if (mutualConnectionLink) {
-    console.log('Found mutual connections link, clicking...');
-    console.log(`Link URL: ${mutualConnectionLink.href}`);
+    log('Found mutual connections link, clicking...');
+    log(`Link URL: ${mutualConnectionLink.href}`);
 
     // Store the current profile's information for extraction
     var currentUrl = window.location.href;
@@ -253,22 +267,22 @@ function findAndClickMutualConnections() {
     // Set flag to indicate we're expecting a mutual connections page load
     localStorage.setItem('linkedin_awaiting_mutual_connections', 'true');
 
-    console.log(`Stored profile info - name: "${nameToStore}", URL: "${currentUrl}"`);
+    log(`Stored profile info - name: "${nameToStore}", URL: "${currentUrl}"`);
 
     mutualConnectionLink.click();
   } else {
-    console.log('No mutual connections link found on this profile');
+    log('No mutual connections link found on this profile');
   }
 }
 
 async function extractMutualConnectionNames() {
 
-  console.log('Extracting mutual connection names...');
+  log('Extracting mutual connection names...');
 
   try {
     // Get the target profile URL and stored metadata from localStorage
     var targetProfileUrl = localStorage.getItem('linkedin_target_profile_url') || '';
-    console.log(`Target profile URL: "${targetProfileUrl}"`);
+    log(`Target profile URL: "${targetProfileUrl}"`);
 
     var targetJobId = localStorage.getItem('linkedin_target_job_id') || '';
 
@@ -290,7 +304,7 @@ async function extractMutualConnectionNames() {
       }
     }
 
-    console.log(`Target first name: "${targetFirstName}", Job ID: "${targetJobId}"`);
+    log(`Target first name: "${targetFirstName}", Job ID: "${targetJobId}"`);
 
     // Initialize pagination state — restore from localStorage if resuming after URL navigation
     if (!paginationState.isExtracting) {
@@ -307,7 +321,7 @@ async function extractMutualConnectionNames() {
           paginationState.targetJobId = s.targetJobId || targetJobId;
           paginationState.searchDoc = null;
           localStorage.removeItem('linkedin_pagination_state');
-          console.log(`Resuming pagination: page ${paginationState.currentPage}, ${paginationState.allResults.length} results so far`);
+          log(`Resuming pagination: page ${paginationState.currentPage}, ${paginationState.allResults.length} results so far`);
         } catch(e) { savedState = null; }
       }
       if (!savedState) {
@@ -335,14 +349,14 @@ async function extractMutualConnectionNames() {
           try {
             var iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
             if (iDoc && iDoc.querySelector(RESULT_SELECTOR)) {
-              console.log('Found results in interop-iframe');
+              log('Found results in interop-iframe');
               return iDoc;
             }
           } catch(e) { /* cross-origin guard, shouldn't happen for linkedin.com */ }
         }
         // Fallback: top-level document (for non-iframe renders)
         if (document.querySelector(RESULT_SELECTOR)) {
-          console.log('Found results in top-level document');
+          log('Found results in top-level document');
           return document;
         }
         await new Promise(function(r) { setTimeout(r, 300); });
@@ -426,14 +440,14 @@ async function extractMutualConnectionNames() {
     }
 
     if (nameElements.length === 0) {
-      console.log('Could not find mutual connections with any known selector');
+      log('Could not find mutual connections with any known selector');
       outputAccumulatedResults();
       return;
     }
 
     // Add current page results to accumulated results (deduplicated)
     if (!paginationState.seenNames) paginationState.seenNames = new Set();
-    console.log(`Page ${paginationState.currentPage}: Found ${nameElements.length} connections`);
+    log(`Page ${paginationState.currentPage}: Found ${nameElements.length} connections`);
     nameElements.forEach((element) => {
       var mutualConnectionName = element.innerText.trim();
       if (mutualConnectionName && mutualConnectionName.length > 0 && !paginationState.seenNames.has(mutualConnectionName)) {
@@ -458,10 +472,10 @@ async function extractMutualConnectionNames() {
       }));
       localStorage.setItem('linkedin_awaiting_mutual_connections', 'true');
 
-      console.log(`Navigating to page ${nextPageNum}: ${nextUrl.toString()}`);
+      log(`Navigating to page ${nextPageNum}: ${nextUrl.toString()}`);
       window.location.href = nextUrl.toString();
     } else {
-      console.log('No results on this page — extraction complete.');
+      log('No results on this page — extraction complete.');
       outputAccumulatedResults();
     }
 
@@ -474,14 +488,14 @@ async function extractMutualConnectionNames() {
 
 async function outputAccumulatedResults() {
   if (paginationState.allResults.length === 0) {
-    console.log('No results to output');
+    log('No results to output');
     paginationState.isExtracting = false;
     return;
   }
 
   const total = paginationState.allResults.length;
   const pages = paginationState.currentPage;
-  console.log(`✅ Extraction complete! ${total} mutual connections across ${pages} page(s).`);
+  log(`✅ Extraction complete! ${total} mutual connections across ${pages} page(s).`);
 
   // Build rows for server + fallback CSV
   const rows = paginationState.allResults.map(r => ({
@@ -497,7 +511,7 @@ async function outputAccumulatedResults() {
   rows.forEach(r => {
     csv += `"${r.fullName}","${r.personName}","${r.personUrl}","${r.linkedInUrl}"\n`;
   });
-  console.log(csv);
+  log(csv);
 
   // POST to unified server → Google Sheet
   try {
@@ -508,7 +522,7 @@ async function outputAccumulatedResults() {
     });
     const data = await resp.json();
     if (data.success) {
-      console.log(`✅ Appended ${data.appended} row(s) to Google Sheet`);
+      log(`✅ Appended ${data.appended} row(s) to Google Sheet`);
       alert(`✅ ${data.appended} mutual connection(s) appended to Google Sheet (${pages} page(s) extracted).`);
     } else {
       throw new Error(data.error || 'Unknown server error');
@@ -605,32 +619,32 @@ function checkForLinkedInProfile() {
     // Check if we're awaiting mutual connections extraction
     const awaitingExtraction = localStorage.getItem('linkedin_awaiting_mutual_connections');
 
-    console.log('🔍 DEBUG: On search page');
-    console.log('🔍 DEBUG: URL:', url);
-    console.log('🔍 DEBUG: Awaiting extraction flag:', awaitingExtraction);
-    console.log('🔍 DEBUG: Already processed URL:', processedSearchPageUrl);
+    log('🔍 DEBUG: On search page');
+    log('🔍 DEBUG: URL:', url);
+    log('🔍 DEBUG: Awaiting extraction flag:', awaitingExtraction);
+    log('🔍 DEBUG: Already processed URL:', processedSearchPageUrl);
 
     if (awaitingExtraction === 'true') {
       // Check if we've already processed this exact search URL
       if (processedSearchPageUrl === url) {
-        console.log('Already processed this search page URL, skipping...');
+        log('Already processed this search page URL, skipping...');
         return;
       }
 
-      console.log('LinkedIn mutual connections search page detected - auto-triggering extraction...');
-      console.log('Auto-triggered extraction detected - clearing flag and proceeding...');
+      log('LinkedIn mutual connections search page detected - auto-triggering extraction...');
+      log('Auto-triggered extraction detected - clearing flag and proceeding...');
       localStorage.removeItem('linkedin_awaiting_mutual_connections');
 
       // Mark this URL as processed
       processedSearchPageUrl = url;
 
       // Kick off extraction — MutationObserver inside will wait for results
-      console.log('Triggering extraction (MutationObserver will wait for results)...');
+      log('Triggering extraction (MutationObserver will wait for results)...');
       setTimeout(() => {
         extractMutualConnectionNames();
       }, 500);
     } else {
-      console.log('No awaiting extraction flag found - user may have navigated here manually');
+      log('No awaiting extraction flag found - user may have navigated here manually');
     }
   }
 }
@@ -640,25 +654,25 @@ function checkForLinkedInProfile() {
 function detectLinkedInFeed() {
   const url = window.location.href;
   const isLinkedInFeed = url.includes('linkedin.com/feed');
-  console.log('LinkedIn Feed: URL check:', { url, isLinkedInFeed });
+  log('LinkedIn Feed: URL check:', { url, isLinkedInFeed });
   return isLinkedInFeed;
 }
 
 function initLinkedInFeedMonitoring() {
 
   if (!detectLinkedInFeed()) {
-    console.log('LinkedIn Feed: Not on feed page, skipping monitoring');
+    log('LinkedIn Feed: Not on feed page, skipping monitoring');
     return;
   }
 
-  console.log('LinkedIn Feed: ✅ Monitoring for post saves activated!');
+  log('LinkedIn Feed: ✅ Monitoring for post saves activated!');
 
   // Monitor network requests for LinkedIn save API calls
   setupLinkedInNetworkMonitoring();
 }
 
 function setupLinkedInNetworkMonitoring() {
-  console.log('LinkedIn Feed: Setting up postMessage listener for injected script...');
+  log('LinkedIn Feed: Setting up postMessage listener for injected script...');
 
   // Listen for messages from the injected script
   window.addEventListener('message', function(event) {
@@ -669,11 +683,11 @@ function setupLinkedInNetworkMonitoring() {
 
     // Check if this is a LinkedIn post save message
     if (event.data && event.data.type === 'LINKEDIN_POST_SAVED') {
-      console.log('LinkedIn Feed: 🎯 Received post save message from injected script!', event.data);
+      log('LinkedIn Feed: 🎯 Received post save message from injected script!', event.data);
 
       const { activityUrn, url, timestamp } = event.data;
       if (activityUrn) {
-        console.log('LinkedIn Feed: Processing saved post with activity URN:', activityUrn);
+        log('LinkedIn Feed: Processing saved post with activity URN:', activityUrn);
 
         // Small delay to let the UI update, then find and process the post
         setTimeout(() => {
@@ -683,21 +697,21 @@ function setupLinkedInNetworkMonitoring() {
     }
   });
 
-  console.log('LinkedIn Feed: ✅ PostMessage listener set up successfully');
+  log('LinkedIn Feed: ✅ PostMessage listener set up successfully');
 }
 
 function findAndProcessSavedPost(activityUrn) {
   try {
-    console.log('LinkedIn Feed: Looking for post with activity URN:', activityUrn);
+    log('LinkedIn Feed: Looking for post with activity URN:', activityUrn);
 
     // Find the post element by looking for elements with the activity URN
     const postElement = findPostByActivityUrn(activityUrn);
 
     if (postElement) {
-      console.log('LinkedIn Feed: Found post element for saved post!');
+      log('LinkedIn Feed: Found post element for saved post!');
       extractAndCreateReminderFromPost(postElement);
     } else {
-      console.log('LinkedIn Feed: Could not find post element for activity URN:', activityUrn);
+      log('LinkedIn Feed: Could not find post element for activity URN:', activityUrn);
     }
   } catch (error) {
     console.error('LinkedIn Feed: Error processing saved post:', error);
@@ -708,7 +722,7 @@ function findPostByActivityUrn(activityUrn) {
   // Try to find post by data-urn attribute
   const postElement = document.querySelector(`[data-urn*="${activityUrn}"]`);
   if (postElement) {
-    console.log('LinkedIn Feed: Found post by data-urn attribute');
+    log('LinkedIn Feed: Found post by data-urn attribute');
     return postElement;
   }
 
@@ -717,26 +731,26 @@ function findPostByActivityUrn(activityUrn) {
 
 function extractAndCreateReminderFromPost(postElement) {
   try {
-    console.log('LinkedIn Feed: Extracting post information...');
+    log('LinkedIn Feed: Extracting post information...');
 
     const postInfo = extractLinkedInPostInfo(postElement);
 
     if (postInfo && postInfo.author) {
-      console.log('LinkedIn Feed: Creating reminder for saved post...', postInfo);
+      log('LinkedIn Feed: Creating reminder for saved post...', postInfo);
 
       chrome.runtime.sendMessage({
         action: 'createLinkedInPostReminder',
         postInfo: postInfo
       }, response => {
         if (response && response.success) {
-          console.log('LinkedIn Feed: ✅ Reminder created successfully!');
+          log('LinkedIn Feed: ✅ Reminder created successfully!');
           showLinkedInFeedNotification('📌 Reminder created for saved post');
         } else {
-          console.log('LinkedIn Feed: ❌ Failed to create reminder:', response?.error);
+          log('LinkedIn Feed: ❌ Failed to create reminder:', response?.error);
         }
       });
     } else {
-      console.log('LinkedIn Feed: ⚠️ Could not extract enough post information');
+      log('LinkedIn Feed: ⚠️ Could not extract enough post information');
     }
   } catch (error) {
     console.error('LinkedIn Feed: Error creating reminder:', error);
@@ -769,7 +783,7 @@ function extractLinkedInPostInfo(postElement) {
       postInfo.title = `LinkedIn post by ${postInfo.author}`;
     }
 
-    console.log('LinkedIn Feed: Extracted post info:', postInfo);
+    log('LinkedIn Feed: Extracted post info:', postInfo);
     return postInfo;
   } catch (error) {
     console.error('LinkedIn Feed: Error extracting post info:', error);
@@ -811,12 +825,12 @@ function showLinkedInFeedNotification(message) {
 
 // Initialize LinkedIn feed monitoring when on feed page
 function checkForLinkedInFeed() {
-  console.log('LinkedIn Feed: checkForLinkedInFeed() called');
+  log('LinkedIn Feed: checkForLinkedInFeed() called');
   if (detectLinkedInFeed()) {
-    console.log('LinkedIn Feed: Detected LinkedIn feed page, initializing monitoring...');
+    log('LinkedIn Feed: Detected LinkedIn feed page, initializing monitoring...');
     initLinkedInFeedMonitoring();
   } else {
-    console.log('LinkedIn Feed: Not on LinkedIn feed page, skipping...');
+    log('LinkedIn Feed: Not on LinkedIn feed page, skipping...');
   }
 }
 
@@ -855,7 +869,7 @@ async function addToMailMerge() {
     });
     const data = await resp.json();
     if (data.success) {
-      console.log(`✅ Added ${fullName} to mail merge sheet`);
+      log(`✅ Added ${fullName} to mail merge sheet`);
       alert(`✅ ${fullName} added to mail merge sheet.`);
     } else {
       throw new Error(data.error || 'Unknown server error');
@@ -1067,7 +1081,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Profile page → find mutual connections link and click it (navigates to search page)
     // Search page → extract data from current results
     var url = window.location.href;
-    if (url.includes('/search/results/') && url.includes('facetConnectionOf')) {
+    if (url.includes('/search/results/') && (url.includes('connectionOf') || url.includes('facetConnectionOf'))) {
       extractMutualConnectionNames();
     } else {
       findAndClickMutualConnections();
@@ -1102,7 +1116,7 @@ window.addEventListener('load', () => {
 
 // Listen for navigation via History API (for SPA-style navigation)
 window.addEventListener('popstate', () => {
-  console.log('Navigation detected via popstate event');
+  log('Navigation detected via popstate event');
   setTimeout(() => {
     checkForLinkedInExtraction();
     checkForLinkedInProfile();
@@ -1115,13 +1129,13 @@ let currentUrl = window.location.href;
 function checkUrlChange() {
   if (window.location.href !== currentUrl) {
     const newUrl = window.location.href;
-    console.log('URL changed from', currentUrl, 'to', newUrl);
+    log('URL changed from', currentUrl, 'to', newUrl);
     currentUrl = newUrl;
 
     // Reset processed search page when navigating away from search results
     if (!newUrl.includes('/search/results/')) {
       if (processedSearchPageUrl !== null) {
-        console.log('Navigated away from search results - resetting processed URL flag');
+        log('Navigated away from search results - resetting processed URL flag');
         processedSearchPageUrl = null;
       }
     }
@@ -1131,7 +1145,7 @@ function checkUrlChange() {
     const isMutualConnectionsPage = newUrl.includes('/search/results/') && (newUrl.includes('connectionOf') || newUrl.includes('facetConnectionOf'));
 
     if (awaitingExtraction === 'true' && isMutualConnectionsPage) {
-      console.log('Detected navigation to mutual connections page - triggering checks immediately');
+      log('Detected navigation to mutual connections page - triggering checks immediately');
       // Run checks immediately without the usual delay
       setTimeout(() => {
         checkForLinkedInExtraction();
@@ -1150,5 +1164,5 @@ function checkUrlChange() {
 }
 setInterval(checkUrlChange, 1000);
 
-console.log('LinkedIn Networking: Content script loaded');
-console.log('💡 LinkedIn Feed: Post save monitoring available when enabled');
+log('LinkedIn Networking: Content script loaded');
+log('💡 LinkedIn Feed: Post save monitoring available when enabled');
