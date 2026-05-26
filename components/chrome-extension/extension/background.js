@@ -36,6 +36,22 @@ function setupContextMenus() {
         'https://www.linkedin.com/in/*'
       ]
     });
+    chrome.contextMenus.create({
+      id: 'congrats-and-connect',
+      title: 'Congrats and Connect',
+      contexts: ['page'],
+      documentUrlPatterns: [
+        'https://www.linkedin.com/in/*'
+      ]
+    });
+    chrome.contextMenus.create({
+      id: 'get-as-google-contact',
+      title: 'Get as Google Contact',
+      contexts: ['page'],
+      documentUrlPatterns: [
+        'https://www.linkedin.com/in/*'
+      ]
+    });
   });
 }
 
@@ -109,6 +125,26 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         console.error('Error sending message:', chrome.runtime.lastError);
       } else {
         console.log('Send connection request triggered');
+      }
+    });
+  }
+
+  if (info.menuItemId === 'congrats-and-connect') {
+    chrome.tabs.sendMessage(tab.id, { action: 'congratsAndConnect' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error sending message:', chrome.runtime.lastError);
+      } else {
+        console.log('Congrats and connect triggered');
+      }
+    });
+  }
+
+  if (info.menuItemId === 'get-as-google-contact') {
+    chrome.tabs.sendMessage(tab.id, { action: 'getAsGoogleContact' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error sending message:', chrome.runtime.lastError);
+      } else {
+        console.log('Get as Google Contact triggered');
       }
     });
   }

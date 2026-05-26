@@ -889,37 +889,7 @@ async function addToMailMerge() {
   }
 }
 
-async function sendConnectionRequest() {
-  const fullName = getProfilePersonName();
-  const firstName = fullName && fullName !== 'Unknown Profile' ? fullName.split(/\s+/)[0] : '';
-  if (!firstName) {
-    alert('⚠️ Could not extract name from this profile.');
-    return;
-  }
-
-  // Build message via prompts (mirrors bookmarklet logic)
-  const msg = ['Hi ', firstName, ', '];
-  const retry = prompt('Retry?');
-  if (retry) {
-    msg.push("hope my previous outreach didn't go to your Spam! ");
-  } else {
-    const event = prompt('For which event?');
-    if (event) msg.push(`found you via ${event}; I couldn't make it. `);
-  }
-  if (prompt('Include looking?')) {
-    msg.push("I'm hands-on ENG leader who's scaled SaaS and data-driven products and global teams of up to 50 over 13+ years. I'm seeking a new challenge, ideally in/near SF @ Series A/B. ");
-  }
-  const expertise = prompt('For what expertise?');
-  if (expertise) msg.push(`Seems like you're a Go-To person on ${expertise}! `);
-  const dow = new Date().getDay(); // 0=Sun,5=Fri,6=Sat
-  if (dow === 5 || dow === 6 || dow === 0) msg.push('Have a great weekend! ');
-
-  const outreach = msg.join('');
-  const LOG = msg => console.debug('[CONNECTION REQUEST] ' + msg);
-  LOG(`Message (${outreach.length} chars): ${outreach.slice(0, 60)}…`);
-
-  // -- LinkedIn UI automation (mirrors components/networker/src/services/linkedin.ts) --
-
+async function _doConnectWithNote(outreach, LOG) {
   // Skip if already pending
   const isPending = Array.from(document.querySelectorAll('button'))
     .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
@@ -1067,6 +1037,116 @@ async function sendConnectionRequest() {
   }
 }
 
+async function sendConnectionRequest() {
+  const fullName = getProfilePersonName();
+  const firstName = fullName && fullName !== 'Unknown Profile' ? fullName.split(/\s+/)[0] : '';
+  if (!firstName) {
+    alert('⚠️ Could not extract name from this profile.');
+    return;
+  }
+
+  // Build message via prompts (mirrors bookmarklet logic)
+  const msg = ['Hi ', firstName, ', '];
+  const retry = prompt('Retry?');
+  if (retry) {
+    msg.push("hope my previous outreach didn't go to your Spam! ");
+  } else {
+    const event = prompt('For which event?');
+    if (event) msg.push(`found you via ${event}; I couldn't make it. `);
+  }
+  if (prompt('Include looking?')) {
+    msg.push("I'm hands-on ENG leader who's scaled SaaS and data-driven products and global teams of up to 50 over 13+ years. I'm seeking a new challenge, ideally in/near SF @ Series A/B. ");
+  }
+  const expertise = prompt('For what expertise?');
+  if (expertise) msg.push(`Seems like you're a Go-To person on ${expertise}! `);
+  const dow = new Date().getDay(); // 0=Sun,5=Fri,6=Sat
+  if (dow === 5 || dow === 6 || dow === 0) msg.push('Have a great weekend! ');
+
+  const outreach = msg.join('');
+  const LOG = msg => console.debug('[CONNECTION REQUEST] ' + msg);
+  LOG(`Message (${outreach.length} chars): ${outreach.slice(0, 60)}…`);
+
+  await _doConnectWithNote(outreach, LOG);
+}
+
+async function congratsAndConnect() {
+  const fullName = getProfilePersonName();
+  const firstName = fullName && fullName !== 'Unknown Profile' ? fullName.split(/\s+/)[0] : '';
+  if (!firstName) { alert('⚠️ Could not extract name from this profile.'); return; }
+
+  const LOG = msg => console.debug('[CONGRATS CONNECT] ' + msg);
+  LOG(`Profile: "${firstName}"`);
+
+  const round = prompt('Funding round?');
+  if (round === null) return;
+  const domain = prompt('Domain?');
+  if (domain === null) return;
+
+  const parts = [
+    'Hi ', firstName, ', congrats on the ', round, ' for ', domain,
+    '! Been an IC, led teams, now building again. Know what your stage actually needs.',
+    ' Happy to chat: https://calendly.com/bluxomelabs/quick-chat'
+  ];
+  const dow = new Date().getDay();
+  if (dow === 5 || dow === 6 || dow === 0) parts.push(' Have a great weekend!');
+
+  const outreach = parts.join('');
+  LOG(`Message (${outreach.length} chars): ${outreach.slice(0, 60)}…`);
+
+  await _doConnectWithNote(outreach, LOG);
+}
+
+function getAsGoogleContact() {
+  const fullName = getProfilePersonName();
+  if (!fullName || fullName === 'Unknown Profile') {
+    alert('⚠️ Could not extract name from this profile.');
+    return;
+  }
+
+  const nameParts = fullName.trim().split(/\s+/);
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+  const linkedinUrl = cleanLinkedInUrl(window.location.href);
+  const currentYear = new Date().getFullYear().toString();
+
+  // Scan visible page text for an email address
+  const emailMatch = (document.body.innerText || '').match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
+  const email = emailMatch
+    ? emailMatch.find(e => !e.includes('linkedin.com') && !e.includes('example.com') && !e.includes('noreply')) || ''
+    : '';
+
+  let vcard = 'BEGIN:VCARD\n';
+  vcard += 'VERSION:3.0\n';
+  vcard += `FN:${fullName}\n`;
+  vcard += `N:${lastName};${firstName};;;\n`;
+  if (email) vcard += `EMAIL;TYPE=WORK:${email}\n`;
+  vcard += `URL;TYPE=WORK:${linkedinUrl}\n`;
+  vcard += `CATEGORIES:${currentYear}\n`;
+  vcard += 'NOTE:Added from LinkedIn via Career Catalyst\n';
+  vcard += 'END:VCARD';
+
+  const blob = new Blob([vcard], { type: 'text/vcard' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${firstName}_${lastName}.vcf`.replace(/\s+/g, '_');
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  const lines = [
+    'Contact downloaded:',
+    `• Name: ${fullName}`,
+    `• LinkedIn: ${linkedinUrl}`,
+    email ? `• Email: ${email}` : '• Email: not found on page',
+    `• Label: ${currentYear}`,
+    '',
+    'Double-click the .vcf file to import into Contacts.'
+  ];
+  alert(lines.join('\n'));
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractLinkedInConnections') {
     runLinkedInConnectionExtraction();
@@ -1082,6 +1162,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'sendConnectionRequest') {
     sendConnectionRequest();
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'congratsAndConnect') {
+    congratsAndConnect();
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'getAsGoogleContact') {
+    getAsGoogleContact();
     sendResponse({ success: true });
     return true;
   }
