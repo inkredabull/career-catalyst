@@ -16,6 +16,7 @@
   "dependencies": {
     "@browserbasehq/stagehand": "^2.4.1",
     "@inkredabull/career-catalyst-core": "*",
+    "@inkredabull/career-catalyst-prep": "*",
     "axios": "^1.6.2",
     "cheerio": "^1.0.0-rc.12",
     "commander": "^11.0.0",

@@ -3,7 +3,6 @@ import {
   AgentConfig,
   ExtractorResult,
   ResumeCreatorAgent,
-  InterviewPrepAgent,
   OutreachAgent,
   LLMProviderConfig,
   resolveFromProjectRoot,
@@ -11,6 +10,7 @@ import {
   ApplicationFormData,
   ApplicationResult
 } from '@inkredabull/career-catalyst-core';
+import { InterviewPrepAgent } from '@inkredabull/career-catalyst-prep';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as cheerio from 'cheerio';

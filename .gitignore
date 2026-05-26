@@ -118,6 +118,7 @@ jspm_packages/
 !package.json
 !package-lock.json
 !tsconfig.json
+!.eslintrc.json
 !tsconfig.webpack.json
 !appsscript.json
 !vercel.json

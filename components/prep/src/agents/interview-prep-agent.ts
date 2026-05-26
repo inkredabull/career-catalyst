@@ -1,7 +1,7 @@
-import { ClaudeBaseAgent } from './claude-base-agent';
-import { JobListing, AgentConfig, StatementType, StatementOptions, StatementResult, InterviewPrepResult, JobTheme, ThemeExtractionResult, ThemeExample, ProfileConfig, ProfileResult, ProjectInfo, ProjectExtractionResult, AboutMeSection, AboutMeSectionData, SectionGenerationResult, SectionCritiqueResult } from '../types';
-import { WebScraper } from '../utils/web-scraper';
-import { resolveFromProjectRoot } from '../utils/project-root';
+/* eslint-disable @typescript-eslint/no-unused-vars, no-case-declarations, prefer-const, no-useless-escape, no-regex-spaces */
+import { ClaudeBaseAgent, WebScraper, resolveFromProjectRoot } from '@inkredabull/career-catalyst-core';
+import { JobListing } from '@inkredabull/career-catalyst-core';
+import { StatementType, StatementOptions, StatementResult, InterviewPrepResult, JobTheme, ThemeExtractionResult, ThemeExample, ProfileConfig, ProfileResult, ProjectInfo, ProjectExtractionResult, AboutMeSection, AboutMeSectionData, SectionGenerationResult, SectionCritiqueResult } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
@@ -261,7 +261,7 @@ Format as:
     const sheetName = process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1';
     if (sheetsUrl) {
       try {
-        const { GoogleSheetsClient, extractSpreadsheetId, sheetsRowToJobListing } = await import('../utils/google-sheets');
+        const { GoogleSheetsClient, extractSpreadsheetId, sheetsRowToJobListing } = await import('@inkredabull/career-catalyst-core');
         const client = new GoogleSheetsClient();
         const spreadsheetId = extractSpreadsheetId(sheetsUrl);
         const row = await client.fetchJobById(spreadsheetId, sheetName, jobId);
@@ -281,7 +281,7 @@ Format as:
 
   private loadPromptTemplate(type: StatementType, person?: 'first' | 'third'): string {
     try {
-      const promptPath = path.resolve('prompts', `statement-${type}.md`);
+      const promptPath = path.resolve(__dirname, '../../prompts', `statement-${type}.md`);
       return fs.readFileSync(promptPath, 'utf-8');
     } catch (error) {
       console.warn(`⚠️  Failed to load prompt template for ${type}, using fallback`);
@@ -404,7 +404,7 @@ Format as:
   // Section-specific generation methods
   private loadSectionPrompt(section: AboutMeSection): string {
     try {
-      const promptPath = path.resolve('prompts', `statement-about-me-${section}.md`);
+      const promptPath = path.resolve(__dirname, '../../prompts', `statement-about-me-${section}.md`);
       return fs.readFileSync(promptPath, 'utf-8');
     } catch (error) {
       console.warn(`⚠️  Failed to load prompt template for ${section}, using fallback`);

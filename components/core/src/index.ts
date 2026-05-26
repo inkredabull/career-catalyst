@@ -1,7 +1,8 @@
 export { BaseAgent } from './agents/base-agent';
+export { ClaudeBaseAgent } from './agents/claude-base-agent';
+export { GoogleSheetsClient, extractSpreadsheetId, sheetsRowToJobListing } from './utils/google-sheets';
 export { JobExtractorAgent } from './agents/job-extractor-agent';
 export { ResumeCreatorAgent } from './agents/resume-creator-agent';
-export { InterviewPrepAgent } from './agents/interview-prep-agent';
 export { OutreachAgent } from './agents/outreach-agent';
 export { WebScraper } from './utils/web-scraper';
 export { resolveFromProjectRoot } from './utils/project-root';
