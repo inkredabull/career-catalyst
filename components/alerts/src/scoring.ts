@@ -107,11 +107,13 @@ End with a blank line then: Verdict: [🟢 Strong Fit — Pursue Actively | 🟡
       .map(b => b.text)
       .join('');
 
+    const verdictMatch = text.match(/Verdict:\s*(🟢|🟡|🔴)/);
     let verdict: ScoreResult['verdict'] = '?';
-    if (text.includes('🟢')) verdict = '🟢';
-    else if (text.includes('🟡')) verdict = '🟡';
-    else if (text.includes('🔴')) verdict = '🔴';
-    else log('WARN', 'Could not parse verdict for %s — %s: "%s"', job.company, job.title, text.slice(0, 100));
+    if (verdictMatch) {
+      verdict = verdictMatch[1] as ScoreResult['verdict'];
+    } else {
+      log('WARN', 'Could not parse verdict for %s — %s: "%s"', job.company, job.title, text.slice(0, 100));
+    }
 
     return { verdict, reasoning: text };
   } catch (err) {
