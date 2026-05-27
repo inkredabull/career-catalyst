@@ -3,6 +3,27 @@
 
 const log = (...a) => console.log('[CAREER CATALYST]', ...a);
 
+function interpolate(template, vars) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] != null ? vars[key] : ''));
+}
+
+const MESSAGE_TEMPLATES = {
+  // congratsAndConnect
+  CONGRATS_CONNECT:
+    "Hi {{firstName}}, congrats on the {{round}} for {{domain}}! " +
+    "Been an IC, led teams, now building again. Know what your stage actually needs. " +
+    "Happy to chat: https://calendly.com/bluxomelabs/quick-chat",
+
+  // sendConnectionRequest segments (branching stays in code)
+  SCR_GREETING:  "Hi {{firstName}}, ",
+  SCR_RETRY:     "hope my previous outreach didn't go to your Spam! ",
+  SCR_EVENT:     "found you via {{event}}; I couldn't make it. ",
+  SCR_LOOKING:   "I'm hands-on ENG leader who's scaled SaaS and data-driven products and global teams of up to 50 over 13+ years. I'm seeking a new challenge, ideally in/near SF @ Series A/B. ",
+  SCR_EXPERTISE: "Seems like you're a Go-To person on {{expertise}}! ",
+
+  WEEKEND_CLOSING: "Have a great weekend! ",
+};
+
 // Track if extraction is already running to avoid duplicates
 let linkedInExtractionRunning = false;
 
@@ -1046,21 +1067,21 @@ async function sendConnectionRequest() {
   }
 
   // Build message via prompts (mirrors bookmarklet logic)
-  const msg = ['Hi ', firstName, ', '];
+  const msg = [interpolate(MESSAGE_TEMPLATES.SCR_GREETING, { firstName })];
   const retry = prompt('Retry?');
   if (retry) {
-    msg.push("hope my previous outreach didn't go to your Spam! ");
+    msg.push(MESSAGE_TEMPLATES.SCR_RETRY);
   } else {
     const event = prompt('For which event?');
-    if (event) msg.push(`found you via ${event}; I couldn't make it. `);
+    if (event) msg.push(interpolate(MESSAGE_TEMPLATES.SCR_EVENT, { event }));
   }
   if (prompt('Include looking?')) {
-    msg.push("I'm hands-on ENG leader who's scaled SaaS and data-driven products and global teams of up to 50 over 13+ years. I'm seeking a new challenge, ideally in/near SF @ Series A/B. ");
+    msg.push(MESSAGE_TEMPLATES.SCR_LOOKING);
   }
   const expertise = prompt('For what expertise?');
-  if (expertise) msg.push(`Seems like you're a Go-To person on ${expertise}! `);
+  if (expertise) msg.push(interpolate(MESSAGE_TEMPLATES.SCR_EXPERTISE, { expertise }));
   const dow = new Date().getDay(); // 0=Sun,5=Fri,6=Sat
-  if (dow === 5 || dow === 6 || dow === 0) msg.push('Have a great weekend! ');
+  if (dow === 5 || dow === 6 || dow === 0) msg.push(MESSAGE_TEMPLATES.WEEKEND_CLOSING);
 
   const outreach = msg.join('');
   const LOG = msg => console.debug('[CONNECTION REQUEST] ' + msg);
@@ -1082,15 +1103,9 @@ async function congratsAndConnect() {
   const domain = prompt('Domain?');
   if (domain === null) return;
 
-  const parts = [
-    'Hi ', firstName, ', congrats on the ', round, ' for ', domain,
-    '! Been an IC, led teams, now building again. Know what your stage actually needs.',
-    ' Happy to chat: https://calendly.com/bluxomelabs/quick-chat'
-  ];
   const dow = new Date().getDay();
-  if (dow === 5 || dow === 6 || dow === 0) parts.push(' Have a great weekend!');
-
-  const outreach = parts.join('');
+  const outreach = interpolate(MESSAGE_TEMPLATES.CONGRATS_CONNECT, { firstName, round, domain })
+    + (dow === 5 || dow === 6 || dow === 0 ? MESSAGE_TEMPLATES.WEEKEND_CLOSING : '');
   LOG(`Message (${outreach.length} chars): ${outreach.slice(0, 60)}…`);
 
   await _doConnectWithNote(outreach, LOG);
