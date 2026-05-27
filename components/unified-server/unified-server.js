@@ -1143,7 +1143,7 @@ ${fromBlurb}`;
     }
 
     const output = await new Promise((resolve, reject) => {
-      const args = ['run', 'dev', '--workspace=@inkredabull/career-catalyst-core', '--', 'prep', 'cover-letter', jobId, '--person', perspective, '--content', '--regen'];
+      const args = ['run', 'dev', '--workspace=@inkredabull/career-catalyst-prep', '--', 'prep', 'cover-letter', jobId, '--person', perspective, '--content', '--regen'];
 
       // Add company URL if provided
       if (companyWebsite) {
