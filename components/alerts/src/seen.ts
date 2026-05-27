@@ -126,3 +126,21 @@ export async function loadScore(jobId: string): Promise<ScoreRecord | null> {
   if (!res.ok) return null;
   return JSON.parse(await res.text()) as ScoreRecord;
 }
+
+export async function purgeOldScores(ttlMs: number = 3 * 24 * 60 * 60 * 1000): Promise<void> {
+  const cutoff = Date.now() - ttlMs;
+  let cursor: string | undefined;
+  let deleted = 0;
+
+  do {
+    const result = await list({ prefix: SCORES_PREFIX, limit: 1000, ...(cursor ? { cursor } : {}) });
+    const stale = result.blobs.filter(b => b.uploadedAt.getTime() < cutoff).map(b => b.url);
+    if (stale.length > 0) {
+      await del(stale);
+      deleted += stale.length;
+    }
+    cursor = result.cursor;
+  } while (cursor);
+
+  log('INFO', 'Purged %s stale score blob(s) older than %sd', deleted, Math.round(ttlMs / 86_400_000));
+}

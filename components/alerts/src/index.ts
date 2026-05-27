@@ -5,7 +5,7 @@ import { pause } from './clock';
 import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
 import { fetchGoogleResults } from './google';
 import { log } from './utils/logger';
-import { loadSeen, saveSeen, filterUnseen, markAsSeen, loadStopLists, saveScore } from './seen';
+import { loadSeen, saveSeen, filterUnseen, markAsSeen, loadStopLists, saveScore, purgeOldScores } from './seen';
 import { notify } from './notify';
 import { scoreJob } from './scoring';
 
@@ -86,6 +86,7 @@ export async function getResults(): Promise<SearchResults> {
 
 export async function getOpenReqs(webAppUrl: string): Promise<void> {
   const startedAt = Date.now();
+  await purgeOldScores().catch(err => log('WARN', 'Score purge failed: %s', (err as Error).message));
   const results = await getResults();
   const seen    = await loadSeen();
   const fresh   = filterUnseen(results, seen);
