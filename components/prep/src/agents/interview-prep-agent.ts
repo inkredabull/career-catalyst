@@ -514,12 +514,9 @@ Format as:
   ): Promise<string> {
     const promptTemplate = this.loadSectionPrompt('hook');
     const prompt = this.buildSectionPrompt(promptTemplate, 'hook', job, cvContent, options);
-
     this.logPromptToFile(prompt, 'about-me-hook');
     console.log('📝 Generating hook section...');
-
-    const response = await this.makeClaudeRequest(prompt);
-    return this.cleanResponse(response, 'about-me');
+    return this.generateWithValidation(prompt, 'hook');
   }
 
   private async generateCareerSnapshot(
@@ -544,12 +541,9 @@ Format as:
   ): Promise<string> {
     const promptTemplate = this.loadSectionPrompt('close');
     const prompt = this.buildSectionPrompt(promptTemplate, 'close', job, cvContent, options);
-
     this.logPromptToFile(prompt, 'about-me-close');
     console.log('📝 Generating close section...');
-
-    const response = await this.makeClaudeRequest(prompt);
-    return this.cleanResponse(response, 'about-me');
+    return this.generateWithValidation(prompt, 'close');
   }
 
   private async generatePersonalTouch(
@@ -598,12 +592,9 @@ Format as:
     }
     
     const prompt = this.buildSectionPrompt(promptTemplate, 'focus-story', job, cvContent, options);
-    
     this.logPromptToFile(prompt, 'about-me-focus-story');
     console.log('📝 Generating focus story section...');
-    
-    const response = await this.makeClaudeRequest(prompt);
-    return this.cleanResponse(response, 'about-me');
+    return this.generateWithValidation(prompt, 'focus-story');
   }
 
   private async generateThemes(
@@ -651,12 +642,72 @@ Format as:
   ): Promise<string> {
     const promptTemplate = this.loadSectionPrompt('why');
     const prompt = this.buildSectionPrompt(promptTemplate, 'why', job, cvContent, options, companyValues);
-    
     this.logPromptToFile(prompt, 'about-me-why');
     console.log('📝 Generating why company section...');
-    
-    const response = await this.makeClaudeRequest(prompt);
-    return this.cleanResponse(response, 'about-me');
+    return this.generateWithValidation(prompt, 'why');
+  }
+
+  private validateCharLimits(section: AboutMeSection, rtfContent: string): { valid: boolean; violations: string[] } {
+    const violations: string[] = [];
+
+    if (section === 'hook') {
+      const bullets = [...rtfContent.matchAll(/\\par\s+\\li1080\s+\\bullet\s+(?!\\b\s)(.+?)(?=\s*\\par|\s*\}|$)/gm)]
+        .map(m => m[1].trim());
+      // First bullet is the fixed lede — no char limit applies
+      for (const b of bullets.slice(1)) {
+        if (b.length > 70) {
+          violations.push(`${b.length} chars (limit 70): "${b.substring(0, 50)}..."`);
+        }
+      }
+    } else if (section === 'why' || section === 'close') {
+      const bullets = [...rtfContent.matchAll(/\\par\s+\\li1080\s+\\bullet\s+(?!\\b\s)(.+?)(?=\s*\\par|\s*\}|$)/gm)]
+        .map(m => m[1].trim());
+      for (const b of bullets) {
+        if (b.length > 70) {
+          violations.push(`${b.length} chars (limit 70): "${b.substring(0, 50)}..."`);
+        }
+      }
+    } else if (section === 'focus-story') {
+      const details = [...rtfContent.matchAll(/\\par\s+\\li1440\s+\\bullet\s+(?!\\b\s)(.+?)(?=\s*\\par|\s*\}|$)/gm)]
+        .map(m => m[1].trim());
+      for (const d of details) {
+        if (d.length > 45) {
+          violations.push(`${d.length} chars (limit 45): "${d.substring(0, 40)}..."`);
+        }
+      }
+    }
+
+    return { valid: violations.length === 0, violations };
+  }
+
+  private async generateWithValidation(
+    prompt: string,
+    section: AboutMeSection,
+    maxRetries = 3
+  ): Promise<string> {
+    let currentPrompt = prompt;
+    let lastContent = '';
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const response = await this.makeClaudeRequest(currentPrompt);
+      lastContent = this.cleanResponse(response, 'about-me');
+
+      const validation = this.validateCharLimits(section, lastContent);
+      if (validation.valid) {
+        return lastContent;
+      }
+
+      if (attempt < maxRetries) {
+        console.warn(`⚠️  Char limit violations in ${section} (attempt ${attempt}/${maxRetries}), retrying...`);
+        validation.violations.forEach(v => console.warn(`   ${v}`));
+        currentPrompt = prompt + `\n\nIMPORTANT: Your previous response had character limit violations. Rewrite the following bullets to be strictly under the character limit:\n${validation.violations.join('\n')}`;
+      } else {
+        console.warn(`⚠️  Char limit violations remain after ${maxRetries} attempts in ${section}:`);
+        validation.violations.forEach(v => console.warn(`   ${v}`));
+      }
+    }
+
+    return lastContent;
   }
 
   private buildSectionPrompt(
@@ -1277,6 +1328,11 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
       if (codeBlockMatch) {
         // Extract content from code block
         return codeBlockMatch[1].trim();
+      }
+      // Extract RTF block directly — strips any LLM reasoning text before/after
+      const rtfMatch = response.match(/(\{\\rtf1[\s\S]*\})/);
+      if (rtfMatch) {
+        return rtfMatch[1].trim();
       }
       // If no code block, just clean markdown formatting
       return response
