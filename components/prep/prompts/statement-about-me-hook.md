@@ -38,6 +38,15 @@ If no specific can be identified, flag it — do not produce a generic different
 - **Job Description**: {{job.description}}
 - **Work History**: {{cvContent}}
 
+## Self-Check (run before outputting)
+
+Before writing the RTF output, verify the generated bullets:
+- Count characters in bullet 2. If > 70 chars, rewrite it shorter. Repeat until ≤ 70.
+- Count characters in bullet 3. If > 70 chars, rewrite it shorter. Repeat until ≤ 70.
+- Bullet 1 is the FIXED_LEDE — do not count or modify it.
+- If a generated bullet cannot be reduced to ≤ 70 chars while retaining meaning, truncate at 70 chars with an ellipsis.
+- Only output the RTF after bullets 2 and 3 pass.
+
 ## Output Format
 
 **IMPORTANT**: Always respond directly in Rich Text Format (RTF) code. Do not use markdown formatting.

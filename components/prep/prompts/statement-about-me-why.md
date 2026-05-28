@@ -24,6 +24,12 @@ signal that the interviewer will ask "why are you looking at this role right now
 Signals: urgency language, growth-stage context, transition framing, "why now" framing.
 If no such signal is present: omit bullet 2 entirely. Do not generate a placeholder.
 
+## Self-Check (run before outputting)
+
+Before writing the RTF output, verify every bullet:
+- Count characters in each bullet. If any bullet > 70 chars, rewrite it shorter. Repeat until ≤ 70.
+- Only output the RTF after all bullets pass.
+
 ## Content Guidelines
 
 - Be specific about the company — use company info and JD signals

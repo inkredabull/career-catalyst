@@ -592,9 +592,9 @@ Format as:
     
     // Inject user theme
     if (userTheme) {
-      promptTemplate = promptTemplate.replace('{{userTheme}}', userTheme);
+      promptTemplate = promptTemplate.replace(/\{\{userTheme\}\}/g, userTheme);
     } else {
-      promptTemplate = promptTemplate.replace('{{userTheme}}', 'high-impact achievements that best demonstrate your capabilities');
+      promptTemplate = promptTemplate.replace(/\{\{userTheme\}\}/g, 'high-impact achievements that best demonstrate your capabilities');
     }
     
     const prompt = this.buildSectionPrompt(promptTemplate, 'focus-story', job, cvContent, options);

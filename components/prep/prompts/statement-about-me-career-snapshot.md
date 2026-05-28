@@ -18,10 +18,9 @@ Extract the 3 most relevant metric-backed accomplishment phrases from the role d
 
 RULES:
 - Select by relevance to the job description and focal theme — do not default to most recent role
-- Preserve original phrasing and metrics verbatim (numbers, percentages, dollar figures must not change)
-- Compression is permitted; invention is not
+- Copy the bullet text exactly as it appears in the source material. Word-for-word. Do not add, remove, or substitute any words — including company names, dates, or labels not present in the original bullet text.
+- Compression is NOT permitted. If a bullet is long in the original, copy it verbatim anyway — do not shorten it.
 - Each bullet must be attributable to a specific role
-- Output exactly 3 bullets, ≤70 chars each
 - If fewer than 3 metric-backed accomplishments exist, output what exists and append:
   WARNING: fewer than 3 metric-backed accomplishments found in cv_role_descriptions
 

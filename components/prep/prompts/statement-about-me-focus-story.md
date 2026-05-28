@@ -34,6 +34,14 @@ STAR headings (Situation/Task/Actions/Results) go at `\li1080` (bold). Detail bu
    - **Actions**: 2 bullets — what you did (verb + noun, no fluff)
    - **Results**: 2 bullets — metrics only, no narrative
 
+## Self-Check (run before outputting)
+
+Before writing the RTF output, verify every detail bullet (lines at `\li1440`):
+- Count characters. Limit is 45 chars, not 70.
+- If any detail bullet > 45 chars, rewrite it shorter. Repeat until ≤ 45.
+- STAR heading lines (Situation/Task/Actions/Results) are exempt from this check.
+- Only output the RTF after all detail bullets pass.
+
 ## Content Guidelines
 
 - Every detail bullet is a memory trigger — the speaker fills in the story verbally

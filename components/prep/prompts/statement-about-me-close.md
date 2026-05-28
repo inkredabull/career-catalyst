@@ -22,6 +22,14 @@ PROHIBITED: questions, hedges, "excited to learn", "looking forward to", "hope t
 REQUIRED framing: here is what I will do — not here is what I hope.
 If bullet 2 contains a question mark or hedge word, regenerate.
 
+## Self-Check (run before outputting)
+
+Before writing the RTF output, verify every bullet:
+- Count characters in bullet 1. If > 70 chars, rewrite shorter. Repeat until ≤ 70.
+- Count characters in bullet 2. If > 70 chars, rewrite shorter. Repeat until ≤ 70.
+- If bullet 2 contains a question mark or hedge word (hope, looking forward, excited to learn), rewrite it.
+- Only output the RTF after all bullets pass.
+
 ## Content Guidelines
 
 - No hedging, no filler — confident and direct
