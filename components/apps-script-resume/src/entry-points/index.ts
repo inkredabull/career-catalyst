@@ -413,6 +413,15 @@ export function createCustomization(): void {
   }
 }
 
+function checkIsReasoningModel(modelId: string): boolean {
+  return (
+    modelId.includes('deepseek') ||
+    modelId.includes('gpt-5.5') ||
+    modelId.includes('gemini-3.') ||
+    /\/o\d/.test(modelId)
+  );
+}
+
 /**
  * Generate achievement using specific model
  * @param modelName - Name of model ('claude', 'gemini', 'openai', 'mistral', 'cohere')
@@ -440,10 +449,14 @@ export function fetchWithModel(modelName: string): void {
         Logger.warn(`fetchWithModel: ${audience} column not found — skipping`);
         continue;
       }
-      const maxTokens =
+      const modelId = services.ai['modelMap'][modelName] ?? '';
+      const baseTokens =
         audience === 'linkedin'
           ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_LINKEDIN
           : CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
+      const maxTokens = checkIsReasoningModel(modelId)
+        ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_REASONING
+        : baseTokens;
 
       Logger.log(
         `fetchWithModel(${modelName}): generating ${audience}, col ${colIndex + 1}, maxTokens=${maxTokens}`
@@ -508,17 +521,13 @@ export function generateAchievementWithModel(modelName: string): ModelGeneration
     // Reasoning models need a flat high cap — their thinking chain alone can consume thousands
     // of tokens before producing the final answer; scaling from the small output budget doesn't work
     const modelId = services.ai['modelMap'][modelName];
-    const isReasoningModel =
-      modelId &&
-      (modelId.includes('deepseek') || modelId.includes('gpt-5.5') || /\/o\d/.test(modelId));
+    const isReasoning = !!modelId && checkIsReasoningModel(modelId);
 
-    const maxTokens = isReasoningModel
+    const maxTokens = isReasoning
       ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_REASONING
       : CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
 
-    Logger.log(
-      `generateAchievementWithModel: maxTokens=${maxTokens} (reasoning=${isReasoningModel})`
-    );
+    Logger.log(`generateAchievementWithModel: maxTokens=${maxTokens} (reasoning=${isReasoning})`);
 
     const config = {
       provider: modelName,
