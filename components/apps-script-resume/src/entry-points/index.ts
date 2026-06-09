@@ -659,7 +659,6 @@ export function compareModels(): void {
     >;
 
     const claudeModel = models['claude'] || CONFIG.AI.FALLBACK_MODELS.CLAUDE;
-    const geminiModel = models['gemini'] || CONFIG.AI.FALLBACK_MODELS.GEMINI;
     const openaiModel = models['openai'] || CONFIG.AI.FALLBACK_MODELS.OPENAI;
     const mistralModel = models['mistral'] || CONFIG.AI.FALLBACK_MODELS.MISTRAL;
     const cohereModel = models['cohere'] || CONFIG.AI.FALLBACK_MODELS.COHERE;
@@ -674,7 +673,6 @@ export function compareModels(): void {
     };
 
     const claudeDisplay = fmt(claudeModel);
-    const geminiDisplay = fmt(geminiModel);
     const openaiDisplay = fmt(openaiModel);
     const mistralDisplay = fmt(mistralModel);
     const cohereDisplay = fmt(cohereModel);
@@ -734,15 +732,7 @@ export function compareModels(): void {
         <textarea class="notes-input" id="notesClaude" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseClaude" onclick="chooseModel('claude')">✓ Choose This</button>
       </div>
-      <div class="result-card" id="resultGemini">
-        <h4>🔮 ${geminiDisplay}</h4>
-        <div class="model-label">${geminiModel}</div>
-        <div class="result-content" id="contentGemini"><div class="loading">Pending...</div></div>
-        <div class="char-count" id="countGemini"></div>
-        <div class="metadata" id="metadataGemini"></div>
-        <textarea class="notes-input" id="notesGemini" placeholder="Notes..."></textarea>
-        <button class="choose-btn" id="chooseGemini" onclick="chooseModel('gemini')">✓ Choose This</button>
-      </div>
+      <!-- Gemini disabled: re-add result-card div here to re-enable -->
       <div class="result-card" id="resultOpenAI">
         <h4>💬 ${openaiDisplay}</h4>
         <div class="model-label">${openaiModel}</div>
@@ -775,7 +765,7 @@ export function compareModels(): void {
   <script>
     const MODELS=[
       {key:'claude',contentId:'contentClaude',countId:'countClaude',cardId:'resultClaude',buttonId:'chooseClaude',metadataId:'metadataClaude',notesId:'notesClaude'},
-      {key:'gemini',contentId:'contentGemini',countId:'countGemini',cardId:'resultGemini',buttonId:'chooseGemini',metadataId:'metadataGemini',notesId:'notesGemini'},
+      // Gemini disabled: re-add {key:'gemini',...} here to re-enable
       {key:'openai',contentId:'contentOpenAI',countId:'countOpenAI',cardId:'resultOpenAI',buttonId:'chooseOpenAI',metadataId:'metadataOpenAI',notesId:'notesOpenAI'},
       {key:'mistral',contentId:'contentMistral',countId:'countMistral',cardId:'resultMistral',buttonId:'chooseMistral',metadataId:'metadataMistral',notesId:'notesMistral'},
       {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere',notesId:'notesCohere'}
