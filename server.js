@@ -7,7 +7,7 @@ import path from "path";
 import crypto from "crypto";
 
 const app = express();
-const PORT = 3333;
+const PORT = 3334;
 
 app.use(bodyParser.json());
 
@@ -26,6 +26,18 @@ app.get("/health", (_req, res) => res.status(200).send("ok"));
 
 // ---- Proxy: career-catalyst unified-server routes ----
 const UNIFIED_SERVER = "http://localhost:3000";
+
+app.get("/extract", async (req, res) => {
+  const url = new URL("/extract", UNIFIED_SERVER);
+  url.search = new URLSearchParams(req.query).toString();
+  try {
+    const upstream = await fetch(url.toString());
+    const html = await upstream.text();
+    res.status(upstream.status).set("content-type", "text/html").send(html);
+  } catch (e) {
+    res.status(502).send(`<p>Upstream error: ${e.message}</p>`);
+  }
+});
 
 app.get("/llm", async (req, res) => {
   const url = new URL("/llm", UNIFIED_SERVER);
