@@ -2,6 +2,8 @@ import { Resend } from 'resend';
 import { requireEnv, ENV } from './config/settings';
 import { JobResult, SearchResults } from './linkedin';
 
+const TRACK_BASE = process.env[ENV.TRACK_BASE_URL] ?? 'http://localhost:3334';
+
 const JUDGMENT_COLOR: Record<string, string> = {
   '🟢': '#22c55e',
   '🟡': '#eab308',
@@ -18,7 +20,7 @@ export function formatEntry(r: JobResult, webAppUrl: string): { text: string; ht
   const banCo    = `${root}/api/block?type=company&value=${encodeURIComponent(r.company)}`;
   const banTi    = `${root}/api/block?type=title&value=${encodeURIComponent(r.title)}`;
   const scoreUrl = `${root}/api/score?id=${encodeURIComponent(r.id)}`;
-  const trackUrl = `http://localhost:3000/extract?url=${encodeURIComponent(r.url)}`;
+  const trackUrl = `${TRACK_BASE}/extract?url=${encodeURIComponent(r.url)}`;
   const judgment = r.judgment ?? '?';
   const color    = JUDGMENT_COLOR[judgment] ?? '#9ca3af';
   const meta     = sourceLine(r.search, r.source ?? 'LinkedIn');

@@ -62,7 +62,7 @@ describe('formatEntry', () => {
   it('includes track link pointing to localhost:3000/extract with job url', () => {
     const job = makeJob();
     const { text, html } = formatEntry(job, BASE_URL);
-    const expected = `http://localhost:3000/extract?url=${encodeURIComponent(job.url)}`;
+    const expected = `http://localhost:3334/extract?url=${encodeURIComponent(job.url)}`;
     expect(text).toContain(expected);
     expect(html).toContain(expected);
   });

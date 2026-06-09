@@ -10,6 +10,7 @@ export const ENV = {
   ANTHROPIC_API_KEY:   'ANTHROPIC_API_KEY',
   RESEND_API_KEY:      'RESEND_API_KEY',
   LOG_LEVEL:           'LOG_LEVEL',
+  TRACK_BASE_URL:      'TRACK_BASE_URL',
 } as const;
 
 /** Read a required env var — throws with a clear message if not set. */
