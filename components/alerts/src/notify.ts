@@ -18,17 +18,18 @@ export function formatEntry(r: JobResult, webAppUrl: string): { text: string; ht
   const banCo    = `${root}/api/block?type=company&value=${encodeURIComponent(r.company)}`;
   const banTi    = `${root}/api/block?type=title&value=${encodeURIComponent(r.title)}`;
   const scoreUrl = `${root}/api/score?id=${encodeURIComponent(r.id)}`;
+  const trackUrl = `http://localhost:3000/extract?url=${encodeURIComponent(r.url)}`;
   const judgment = r.judgment ?? '?';
   const color    = JUDGMENT_COLOR[judgment] ?? '#9ca3af';
   const meta     = sourceLine(r.search, r.source ?? 'LinkedIn');
   return {
-    text: [`[${judgment}] ${r.company} — ${r.title}`, r.location, r.info, r.url, `Score: ${scoreUrl}`, meta, '---'].filter(Boolean).join('\n'),
+    text: [`[${judgment}] ${r.company} — ${r.title}`, r.location, r.info, r.url, `Score: ${scoreUrl}`, `Track: ${trackUrl}`, meta, '---'].filter(Boolean).join('\n'),
     html: `<div style="margin-bottom:14px;padding:10px 12px;border-left:4px solid ${color}">
       <div style="font-size:18px;font-weight:bold;margin-bottom:4px">${judgment} <a href="${r.url}" style="color:inherit;text-decoration:none">${r.company}</a> <a href="${banCo}" style="font-size:12px;text-decoration:none">👎</a></div>
       <div style="margin-bottom:4px">${r.title} <a href="${banTi}" style="font-size:12px;text-decoration:none">👎</a></div>
       ${r.location ? `<div style="color:#6b7280;font-size:13px">${r.location}</div>` : ''}
       ${r.info ? `<div style="font-size:13px">${r.info}</div>` : ''}
-      <div style="font-size:13px;margin-top:4px"><a href="${r.url}">${r.url}</a> · <a href="${scoreUrl}">Why ${judgment}?</a></div>
+      <div style="font-size:13px;margin-top:4px"><a href="${r.url}">${r.url}</a> <br/> <a href="${scoreUrl}">Why ${judgment}?</a> · <a href="${trackUrl}">Track</a></div>
       <div style="font-size:12px;color:#6b7280;margin-top:2px">${meta}</div>
     </div>`,
   };

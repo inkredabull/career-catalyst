@@ -535,6 +535,35 @@ app.post('/cv-question', async (req, res) => {
   }
 });
 
+// GET /extract — email "Track" link handler
+// Accepts a LinkedIn job URL as query param, fires extraction in background, returns HTML confirmation
+app.get('/extract', (req, res) => {
+  const { url } = req.query;
+  if (!url || !url.includes('linkedin.com/jobs')) {
+    return res.status(400).send('<p>Missing or invalid url parameter.</p>');
+  }
+
+  const safeUrl = url.replace(/"/g, '');
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Tracking…</title></head>
+<body style="font-family:sans-serif;padding:32px">
+  <p>Tracking started for:</p>
+  <p><a href="${safeUrl}">${safeUrl}</a></p>
+  <p style="color:#888;font-size:13px">You can close this tab.</p>
+</body></html>`);
+
+  setImmediate(() => {
+    const projectDir = path.resolve(__dirname, '..', '..');
+    const command = `npx ts-node components/core/src/cli.ts extract "${safeUrl}" --skip-post-workflow`;
+    try {
+      console.log(`[GET /extract] Tracking: ${safeUrl}`);
+      execSync(command, { cwd: projectDir, encoding: 'utf-8', timeout: 120000 });
+      console.log(`[GET /extract] Done: ${safeUrl}`);
+    } catch (err) {
+      console.error(`[GET /extract] Failed: ${err.message}`);
+    }
+  });
+});
+
 // Extract endpoint (from CLI server)
 app.post('/extract', async (req, res) => {
   console.log(`[${new Date().toISOString()}] Extract request`);
