@@ -101,10 +101,12 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
     Object.values(fresh).map(async (job) => {
       const { verdict, reasoning } = await scoreJob(job);
       job.judgment = verdict;
-      try {
-        await saveScore(job.id, { job, verdict, reasoning, scoredAt: new Date().toISOString() });
-      } catch (err) {
-        log('WARN', 'Score save failed for %s (%s): %s', job.id, job.title, (err as Error).message);
+      if (verdict !== '🔴') {
+        try {
+          await saveScore(job.id, { job, verdict, reasoning, scoredAt: new Date().toISOString() });
+        } catch (err) {
+          log('WARN', 'Score save failed for %s (%s): %s', job.id, job.title, (err as Error).message);
+        }
       }
       log('DEBUG', 'Scored [%s]: %s — %s', verdict, job.company, job.title);
     })
@@ -112,8 +114,9 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
 
   const judgmentSummary = Object.values(fresh).map(j => j.judgment ?? '?').join(' ');
   log('INFO', 'Judgments before notify: %s', judgmentSummary);
-  log('INFO', 'Sending email for %s jobs...', Object.keys(fresh).length);
-  await notify(fresh, webAppUrl, Date.now() - startedAt);
+  const toNotify = Object.fromEntries(Object.entries(fresh).filter(([, j]) => j.judgment !== '🔴'));
+  log('INFO', 'Sending email for %s jobs (%s passed filter)...', Object.keys(toNotify).length, Object.keys(fresh).length);
+  await notify(toNotify, webAppUrl, Date.now() - startedAt);
   log('INFO', 'Email sent, saving seen...');
   await saveSeen(markAsSeen(fresh, seen));
   log('INFO', 'Done.');
