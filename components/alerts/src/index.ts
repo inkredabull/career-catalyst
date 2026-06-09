@@ -1,5 +1,5 @@
 import { ENV } from './config/settings';
-import { SF_FILTER, TIME_FRAME } from './config/constants';
+import { SF_FILTER, TIME_FRAME, STRONG_FIT_MAX_APPLICANTS } from './config/constants';
 import { SEARCH_TITLES } from './config/titles';
 import { pause } from './clock';
 import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
@@ -111,6 +111,13 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
       log('DEBUG', 'Scored [%s]: %s — %s', verdict, job.company, job.title);
     })
   );
+
+  for (const job of Object.values(fresh)) {
+    if (job.judgment === '🟢' && job.applicants !== undefined && job.applicants >= STRONG_FIT_MAX_APPLICANTS) {
+      log('INFO', 'Demoted 🟢→🟡 (%s applicants): [%s] %s — %s', job.applicants, job.search, job.company, job.title);
+      job.judgment = '🟡';
+    }
+  }
 
   const judgmentSummary = Object.values(fresh).map(j => j.judgment ?? '?').join(' ');
   log('INFO', 'Judgments before notify: %s', judgmentSummary);

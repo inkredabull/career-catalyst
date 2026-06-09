@@ -21,7 +21,7 @@ export const GEOS: Record<string, string> = {
 export const ONE_WEEK   = 'r604800';
 export const ONE_DAY    = 'r86400';
 export const EIGHT_HOURS = 'r28800';
-export const TIME_FRAME  = EIGHT_HOURS;
+export const TIME_FRAME  = ONE_DAY;
 
 export const SF_FILTER = {
   origin: 'JOB_SEARCH_PAGE_JOB_FILTER',
@@ -50,4 +50,6 @@ export const US_FILTER = {
   },
   spellCorrectionEnabled: true,
 };
+
+export const STRONG_FIT_MAX_APPLICANTS = 50;
 

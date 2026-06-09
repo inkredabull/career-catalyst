@@ -12,15 +12,16 @@ export interface SearchFilter {
 }
 
 export interface JobResult {
-  id:        string;
-  company:   string;
-  title:     string;
-  location?: string;
-  info?:     string;
-  url:       string;
-  search:    string;
-  source?:   string;
-  judgment?: string;
+  id:          string;
+  company:     string;
+  title:       string;
+  location?:   string;
+  info?:       string;
+  applicants?: number;
+  url:         string;
+  search:      string;
+  source?:     string;
+  judgment?:   string;
 }
 
 export type SearchResults = Record<string, JobResult>;
@@ -105,9 +106,10 @@ export function extractInfo(data: Record<string, unknown>, search: string, sourc
         id,
         company,
         title,
-        ...(location ? { location } : {}),
-        ...(info     ? { info }     : {}),
-        ...(source   ? { source }   : {}),
+        ...(location                 ? { location }   : {}),
+        ...(info                     ? { info }       : {}),
+        ...(applicants !== undefined ? { applicants } : {}),
+        ...(source                   ? { source }     : {}),
         url: `https://www.linkedin.com/jobs/view/${id}`,
         search,
       };
