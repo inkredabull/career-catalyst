@@ -88,6 +88,12 @@ const GOOGLE_SEARCHES: GoogleSearch[] = [
     prefix: 'site:wellfound.com ("San Francisco")',
     suffix: '(apply OR "job description" OR "role" OR responsibilities) -"new grad" -"intern"',
   },
+  {
+    label:  'Indeed/SF',
+    source: 'Indeed',
+    prefix: 'site:indeed.com ("San Francisco" OR "SF Bay Area" OR Remote)',
+    suffix: '-"new grad" -"intern"',
+  },
 ];
 
 // ---------------------------------------------------------------------------
