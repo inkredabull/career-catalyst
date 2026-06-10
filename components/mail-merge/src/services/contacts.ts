@@ -172,6 +172,7 @@ export const pickRandomContacts = (count = 5): string => {
   );
 
   const all = getAllContacts().filter(contact => {
+    if (!contact.names?.[0]?.displayName) return true;
     const memberships = contact.memberships ?? [];
     const userMemberships = memberships.filter(
       m => m.contactGroupMembership?.contactGroupId != null &&
