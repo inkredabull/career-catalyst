@@ -161,10 +161,15 @@ export const pickRandomContacts = (count = 5): string => {
     .getProperty(SCRIPT_PROPS.WARMUP_EXCLUDE_LABEL_PREFIXES) ?? '';
   const excludedPrefixes = rawPrefixes.split(',').map(p => p.trim()).filter(Boolean);
 
+  const HARDCODED_EXCLUDED_LABELS = ['Archetype/Unhelpful'];
+
   const groups = getContactGroupInfo();
   const excludedIds = new Set(
     groups
-      .filter(g => excludedPrefixes.some(prefix => g.name.startsWith(prefix)))
+      .filter(g =>
+        HARDCODED_EXCLUDED_LABELS.includes(g.name) ||
+        excludedPrefixes.some(prefix => g.name.startsWith(prefix))
+      )
       .map(g => g.id)
   );
   const userGroupIds = new Set(
