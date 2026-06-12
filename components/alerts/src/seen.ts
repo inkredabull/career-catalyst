@@ -54,7 +54,10 @@ function getBucket() {
   const bucketName = process.env[ENV.GCS_BUCKET];
   if (!bucketName)
     throw new Error(`Environment variable not set: ${ENV.GCS_BUCKET}`);
-  const storage = new Storage();
+  const credsRaw = process.env["GOOGLE_APPLICATION_CREDENTIALS"];
+  // On Vercel the env var holds the JSON content directly, not a file path
+  const credentials = credsRaw ? (JSON.parse(credsRaw) as object) : undefined;
+  const storage = new Storage({ ...(credentials ? { credentials } : {}) });
   return storage.bucket(bucketName);
 }
 
