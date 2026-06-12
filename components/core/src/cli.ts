@@ -23,16 +23,6 @@ import { resolveFromProjectRoot } from './utils/project-root';
 
 // Helper function to find CV file automatically
 async function findCvFile(): Promise<string> {
-  if (process.env.CV_PATH) {
-    try {
-      await fs.access(process.env.CV_PATH);
-      console.log(`📄 Using CV file from CV_PATH: ${process.env.CV_PATH}`);
-      return process.env.CV_PATH;
-    } catch {
-      throw new Error(`CV file not found at CV_PATH=${process.env.CV_PATH}`);
-    }
-  }
-
   let projectRoot = process.cwd();
   try {
     let currentDir = process.cwd();
@@ -49,6 +39,23 @@ async function findCvFile(): Promise<string> {
     }
   } catch {
     // fall through: use cwd
+  }
+
+  if (process.env.CV_PATH) {
+    const candidates = [
+      process.env.CV_PATH,
+      path.resolve(projectRoot, process.env.CV_PATH),
+    ];
+    for (const p of candidates) {
+      try {
+        await fs.access(p);
+        console.log(`📄 Using CV file from CV_PATH: ${p}`);
+        return p;
+      } catch {
+        // try next
+      }
+    }
+    throw new Error(`CV file not found at CV_PATH=${process.env.CV_PATH} (tried relative to cwd and project root)`);
   }
 
   const possiblePaths = [

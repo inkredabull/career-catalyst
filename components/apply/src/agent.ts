@@ -20,10 +20,14 @@ import { Stagehand } from '@browserbasehq/stagehand';
 import * as readline from 'readline';
 
 function findCvFileSync(): string | null {
-  if (process.env.CV_PATH) {
-    return fs.existsSync(process.env.CV_PATH) ? process.env.CV_PATH : null;
-  }
   const projectRoot = resolveFromProjectRoot('.');
+  if (process.env.CV_PATH) {
+    const candidates = [
+      process.env.CV_PATH,
+      path.resolve(projectRoot, process.env.CV_PATH),
+    ];
+    return candidates.find(p => fs.existsSync(p)) ?? null;
+  }
   const candidates = [
     path.join(projectRoot, 'cv.txt'),
     path.join(projectRoot, 'CV.txt'),

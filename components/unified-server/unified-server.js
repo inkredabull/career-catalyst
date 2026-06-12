@@ -191,7 +191,7 @@ ${'='.repeat(80)}
     const projectRoot = path.resolve(__dirname, '..', '..');
 
     const possiblePaths = process.env.CV_PATH
-      ? [process.env.CV_PATH]
+      ? [process.env.CV_PATH, path.resolve(projectRoot, process.env.CV_PATH)]
       : [
           path.join(projectRoot, 'cv.txt'),
           path.join(projectRoot, 'CV.txt'),
