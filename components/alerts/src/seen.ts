@@ -96,7 +96,14 @@ export async function loadStopLists(): Promise<{
   companies: string[];
   titles: string[];
 }> {
-  return readGCS(STOP_LISTS_PATH, { companies: [], titles: [] });
+  const raw = await readGCS<{ companies?: string[]; titles?: string[] }>(
+    STOP_LISTS_PATH,
+    { companies: [], titles: [] },
+  );
+  return {
+    companies: Array.isArray(raw.companies) ? raw.companies : [],
+    titles: Array.isArray(raw.titles) ? raw.titles : [],
+  };
 }
 
 export async function addToStopList(
