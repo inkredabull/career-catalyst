@@ -11,6 +11,16 @@ import { execSync } from 'child_process';
 import * as readline from 'readline';
 
 async function findCvFile(): Promise<string> {
+  if (process.env.CV_PATH) {
+    try {
+      await fs.access(process.env.CV_PATH);
+      console.log(`📄 Using CV file from CV_PATH: ${process.env.CV_PATH}`);
+      return process.env.CV_PATH;
+    } catch {
+      throw new Error(`CV file not found at CV_PATH=${process.env.CV_PATH}`);
+    }
+  }
+
   let projectRoot = process.cwd();
   try {
     let currentDir = process.cwd();
@@ -53,7 +63,7 @@ async function findCvFile(): Promise<string> {
     }
   }
 
-  throw new Error('CV file not found. Please create a cv.txt file in the current directory or specify the path.');
+  throw new Error('CV file not found. Set CV_PATH in .env or create cv.txt in the project root.');
 }
 
 function unescapeRTF(content: string): string {

@@ -188,23 +188,23 @@ ${'='.repeat(80)}
   }
 
   loadCVContent() {
-    // Project root is two levels up from packages/unified-server
     const projectRoot = path.resolve(__dirname, '..', '..');
 
-    const possiblePaths = [
-      path.join(projectRoot, 'cv.txt'),
-      path.join(projectRoot, 'CV.txt'),
-      path.join(projectRoot, 'sample-cv.txt'),
-      // Also check current directory as fallback
-      'cv.txt',
-      './cv.txt',
-      'CV.txt',
-      './CV.txt',
-      'sample-cv.txt',
-      './sample-cv.txt'
-    ];
+    const possiblePaths = process.env.CV_PATH
+      ? [process.env.CV_PATH]
+      : [
+          path.join(projectRoot, 'cv.txt'),
+          path.join(projectRoot, 'CV.txt'),
+          path.join(projectRoot, 'sample-cv.txt'),
+          'cv.txt',
+          './cv.txt',
+          'CV.txt',
+          './CV.txt',
+          'sample-cv.txt',
+          './sample-cv.txt'
+        ];
 
-    console.log('  -> Looking for CV file in:', projectRoot);
+    console.log('  -> Looking for CV file in:', process.env.CV_PATH || projectRoot);
 
     for (const cvPath of possiblePaths) {
       try {

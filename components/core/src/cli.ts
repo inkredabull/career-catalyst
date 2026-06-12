@@ -23,10 +23,18 @@ import { resolveFromProjectRoot } from './utils/project-root';
 
 // Helper function to find CV file automatically
 async function findCvFile(): Promise<string> {
-  // Try to find project root by looking for package.json with workspaces
+  if (process.env.CV_PATH) {
+    try {
+      await fs.access(process.env.CV_PATH);
+      console.log(`📄 Using CV file from CV_PATH: ${process.env.CV_PATH}`);
+      return process.env.CV_PATH;
+    } catch {
+      throw new Error(`CV file not found at CV_PATH=${process.env.CV_PATH}`);
+    }
+  }
+
   let projectRoot = process.cwd();
   try {
-    // Walk up to find project root (contains package.json with workspaces)
     let currentDir = process.cwd();
     while (currentDir !== path.dirname(currentDir)) {
       const pkgPath = path.join(currentDir, 'package.json');
@@ -40,22 +48,19 @@ async function findCvFile(): Promise<string> {
       currentDir = path.dirname(currentDir);
     }
   } catch {
-    // If we can't find project root, use current directory
+    // fall through: use cwd
   }
 
   const possiblePaths = [
-    // Try current directory first
     'cv.txt',
     './cv.txt',
     'CV.txt',
     './CV.txt',
     'sample-cv.txt',
     './sample-cv.txt',
-    // Try project root
     path.join(projectRoot, 'cv.txt'),
     path.join(projectRoot, 'CV.txt'),
     path.join(projectRoot, 'sample-cv.txt'),
-    // Try data directory in project root
     path.join(projectRoot, 'data', 'cv.txt'),
     path.join(projectRoot, 'data', 'CV.txt')
   ];
@@ -66,11 +71,11 @@ async function findCvFile(): Promise<string> {
       console.log(`📄 Found CV file: ${cvPath}`);
       return cvPath;
     } catch {
-      // File doesn't exist, continue searching
+      // continue
     }
   }
 
-  throw new Error('CV file not found. Please create a cv.txt file in the current directory or specify the path.');
+  throw new Error('CV file not found. Set CV_PATH in .env or create cv.txt in the project root.');
 }
 
 const program = new Command();
