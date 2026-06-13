@@ -29,6 +29,23 @@ async function findCvFile(): Promise<string> {
     // fall through: use cwd
   }
 
+  if (process.env.CV_PATH) {
+    const candidates = [
+      process.env.CV_PATH,
+      path.resolve(projectRoot, process.env.CV_PATH),
+    ];
+    for (const p of candidates) {
+      try {
+        await fs.access(p);
+        console.log(`📄 Using CV file from CV_PATH: ${p}`);
+        return p;
+      } catch {
+        // try next
+      }
+    }
+    throw new Error(`CV file not found at CV_PATH=${process.env.CV_PATH} (tried relative to cwd and project root)`);
+  }
+
   const possiblePaths = [
     'cv.txt',
     './cv.txt',
@@ -53,7 +70,7 @@ async function findCvFile(): Promise<string> {
     }
   }
 
-  throw new Error('CV file not found. Please create a cv.txt file in the current directory or specify the path.');
+  throw new Error('CV file not found. Set CV_PATH in .env or create cv.txt in the project root.');
 }
 
 function unescapeRTF(content: string): string {

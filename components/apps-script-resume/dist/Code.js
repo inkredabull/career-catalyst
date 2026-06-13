@@ -2543,11 +2543,18 @@ function createCustomization() {
         DialogService.showAlert(`Error creating customization: ${error.message}`);
     }
 }
+function checkIsReasoningModel(modelId) {
+    return (modelId.includes('deepseek') ||
+        modelId.includes('gpt-5.5') ||
+        modelId.includes('gemini-3.') ||
+        /\/o\d/.test(modelId));
+}
 /**
  * Generate achievement using specific model
  * @param modelName - Name of model ('claude', 'gemini', 'openai', 'mistral', 'cohere')
  */
 function fetchWithModel(modelName) {
+    var _a;
     try {
         const services = initializeServices();
         const { row, headers, rowIndex } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
@@ -2565,9 +2572,13 @@ function fetchWithModel(modelName) {
                 Logger.warn(`fetchWithModel: ${audience} column not found — skipping`);
                 continue;
             }
-            const maxTokens = audience === 'linkedin'
+            const modelId = (_a = services.ai['modelMap'][modelName]) !== null && _a !== void 0 ? _a : '';
+            const baseTokens = audience === 'linkedin'
                 ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_LINKEDIN
                 : CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
+            const maxTokens = checkIsReasoningModel(modelId)
+                ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_REASONING
+                : baseTokens;
             Logger.log(`fetchWithModel(${modelName}): generating ${audience}, col ${colIndex + 1}, maxTokens=${maxTokens}`);
             const prompt = services.achievement.buildPrompt(challenge, actions, result, client, audience);
             const response = services.ai.query(prompt, { provider: modelName, maxTokens });
@@ -2600,12 +2611,11 @@ function generateAchievementWithModel(modelName) {
         // Reasoning models need a flat high cap — their thinking chain alone can consume thousands
         // of tokens before producing the final answer; scaling from the small output budget doesn't work
         const modelId = services.ai['modelMap'][modelName];
-        const isReasoningModel = modelId &&
-            (modelId.includes('deepseek') || modelId.includes('gpt-5.5') || /\/o\d/.test(modelId));
-        const maxTokens = isReasoningModel
+        const isReasoning = !!modelId && checkIsReasoningModel(modelId);
+        const maxTokens = isReasoning
             ? CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_REASONING
             : CONFIG.AI.MAX_TOKENS.ACHIEVEMENT_CV;
-        Logger.log(`generateAchievementWithModel: maxTokens=${maxTokens} (reasoning=${isReasoningModel})`);
+        Logger.log(`generateAchievementWithModel: maxTokens=${maxTokens} (reasoning=${isReasoning})`);
         const config = {
             provider: modelName,
             model: services.ai['modelMap'][modelName] || '',
@@ -2715,7 +2725,6 @@ function compareModels() {
         const services = initializeServices();
         const models = services.ai['modelMap'];
         const claudeModel = models['claude'] || CONFIG.AI.FALLBACK_MODELS.CLAUDE;
-        const geminiModel = models['gemini'] || CONFIG.AI.FALLBACK_MODELS.GEMINI;
         const openaiModel = models['openai'] || CONFIG.AI.FALLBACK_MODELS.OPENAI;
         const mistralModel = models['mistral'] || CONFIG.AI.FALLBACK_MODELS.MISTRAL;
         const cohereModel = models['cohere'] || CONFIG.AI.FALLBACK_MODELS.COHERE;
@@ -2728,7 +2737,6 @@ function compareModels() {
                 .substring(0, 50);
         };
         const claudeDisplay = fmt(claudeModel);
-        const geminiDisplay = fmt(geminiModel);
         const openaiDisplay = fmt(openaiModel);
         const mistralDisplay = fmt(mistralModel);
         const cohereDisplay = fmt(cohereModel);
@@ -2787,15 +2795,7 @@ function compareModels() {
         <textarea class="notes-input" id="notesClaude" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseClaude" onclick="chooseModel('claude')">✓ Choose This</button>
       </div>
-      <div class="result-card" id="resultGemini">
-        <h4>🔮 ${geminiDisplay}</h4>
-        <div class="model-label">${geminiModel}</div>
-        <div class="result-content" id="contentGemini"><div class="loading">Pending...</div></div>
-        <div class="char-count" id="countGemini"></div>
-        <div class="metadata" id="metadataGemini"></div>
-        <textarea class="notes-input" id="notesGemini" placeholder="Notes..."></textarea>
-        <button class="choose-btn" id="chooseGemini" onclick="chooseModel('gemini')">✓ Choose This</button>
-      </div>
+      <!-- Gemini disabled: re-add result-card div here to re-enable -->
       <div class="result-card" id="resultOpenAI">
         <h4>💬 ${openaiDisplay}</h4>
         <div class="model-label">${openaiModel}</div>
@@ -2828,7 +2828,7 @@ function compareModels() {
   <script>
     const MODELS=[
       {key:'claude',contentId:'contentClaude',countId:'countClaude',cardId:'resultClaude',buttonId:'chooseClaude',metadataId:'metadataClaude',notesId:'notesClaude'},
-      {key:'gemini',contentId:'contentGemini',countId:'countGemini',cardId:'resultGemini',buttonId:'chooseGemini',metadataId:'metadataGemini',notesId:'notesGemini'},
+      // Gemini disabled: re-add {key:'gemini',...} here to re-enable
       {key:'openai',contentId:'contentOpenAI',countId:'countOpenAI',cardId:'resultOpenAI',buttonId:'chooseOpenAI',metadataId:'metadataOpenAI',notesId:'notesOpenAI'},
       {key:'mistral',contentId:'contentMistral',countId:'countMistral',cardId:'resultMistral',buttonId:'chooseMistral',metadataId:'metadataMistral',notesId:'notesMistral'},
       {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere',notesId:'notesCohere'}

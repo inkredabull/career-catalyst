@@ -1,32 +1,43 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { addToStopList } from '../src/seen';
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { addToStopList } from "../src/seen";
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-function isValidType(t: unknown): t is 'company' | 'title' {
-  return t === 'company' || t === 'title';
+function isValidType(t: unknown): t is "company" | "title" {
+  return t === "company" || t === "title";
 }
 
-async function parseFormBody(req: VercelRequest): Promise<Record<string, string>> {
+async function parseFormBody(
+  req: VercelRequest,
+): Promise<Record<string, string>> {
   return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
-    req.on('end', () => resolve(Object.fromEntries(new URLSearchParams(body))));
-    req.on('error', reject);
+    let body = "";
+    req.on("data", (chunk: Buffer) => {
+      body += chunk.toString();
+    });
+    req.on("end", () => resolve(Object.fromEntries(new URLSearchParams(body))));
+    req.on("error", reject);
   });
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  res.setHeader('Content-Type', 'text/html');
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+): Promise<void> {
+  res.setHeader("Content-Type", "text/html");
 
-  if (req.method === 'GET') {
-    const type  = req.query['type'] as string | undefined;
-    const value = req.query['value'] as string | undefined;
+  if (req.method === "GET") {
+    const type = req.query["type"] as string | undefined;
+    const value = req.query["value"] as string | undefined;
 
     if (!isValidType(type) || !value) {
-      res.status(400).send('<p>Missing or invalid parameters.</p>');
+      res.status(400).send("<p>Missing or invalid parameters.</p>");
       return;
     }
 
@@ -55,13 +66,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  if (req.method === 'POST') {
-    const body    = await parseFormBody(req);
-    const type    = body['type'];
-    const trimmed = body['value']?.trim();
+  if (req.method === "POST") {
+    const body = await parseFormBody(req);
+    const type = body["type"];
+    const trimmed = body["value"]?.trim();
 
     if (!isValidType(type) || !trimmed) {
-      res.status(400).send('<p>Missing or invalid parameters.</p>');
+      res.status(400).send("<p>Missing or invalid parameters.</p>");
       return;
     }
 
@@ -78,5 +89,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  res.status(405).send('<p>Method not allowed.</p>');
+  res.status(405).send("<p>Method not allowed.</p>");
 }

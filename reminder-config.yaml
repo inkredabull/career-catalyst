@@ -3,7 +3,7 @@
 
 reminder_config:
   # The list name in Reminders app where job tracking reminders will be created
-  list_name: "Get a new job"
+  list_name: "Build with purpose"
   
   # Default priority for job tracking reminders (0-9, where 9 is highest)
   default_priority: 5

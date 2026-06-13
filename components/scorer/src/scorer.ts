@@ -3,8 +3,10 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 // ─── CV ───────────────────────────────────────────────────────────────────────
-// Read from cv.txt at the career-catalyst root so there is a single source of truth.
-const cvPath = resolve(__dirname, "../../../cv.txt");
+const projectRoot = resolve(__dirname, "../../..");
+const cvPath = process.env.CV_PATH
+  ? resolve(projectRoot, process.env.CV_PATH)
+  : resolve(projectRoot, "cv.txt");
 export const CV = readFileSync(cvPath, "utf8").trim();
 
 // ─── APPLICANT SATURATION ─────────────────────────────────────────────────────

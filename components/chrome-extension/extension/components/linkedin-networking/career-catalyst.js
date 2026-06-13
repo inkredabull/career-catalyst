@@ -7,12 +7,30 @@ function interpolate(template, vars) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] != null ? vars[key] : ''));
 }
 
+function joinWith(items, connector) {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} ${connector} ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, ${connector} ${items[items.length - 1]}`;
+}
+
+const PAIN_POINTS = [
+  'create order out of chaos',
+  'address team throughput',
+  'improve cybersecurity',
+  'roll out Gen AI safely',
+  'foster great talent',
+];
+
 const MESSAGE_TEMPLATES = {
+
   // congratsAndConnect
   CONGRATS_CONNECT:
-    "Hi {{firstName}}, congrats on the {{round}} for {{domain}}! " +
-    "Been an IC, led teams, now building again. Know what your stage actually needs. " +
-    "Happy to chat: https://calendly.com/bluxomelabs/quick-chat",
+    // "Hi {{firstName}}, congrats on the {{round}} for {{domain}}! " +
+    "Hi {{firstName}}, congrats on the {{round}}! " +
+    "I help founders " + joinWith(PAIN_POINTS, "and") + ". " +
+    "I'm local; quick chat if you need any help? " +
+    "https://calendly.com/bluxomelabs/quick-chat",
 
   // sendConnectionRequest segments (branching stays in code)
   SCR_GREETING:  "Hi {{firstName}}, ",
@@ -1104,8 +1122,9 @@ async function congratsAndConnect() {
   if (domain === null) return;
 
   const dow = new Date().getDay();
+
   const outreach = interpolate(MESSAGE_TEMPLATES.CONGRATS_CONNECT, { firstName, round, domain })
-    + (dow === 5 || dow === 6 || dow === 0 ? MESSAGE_TEMPLATES.WEEKEND_CLOSING : '');
+    + (dow === 5 || dow === 6 || dow === 0 ? " " + MESSAGE_TEMPLATES.WEEKEND_CLOSING : '');
   LOG(`Message (${outreach.length} chars): ${outreach.slice(0, 60)}…`);
 
   await _doConnectWithNote(outreach, LOG);

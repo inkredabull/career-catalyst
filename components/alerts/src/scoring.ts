@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { ENV } from './config/settings';
-import { JobResult } from './linkedin';
-import { log } from './utils/logger';
+import Anthropic from "@anthropic-ai/sdk";
+import { ENV } from "./config/settings";
+import { JobResult } from "./linkedin";
+import { log } from "./utils/logger";
 
 // ---------------------------------------------------------------------------
 // Rubric — kept in sync with components/scorer/src/scorer.ts
@@ -53,14 +53,14 @@ Judgment labels (pick exactly one):
 async function fetchJD(url: string): Promise<string> {
   try {
     const res = await fetch(`https://r.jina.ai/${url}`, {
-      headers: { Accept: 'text/plain' },
+      headers: { Accept: "text/plain" },
       signal: AbortSignal.timeout(15_000),
     });
-    log('DEBUG', 'Jina HTTP %s for %s', res.status, url.slice(0, 80));
+    log("DEBUG", "Jina HTTP %s for %s", res.status, url.slice(0, 80));
     const text = await res.text();
     return text.slice(0, 12_000);
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -69,15 +69,15 @@ async function fetchJD(url: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export interface ScoreResult {
-  verdict:   '🟢' | '🟡' | '🔴' | '?';
+  verdict: "🟢" | "🟡" | "🔴" | "?";
   reasoning: string;
 }
 
 export async function scoreJob(job: JobResult): Promise<ScoreResult> {
   const apiKey = process.env[ENV.ANTHROPIC_API_KEY];
   if (!apiKey) {
-    log('WARN', 'ANTHROPIC_API_KEY not set — skipping scoring');
-    return { verdict: '?', reasoning: '' };
+    log("WARN", "ANTHROPIC_API_KEY not set — skipping scoring");
+    return { verdict: "?", reasoning: "" };
   }
 
   const jdText = await fetchJD(job.url);
@@ -87,39 +87,54 @@ export async function scoreJob(job: JobResult): Promise<ScoreResult> {
     `## Job`,
     `Company: ${job.company}`,
     `Title: ${job.title}`,
-    job.location ? `Location: ${job.location}` : '',
+    job.location ? `Location: ${job.location}` : "",
     `URL: ${job.url}`,
-    jdText ? `\n## Job Description\n${jdText}` : '',
+    jdText ? `\n## Job Description\n${jdText}` : "",
     `\nScore each of the 14 dimensions with a brief 1-2 sentence assessment and numeric score.
 Format each line as: N. Dimension Name: [score] — assessment
 End with a blank line then: Verdict: [🟢 Strong Fit — Pursue Actively | 🟡 Conditional Fit — Dig Deeper Before Committing | 🔴 Pass — Meaningful Misalignment]`,
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: "claude-sonnet-4-6",
       max_tokens: 1500,
-      system: 'You are a job scoring assistant for a VP Engineering / CTO candidate. Score each dimension and end with the verdict.',
-      messages: [{ role: 'user', content: userMessage }],
+      system:
+        "You are a job scoring assistant for a VP Engineering / CTO candidate. Score each dimension and end with the verdict.",
+      messages: [{ role: "user", content: userMessage }],
     });
 
     const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map(b => b.text)
-      .join('');
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("");
 
     const verdictMatch = text.match(/Verdict:\s*(🟢|🟡|🔴)/);
-    let verdict: ScoreResult['verdict'] = '?';
+    let verdict: ScoreResult["verdict"] = "?";
     if (verdictMatch) {
-      verdict = verdictMatch[1] as ScoreResult['verdict'];
+      verdict = verdictMatch[1] as ScoreResult["verdict"];
     } else {
-      log('WARN', 'Could not parse verdict for %s — %s: "%s"', job.company, job.title, text.slice(0, 100));
+      log(
+        "WARN",
+        'Could not parse verdict for %s — %s: "%s"',
+        job.company,
+        job.title,
+        text.slice(0, 100),
+      );
     }
 
     return { verdict, reasoning: text };
   } catch (err) {
-    log('WARN', 'Scoring failed for %s — %s: %s', job.company, job.title, (err as Error).message);
-    return { verdict: '?', reasoning: '' };
+    log(
+      "WARN",
+      "Scoring failed for %s — %s: %s",
+      job.company,
+      job.title,
+      (err as Error).message,
+    );
+    return { verdict: "?", reasoning: "" };
   }
 }
