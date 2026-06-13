@@ -1,5 +1,5 @@
 import { ENV } from './config/settings';
-import { SF_FILTER, TIME_FRAME, STRONG_FIT_MAX_APPLICANTS } from './config/constants';
+import { SF_FILTER, TIME_FRAME, STRONG_FIT_MAX_APPLICANTS, APPLICANT_SATURATION_THRESHOLD } from './config/constants';
 import { SEARCH_TITLES } from './config/titles';
 import { pause } from './clock';
 import { getSearchResultsFromLinkedin, getTopApplicantFromLinkedin, extractInfo, getSearchToPerform, SearchFilter, JobResult, SearchResults } from './linkedin';
@@ -113,7 +113,10 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
   );
 
   for (const job of Object.values(fresh)) {
-    if (job.judgment === '🟢' && job.applicants !== undefined && job.applicants >= STRONG_FIT_MAX_APPLICANTS) {
+    if (job.applicants !== undefined && job.applicants >= APPLICANT_SATURATION_THRESHOLD) {
+      log('INFO', 'Forced 🔴 Pass (%s applicants ≥ %s, oversaturated): [%s] %s — %s', job.applicants, APPLICANT_SATURATION_THRESHOLD, job.search, job.company, job.title);
+      job.judgment = '🔴';
+    } else if (job.judgment === '🟢' && job.applicants !== undefined && job.applicants >= STRONG_FIT_MAX_APPLICANTS) {
       log('INFO', 'Demoted 🟢→🟡 (%s applicants): [%s] %s — %s', job.applicants, job.search, job.company, job.title);
       job.judgment = '🟡';
     }

@@ -38,6 +38,8 @@ These are the direct pursue/pass drivers. Score honestly.
 Hard filters (score 1): comp below $225K, confirmed in-office outside SF Bay Area, IC-only, no AI/tech leadership mandate.
 Soft filters (flag yellow if absent): React/Python/TypeScript stack, GCP, Series A–B or verified strong TC public co, prior exit on exec team.
 
+Categorical Pass override: if the posting shows 100 or more applicants ("N applicants", "Over N applicants", "N people clicked apply"), the role is oversaturated — set the verdict to 🔴 Pass regardless of dimension scores.
+
 Judgment labels (pick exactly one):
 - 🟢 Strong Fit — Pursue Actively
 - 🟡 Conditional Fit — Dig Deeper Before Committing
