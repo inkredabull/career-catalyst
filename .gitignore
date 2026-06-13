@@ -113,7 +113,7 @@ jspm_packages/
 .node_repl_history
 
 # Output files
-*.txt
+work-history/*
 *.json
 !package.json
 !package-lock.json
