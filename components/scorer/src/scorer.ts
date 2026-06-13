@@ -9,6 +9,13 @@ const cvPath = process.env.CV_PATH
   : resolve(projectRoot, "cv.txt");
 export const CV = readFileSync(cvPath, "utf8").trim();
 
+// ─── APPLICANT SATURATION ─────────────────────────────────────────────────────
+// A posting with this many or more applicants is oversaturated — an application is
+// unlikely to be reviewed, so it's a categorical Pass regardless of fit. Tune here.
+// (Sits between alerts' STRONG_FIT_MAX_APPLICANTS=50 demotion and the extractor's
+//  200-applicant hard-skip.)
+export const APPLICANT_SATURATION_THRESHOLD = 100;
+
 // ─── SCORING RUBRIC ───────────────────────────────────────────────────────────
 export const RUBRIC = `
 ## 14-Dimension Scoring Rubric
@@ -46,6 +53,9 @@ Hard filters (score 1 on the relevant dimension if triggered):
 - IC-heavy with no direct reports or org-building mandate
 - Role has no technical leadership or AI/ML innovation mandate (ask: would Anthony's AI expertise grow or be used here?)
 - Scope Creep: role asks one person to personally own all three of — (1) deep IC work (coding, code review, architecture ownership), (2) org-building and team management, and (3) high-bar technical recruiting. When all three appear as personal duties directed at the role holder, score Dimension 2 as 1 and note: "Unicorn scope — leadership, IC, and recruiting collapsed into one seat. Likely founder ambiguity."
+
+Categorical Pass overrides (these force a 🔴 Pass verdict regardless of dimension totals):
+- Applicant saturation: if the posting shows ${APPLICANT_SATURATION_THRESHOLD} or more applicants — look for "N applicants", "Over N applicants", or "N people clicked apply" in the fetched text — the role is oversaturated and an application is unlikely to be reviewed. Set the verdict to 🔴 Pass and note the applicant count, e.g. "646 applicants — oversaturated, application unlikely to be seen." Treat "Over 100 applicants" or "100+ applicants" as meeting the threshold. If the count is genuinely not disclosed in the JD, do not apply this override.
 
 Soft filters (flag as yellow if absent):
 - React / Python / TypeScript in the stack
@@ -87,7 +97,7 @@ Produce a scorecard in this exact structure:
 ### 🏢 [Company Name] — [Role Title]
 
 **Stage:** [e.g., Series B] | **Stack:** [e.g., Python, React, GCP] | **Remote:** [e.g., Remote-friendly]
-**Comp:** [e.g., $220–260K + equity] | **Reporting to:** [e.g., CEO]
+**Comp:** [e.g., $220–260K + equity] | **Reporting to:** [e.g., CEO] | **Applicants:** [e.g., 646 — or "Not disclosed"]
 
 #### Dimension Scores
 
@@ -125,6 +135,8 @@ Judgment labels (pick exactly one):
 - 🟡 Conditional Fit — Dig Deeper Before Committing
 - 🔴 Pass — Meaningful Misalignment
 
+Any Categorical Pass override (e.g. applicant saturation at ${APPLICANT_SATURATION_THRESHOLD}+) forces 🔴 Pass here regardless of the dimension totals.
+
 ---
 
 #### Recommended Next Action
@@ -140,6 +152,7 @@ Scoring notes:
 - A 3.5/5 average is NOT a Strong Fit.
 - Below 35/58 total → default to Pass or Conditional unless exceptional circumstances exist.
 - Primary score below 20/40 → near-automatic Pass regardless of context scores.
+- Applicant saturation (${APPLICANT_SATURATION_THRESHOLD}+ applicants) → categorical 🔴 Pass; do not soften to Conditional just because the fit looks good.
 - Be honest. Anthony's time is finite.
 - Stage calibration for scope creep: Seed/pre-A roles often collapse scope — flag it but don't auto-fail; note "Broad scope consistent with stage — confirm intentional vs. founder confusion." Series A/growth-stage scope creep is a red flag (org design immaturity). Series B+ scope creep is a hard 🔴 — the role is misleveled or the hiring manager doesn't understand the function.
 `.trim();
@@ -151,7 +164,8 @@ against Anthony Bull's profile as a VP Engineering / CTO candidate.
 
 When given a job description (via URL fetch or pasted text), you:
 1. Extract role title, company, stage, location/remote, stack, team size, comp, key responsibilities,
-   and must-have requirements. Note anything missing as "Not disclosed."
+   must-have requirements, and the number of applicants ("N applicants", "Over N applicants",
+   "N people clicked apply"). Note anything missing as "Not disclosed."
 2. Score the role on 15 dimensions using the rubric below.
 3. Apply hard and soft filters.
 4. Output a structured scorecard exactly as specified.

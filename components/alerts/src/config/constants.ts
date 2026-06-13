@@ -52,3 +52,7 @@ export const US_FILTER = {
 };
 
 export const STRONG_FIT_MAX_APPLICANTS = 50;
+// At or above this applicant count a posting is oversaturated — an application is
+// unlikely to be reviewed — so it's forced to a categorical 🔴 Pass regardless of fit.
+// Kept in sync with components/scorer's APPLICANT_SATURATION_THRESHOLD.
+export const APPLICANT_SATURATION_THRESHOLD = 200;
