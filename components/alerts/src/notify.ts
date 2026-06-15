@@ -51,6 +51,28 @@ export function formatEntry(
   };
 }
 
+function geoLabel(search: string): string {
+  const s = search.toLowerCase();
+  if (s.includes("top applicant")) return "Top Applicant";
+  if (s.includes(", us") || s.includes(", united states")) return "Remote US";
+  if (
+    s.includes("san francisco") ||
+    s.includes("sf bay") ||
+    s.includes("ashby") ||
+    s.includes("wellfound") ||
+    s.includes("indeed")
+  )
+    return "San Francisco / Bay Area";
+  return "Other";
+}
+
+const GEO_ORDER = [
+  "Top Applicant",
+  "San Francisco / Bay Area",
+  "Remote US",
+  "Other",
+];
+
 export async function notify(
   results: SearchResults,
   webAppUrl: string,
@@ -59,7 +81,30 @@ export async function notify(
 ): Promise<void> {
   const email = requireEnv(ENV.MY_EMAIL);
   const resend = new Resend(requireEnv(ENV.RESEND_API_KEY));
-  const entries = Object.values(results).map((r) => formatEntry(r, webAppUrl));
+
+  // Group by geography
+  const groups = new Map<string, JobResult[]>();
+  for (const r of Object.values(results)) {
+    const geo = geoLabel(r.search);
+    if (!groups.has(geo)) groups.set(geo, []);
+    groups.get(geo)!.push(r);
+  }
+
+  const textSections: string[] = [];
+  const htmlSections: string[] = [];
+
+  for (const geo of GEO_ORDER) {
+    const jobs = groups.get(geo);
+    if (!jobs || jobs.length === 0) continue;
+    const entries = jobs.map((r) => formatEntry(r, webAppUrl));
+    textSections.push(
+      `=== ${geo} ===\n\n${entries.map((e) => e.text).join("\n\n")}`,
+    );
+    htmlSections.push(
+      `<h2 style="font-size:14px;font-weight:600;color:#374151;margin:24px 0 8px;padding-bottom:4px;border-bottom:1px solid #e5e7eb">${geo} (${jobs.length})</h2>` +
+        entries.map((e) => e.html).join(""),
+    );
+  }
 
   const durationFooter =
     durationMs !== undefined
@@ -79,7 +124,7 @@ export async function notify(
     from: "alerts@bluxomelabs.com",
     to: email,
     subject: `Jobs for ${new Date().toLocaleString("en-US", { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}`,
-    text: entries.map((e) => e.text).join("\n\n") + durationFooter,
-    html: entries.map((e) => e.html).join("") + durationHtml + logsHtml,
+    text: textSections.join("\n\n") + durationFooter,
+    html: htmlSections.join("") + durationHtml + logsHtml,
   });
 }
