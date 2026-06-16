@@ -156,7 +156,12 @@ export const shuffle = <T>(array: T[]): void => {
   }
 };
 
-export const pickRandomContacts = (count = 5): string => {
+export interface WarmupContact {
+  displayName: string;
+  contactUrl: string;
+}
+
+export const pickRandomContacts = (count = 5): WarmupContact[] => {
   const rawPrefixes = PropertiesService.getScriptProperties()
     .getProperty(SCRIPT_PROPS.WARMUP_EXCLUDE_LABEL_PREFIXES) ?? '';
   const excludedPrefixes = rawPrefixes.split(',').map(p => p.trim()).filter(Boolean);
@@ -190,14 +195,10 @@ export const pickRandomContacts = (count = 5): string => {
   });
 
   shuffle(all);
-  const selected = all.slice(0, count);
-
-  return selected
-    .map(contact => {
-      const displayName = contact.names?.[0]?.displayName ?? 'No Name';
-      return `${displayName}\n${getLocalURL(displayName)}`;
-    })
-    .join('\n\n');
+  return all.slice(0, count).map(contact => {
+    const displayName = contact.names?.[0]?.displayName ?? 'No Name';
+    return { displayName, contactUrl: getLocalURL(displayName) };
+  });
 };
 
 // ── Contact reclassification ──────────────────────────────────────────────────

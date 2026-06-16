@@ -9,7 +9,7 @@ import {
 } from '../config/messages';
 import { PROFILE } from '../config/profile';
 import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
-import { getLinkedInUrlByName } from './contacts';
+import { getLinkedInUrlByName, WarmupContact } from './contacts';
 
 interface MsgObj {
   subject: string;
@@ -82,6 +82,28 @@ render();
     HtmlService.createHtmlOutput(html).setWidth(480).setHeight(count > 1 ? 320 : 290),
     `LinkedIn DM${count > 1 ? ` (${count} contacts)` : ''}`
   );
+};
+
+// ── Warmup draft creation ─────────────────────────────────────────────────────
+
+const WARMUP_TEMPLATE = 'Q2 2026 latest-and-greatest';
+
+export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
+  const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
+  const emailTemplate = getGmailTemplateFromDrafts(WARMUP_TEMPLATE);
+
+  for (const { displayName, contactUrl } of contacts) {
+    const parts = displayName.trim().split(/\s+/);
+    const row: Record<string, string> = {
+      [COLS.RECIPIENT]: myEmail,
+      [COLS.FULL_NAME]: displayName,
+      [COLS.FIRST_NAME]: parts[0] ?? '',
+      ContactURL: contactUrl,
+    };
+    const msgObj = fillInTemplateFromObject(emailTemplate.message, row, WARMUP_TEMPLATE);
+    GmailApp.createDraft(myEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html });
+    Logger.log('Created warmup draft for %s', displayName);
+  }
 };
 
 // ── Core send ─────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 import { onOpen } from './ui/menu';
 import { PROFILE } from './config/profile';
 import { generateOutreachMessage, OutreachContext } from './services/message-generator';
-import { sendEmails, sendTestEmail, queueEmails, sendViaGmail, doSendEmails, doSendTestEmail } from './services/gmail';
+import { sendEmails, sendTestEmail, queueEmails, doSendEmails, doSendTestEmail, createWarmupDrafts } from './services/gmail';
 import { fetchContactToSheet, getLinkedInUrlToSheet, pickRandomContacts } from './services/contacts';
 import { getJobMetadata, clearJobMetadataCache } from './services/job-metadata';
 import { SCRIPT_PROPS, COLS, requireProp } from './config/settings';
@@ -25,8 +25,7 @@ function blurb(): readonly string[] {
 // ── Warmup ────────────────────────────────────────────────────────────────────
 
 function sendWarmup(): void {
-  const row: Record<string, string> = { [COLS.RECIPIENT]: requireProp(SCRIPT_PROPS.MY_EMAIL) };
-  sendViaGmail(row, { subject: 'Morning Warmup', text: pickRandomContacts(), html: '' }, null); // warmup never has SEND_SMS flag; return value is always null
+  createWarmupDrafts(pickRandomContacts());
 }
 
 // ── Outreach message generation ───────────────────────────────────────────────
