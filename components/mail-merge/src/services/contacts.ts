@@ -159,6 +159,7 @@ export const shuffle = <T>(array: T[]): void => {
 export interface WarmupContact {
   displayName: string;
   contactUrl: string;
+  email: string;
 }
 
 export const pickRandomContacts = (count = 5): WarmupContact[] => {
@@ -197,7 +198,9 @@ export const pickRandomContacts = (count = 5): WarmupContact[] => {
   shuffle(all);
   return all.slice(0, count).map(contact => {
     const displayName = contact.names?.[0]?.displayName ?? 'No Name';
-    return { displayName, contactUrl: getLocalURL(displayName) };
+    const homeEmail = contact.emailAddresses?.find(e => e.type === 'home');
+    const email = homeEmail?.value ?? contact.emailAddresses?.[0]?.value ?? '';
+    return { displayName, contactUrl: getLocalURL(displayName), email };
   });
 };
 

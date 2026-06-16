@@ -104,12 +104,23 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
   for (const { displayName, contactUrl } of contacts) {
     const parts = displayName.trim().split(/\s+/);
     const row: Record<string, string> = {
-      [COLS.RECIPIENT]: myEmail,
+      [COLS.RECIPIENT]: recipientEmail,
       [COLS.FULL_NAME]: displayName,
       [COLS.FIRST_NAME]: parts[0] ?? '',
       ContactURL: contactUrl,
     };
     const msgObj = fillInTemplateFromObject(emailTemplate.message, row, WARMUP_TEMPLATE);
+    const draft = GmailApp.createDraft(recipientEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html });
+    Logger.log('Created warmup draft for %s (%s)', displayName, recipientEmail);
+
+    const draftId = draft.getId();
+    const draftUrl = `https://mail.google.com/mail/#drafts/${draftId}`;
+    draftLines.push(`${displayName} (${recipientEmail || 'no email'})\n${draftUrl}`);
+  }
+
+  const body = `Morning Warmup drafts created:\n\n${draftLines.join('\n\n')}`;
+  GmailApp.sendEmail(myEmail, 'Morning Warmup — Drafts Ready', body);
+  Logger.log('Sent warmup confirmation email to %s', myEmail);
     GmailApp.createDraft(myEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html, attachments });
     Logger.log('Created warmup draft for %s', displayName);
   }
