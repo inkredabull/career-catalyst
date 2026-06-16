@@ -164,89 +164,80 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
   const seen = await loadSeen();
   const fresh = filterUnseen(results, seen);
 
-  if (Object.keys(fresh).length === 0) {
-    log("INFO", "No new results, skipping email");
-    return;
-  }
-
-  log("INFO", "Scoring %s fresh jobs...", Object.keys(fresh).length);
-  await Promise.all(
-    Object.values(fresh).map(async (job) => {
-      const { verdict, reasoning } = await scoreJob(job);
-      job.judgment = verdict;
-      if (verdict !== "🔴") {
-        try {
-          await saveScore(job.id, {
-            job,
-            verdict,
-            reasoning,
-            scoredAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          log(
-            "WARN",
-            "Score save failed for %s (%s): %s",
-            job.id,
-            job.title,
-            (err as Error).message,
-          );
+  if (Object.keys(fresh).length > 0) {
+    log("INFO", "Scoring %s fresh jobs...", Object.keys(fresh).length);
+    await Promise.all(
+      Object.values(fresh).map(async (job) => {
+        const { verdict, reasoning } = await scoreJob(job);
+        job.judgment = verdict;
+        if (verdict !== "🔴") {
+          try {
+            await saveScore(job.id, {
+              job,
+              verdict,
+              reasoning,
+              scoredAt: new Date().toISOString(),
+            });
+          } catch (err) {
+            log(
+              "WARN",
+              "Score save failed for %s (%s): %s",
+              job.id,
+              job.title,
+              (err as Error).message,
+            );
+          }
         }
-      }
-      log("DEBUG", "Scored [%s]: %s — %s", verdict, job.company, job.title);
-    }),
-  );
+        log("DEBUG", "Scored [%s]: %s — %s", verdict, job.company, job.title);
+      }),
+    );
 
-  for (const job of Object.values(fresh)) {
-    if (
-      job.applicants !== undefined &&
-      job.applicants >= APPLICANT_SATURATION_THRESHOLD
-    ) {
-      log(
-        "INFO",
-        "Forced 🔴 Pass (%s applicants ≥ %s, oversaturated): [%s] %s — %s",
-        job.applicants,
-        APPLICANT_SATURATION_THRESHOLD,
-        job.search,
-        job.company,
-        job.title,
-      );
-      job.judgment = "🔴";
-    } else if (
-      job.judgment === "🟢" &&
-      job.applicants !== undefined &&
-      job.applicants >= STRONG_FIT_MAX_APPLICANTS
-    ) {
-      log(
-        "INFO",
-        "Demoted 🟢→🟡 (%s applicants): [%s] %s — %s",
-        job.applicants,
-        job.search,
-        job.company,
-        job.title,
-      );
-      job.judgment = "🟡";
+    for (const job of Object.values(fresh)) {
+      if (
+        job.applicants !== undefined &&
+        job.applicants >= APPLICANT_SATURATION_THRESHOLD
+      ) {
+        log(
+          "INFO",
+          "Forced 🔴 Pass (%s applicants ≥ %s, oversaturated): [%s] %s — %s",
+          job.applicants,
+          APPLICANT_SATURATION_THRESHOLD,
+          job.search,
+          job.company,
+          job.title,
+        );
+        job.judgment = "🔴";
+      } else if (
+        job.judgment === "🟢" &&
+        job.applicants !== undefined &&
+        job.applicants >= STRONG_FIT_MAX_APPLICANTS
+      ) {
+        log(
+          "INFO",
+          "Demoted 🟢→🟡 (%s applicants): [%s] %s — %s",
+          job.applicants,
+          job.search,
+          job.company,
+          job.title,
+        );
+        job.judgment = "🟡";
+      }
     }
+
+    const judgmentSummary = Object.values(fresh)
+      .map((j) => j.judgment ?? "?")
+      .join(" ");
+    log("INFO", "Judgments before notify: %s", judgmentSummary);
+  } else {
+    log("INFO", "No new results this run");
   }
 
-  const judgmentSummary = Object.values(fresh)
-    .map((j) => j.judgment ?? "?")
-    .join(" ");
-  log("INFO", "Judgments before notify: %s", judgmentSummary);
   const toNotify = Object.fromEntries(
     Object.entries(fresh).filter(([, j]) => j.judgment !== "🔴"),
   );
-  if (Object.keys(toNotify).length === 0) {
-    log(
-      "INFO",
-      "All %s fresh jobs were 🔴 Pass — skipping email",
-      Object.keys(fresh).length,
-    );
-    await saveSeen(markAsSeen(fresh, seen));
-    return;
-  }
   log(
     "INFO",
-    "Sending email for %s jobs (%s passed filter)...",
+    "Sending email (%s jobs to highlight, %s total fresh)...",
     Object.keys(toNotify).length,
     Object.keys(fresh).length,
   );
