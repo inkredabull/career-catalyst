@@ -31,7 +31,6 @@ export const SF_FILTER = {
     distance: [25],
     experience: [5, 6],
     populatedPlace: [SF_GEO_ID],
-    salaryBucketV2: [6],
     timePostedRange: [TIME_FRAME],
     workplaceType: [1, 2, 3],
   },
@@ -44,7 +43,6 @@ export const US_FILTER = {
   selectedFilters: {
     sortBy: ["R"],
     experience: [5, 6],
-    salaryBucketV2: [6],
     timePostedRange: [TIME_FRAME],
     workplaceType: [2],
   },

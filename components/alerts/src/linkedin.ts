@@ -59,7 +59,7 @@ export function getLinkedinURL(filter: SearchFilter): string {
     `spellCorrectionEnabled:${filter.spellCorrectionEnabled}`,
   ];
 
-  return `${baseUrl}?decorationId=${decorationId}&count=25&q=jobSearch&query=(${queryParts.join(",")})&start=0`;
+  return `${baseUrl}?decorationId=${decorationId}&count=50&q=jobSearch&query=(${queryParts.join(",")})&start=0`;
 }
 
 /** Scans a LinkedIn jobInsightsV2ResolutionResults blob for applicant count.
