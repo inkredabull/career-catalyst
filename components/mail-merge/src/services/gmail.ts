@@ -91,6 +91,15 @@ const WARMUP_TEMPLATE = 'Q2 2026 latest-and-greatest';
 export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
   const emailTemplate = getGmailTemplateFromDrafts(WARMUP_TEMPLATE);
+  const flags = getFlagsForSubject(WARMUP_TEMPLATE);
+
+  const attachments: GoogleAppsScript.Base.Blob[] = [...emailTemplate.attachments];
+  if (flags.ATTACH_PHOTO) {
+    const photoUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.PHOTO_URL);
+    if (photoUrl && photoUrl.includes('drive.google.com')) {
+      attachments.push(driveFileAsBlob(photoUrl));
+    }
+  }
 
   for (const { displayName, contactUrl } of contacts) {
     const parts = displayName.trim().split(/\s+/);
@@ -101,7 +110,7 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
       ContactURL: contactUrl,
     };
     const msgObj = fillInTemplateFromObject(emailTemplate.message, row, WARMUP_TEMPLATE);
-    GmailApp.createDraft(myEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html });
+    GmailApp.createDraft(myEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html, attachments });
     Logger.log('Created warmup draft for %s', displayName);
   }
 };
