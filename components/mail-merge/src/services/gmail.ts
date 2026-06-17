@@ -101,7 +101,10 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
     }
   }
 
-  for (const { displayName, contactUrl } of contacts) {
+  const draftLines: string[] = [];
+
+  for (const { displayName, contactUrl, email } of contacts) {
+    const recipientEmail = email || myEmail;
     const parts = displayName.trim().split(/\s+/);
     const row: Record<string, string> = {
       [COLS.RECIPIENT]: recipientEmail,
@@ -110,20 +113,18 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
       ContactURL: contactUrl,
     };
     const msgObj = fillInTemplateFromObject(emailTemplate.message, row, WARMUP_TEMPLATE);
-    const draft = GmailApp.createDraft(recipientEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html });
+    GmailApp.createDraft(recipientEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html, attachments });
     Logger.log('Created warmup draft for %s (%s)', displayName, recipientEmail);
 
-    const draftId = draft.getId();
-    const draftUrl = `https://mail.google.com/mail/#drafts/${draftId}`;
-    draftLines.push(`${displayName} (${recipientEmail || 'no email'})\n${draftUrl}`);
+    const draftSearchUrl = recipientEmail
+      ? `https://mail.google.com/mail/u/0/#search/in:drafts+to:${encodeURIComponent(recipientEmail)}`
+      : 'https://mail.google.com/mail/u/0/#drafts';
+    draftLines.push(`${displayName} (${recipientEmail || 'no email'})\n${draftSearchUrl}`);
   }
 
-  const body = `Morning Warmup drafts created:\n\n${draftLines.join('\n\n')}`;
-  GmailApp.sendEmail(myEmail, 'Morning Warmup — Drafts Ready', body);
+  const body = draftLines.join('\n\n');
+  GmailApp.sendEmail(myEmail, 'Morning Warmup', body);
   Logger.log('Sent warmup confirmation email to %s', myEmail);
-    GmailApp.createDraft(myEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html, attachments });
-    Logger.log('Created warmup draft for %s', displayName);
-  }
 };
 
 // ── Core send ─────────────────────────────────────────────────────────────────
