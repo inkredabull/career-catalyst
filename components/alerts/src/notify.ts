@@ -60,7 +60,8 @@ function geoLabel(search: string): string {
     s.includes("sf bay") ||
     s.includes("ashby") ||
     s.includes("wellfound") ||
-    s.includes("indeed")
+    s.includes("indeed") ||
+    s.includes("anthropic")
   )
     return "San Francisco / Bay Area";
   return "Other";

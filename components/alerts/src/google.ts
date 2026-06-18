@@ -118,6 +118,12 @@ const GOOGLE_SEARCHES: GoogleSearch[] = [
     prefix: 'site:indeed.com ("San Francisco" OR "SF Bay Area" OR Remote)',
     suffix: '-"new grad" -"intern"',
   },
+  {
+    label: "Anthropic/SF",
+    source: "Anthropic",
+    prefix: "site:anthropic.com/jobs",
+    suffix: '-"new grad" -"intern"',
+  },
 ];
 
 // ---------------------------------------------------------------------------
