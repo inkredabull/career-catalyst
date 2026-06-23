@@ -233,13 +233,23 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
   const toNotify = Object.fromEntries(
     Object.entries(fresh).filter(([, j]) => j.judgment !== "🔴"),
   );
+  const passed = Object.fromEntries(
+    Object.entries(fresh).filter(([, j]) => j.judgment === "🔴"),
+  );
   log(
     "INFO",
-    "Sending email (%s jobs to highlight, %s total fresh)...",
+    "Sending email (%s jobs to highlight, %s pass, %s total fresh)...",
     Object.keys(toNotify).length,
+    Object.keys(passed).length,
     Object.keys(fresh).length,
   );
-  await notify(toNotify, webAppUrl, Date.now() - startedAt, flushLogs());
+  await notify(
+    toNotify,
+    webAppUrl,
+    Date.now() - startedAt,
+    flushLogs(),
+    passed,
+  );
   log("INFO", "Email sent, saving seen...");
   await saveSeen(markAsSeen(fresh, seen));
   log("INFO", "Done.");

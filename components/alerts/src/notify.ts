@@ -79,6 +79,7 @@ export async function notify(
   webAppUrl: string,
   durationMs?: number,
   logs?: string[],
+  passJobs?: SearchResults,
 ): Promise<void> {
   const email = requireEnv(ENV.MY_EMAIL);
   const resend = new Resend(requireEnv(ENV.RESEND_API_KEY));
@@ -116,6 +117,20 @@ export async function notify(
       ? `<div style="font-size:12px;color:#9ca3af;margin-top:16px">Completed in ${(durationMs / 1000).toFixed(1)}s</div>`
       : "";
 
+  const passEntries = Object.values(passJobs ?? {});
+  const passHtml =
+    passEntries.length > 0
+      ? `<details style="margin-top:20px"><summary style="font-size:13px;color:#6b7280;cursor:pointer">🔴 Pass (${passEntries.length})</summary><ul style="margin:8px 0 0;padding-left:16px;font-size:12px;color:#6b7280">` +
+        passEntries
+          .map((r) => {
+            const root = webAppUrl.replace(/\/$/, "");
+            const scoreUrl = `${root}/api/score?id=${encodeURIComponent(r.id)}`;
+            return `<li style="margin-bottom:4px">${r.company} — ${r.title} <a href="${scoreUrl}" style="color:#9ca3af">Why?</a></li>`;
+          })
+          .join("") +
+        "</ul></details>"
+      : "";
+
   const logsHtml =
     logs && logs.length > 0
       ? `<details style="margin-top:20px"><summary style="font-size:12px;color:#9ca3af;cursor:pointer">Run log (${logs.length} lines)</summary><pre style="font-size:11px;color:#6b7280;white-space:pre-wrap;margin-top:8px">${logs.join("\n")}</pre></details>`
@@ -126,6 +141,6 @@ export async function notify(
     to: email,
     subject: `Jobs for ${new Date().toLocaleString("en-US", { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}`,
     text: textSections.join("\n\n") + durationFooter,
-    html: htmlSections.join("") + durationHtml + logsHtml,
+    html: htmlSections.join("") + durationHtml + passHtml + logsHtml,
   });
 }
