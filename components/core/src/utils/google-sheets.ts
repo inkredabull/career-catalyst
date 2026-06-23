@@ -33,51 +33,72 @@ export interface JobRow {
   companyStage?: string;
 }
 
-const COLUMN_MAP: Record<keyof JobRow, string> = {
-  id:                 'A',
-  role:               'B',
-  company:            'C',
-  status:             'D',
-  companyStage:       'E',
-  notes:              'F',
-  applied:            'G',
-  updated:            'H',
-  rejectionRationale: 'I',
-  origin:             'J',
-  score:              'K',
-  threshold:          'L',
-  analysis:           'M',
-  jobUrl:             'N',
-  resumeUrl:          'O',
-  critique:           'P',
-  whoGotHired:        'Q',
-  jobTitleShorthand:  'R',
-  description:        'S',
-  location:           'T',
-  salaryMin:          'U',
-  salaryMax:          'V',
-  salaryCurrency:     'W',
-  linkedInCompany:    'X'
+// Maps each JobRow field to the canonical header label used in the Google Sheet (row 1).
+// Matching is case-insensitive, so "Score (%)", "score (%)", "SCORE (%)" all resolve correctly.
+// Extra sheet columns (e.g. "Advanced?") are preserved as empty strings.
+const FIELD_HEADERS: Record<keyof JobRow, string> = {
+  id:                 'ID',
+  role:               'Role',
+  company:            'Company',
+  status:             'Status',
+  companyStage:       'Stage',
+  notes:              'Notes',
+  jobUrl:             'Job URL',
+  applied:            'Applied',
+  updated:            'Updated',
+  rejectionRationale: 'Rejection Rationale',
+  origin:             'Origin',
+  score:              'Score (%)',
+  threshold:          'Threshold?',
+  analysis:           'Analysis',
+  resumeUrl:          'Resume URL',
+  critique:           'Critique',
+  whoGotHired:        'Who Got Hired',
+  jobTitleShorthand:  'Title Short',
+  description:        'Description',
+  location:           'Location',
+  salaryMin:          'Min Salary',
+  salaryMax:          'Max Salary',
+  salaryCurrency:     'Denomination',
+  linkedInCompany:    'LI Slug',
 };
 
-function rowToValues(row: JobRow): string[] {
-  return (Object.keys(COLUMN_MAP) as Array<keyof JobRow>).map(
-    field => row[field] || ''
-  );
+// Reverse lookup: lowercased header label → JobRow field (built once at module load)
+const HEADER_TO_FIELD: Map<string, keyof JobRow> = new Map(
+  (Object.entries(FIELD_HEADERS) as Array<[keyof JobRow, string]>).map(
+    ([field, header]) => [header.toLowerCase(), field]
+  )
+);
+
+function buildRow(row: Partial<JobRow>, headers: string[]): string[] {
+  return headers.map(h => {
+    const field = HEADER_TO_FIELD.get(h.toLowerCase());
+    return field ? (row[field] ?? '') : '';
+  });
 }
 
-function valuesToRow(values: string[]): JobRow {
+function parseRow(values: string[], headers: string[]): JobRow {
   const row: Partial<JobRow> = {};
-  for (const [field, col] of Object.entries(COLUMN_MAP) as Array<[keyof JobRow, string]>) {
-    const idx = col.charCodeAt(0) - 65;
-    (row as Record<string, string>)[field] = values[idx] || '';
-  }
+  headers.forEach((h, i) => {
+    const field = HEADER_TO_FIELD.get(h.toLowerCase());
+    if (field) (row as Record<string, string>)[field] = values[i] ?? '';
+  });
   return row as JobRow;
+}
+
+function colLetter(n: number): string {
+  let s = '';
+  while (n > 0) {
+    s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
 }
 
 export class GoogleSheetsClient {
   private sheets: any;
   private oauth2Client: OAuth2Client;
+  private headerCache = new Map<string, string[]>();
 
   constructor() {
     this.oauth2Client = new google.auth.OAuth2(
@@ -96,6 +117,18 @@ export class GoogleSheetsClient {
     this.sheets = google.sheets({ version: 'v4', auth: this.oauth2Client });
   }
 
+  private async readHeaders(spreadsheetId: string, sheetName: string): Promise<string[]> {
+    const cacheKey = `${spreadsheetId}::${sheetName}`;
+    if (this.headerCache.has(cacheKey)) return this.headerCache.get(cacheKey)!;
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!1:1`,
+    });
+    const headers: string[] = (response.data.values?.[0] ?? []).map(String);
+    this.headerCache.set(cacheKey, headers);
+    return headers;
+  }
+
   /**
    * Insert a row at the top of the sheet (below headers in row 1)
    * This inserts at row 2, pushing all existing data down
@@ -110,7 +143,8 @@ export class GoogleSheetsClient {
         throw new Error('GOOGLE_REFRESH_TOKEN not found. Run: npm run setup-gmail');
       }
 
-      const values = rowToValues(row);
+      const headers = await this.readHeaders(spreadsheetId, sheetName);
+      const values = buildRow(row, headers);
 
       // First, insert a new row at position 2 (below headers)
       await this.sheets.spreadsheets.batchUpdate({
@@ -131,8 +165,8 @@ export class GoogleSheetsClient {
         }
       });
 
-      // Then populate the new row with data
-      const range = `${sheetName}!A2:Z2`; // A2 through Z2 (26 columns)
+      // Then populate the new row with data, spanning all header columns
+      const range = `${sheetName}!A2:${colLetter(headers.length)}2`;
 
       await this.sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -167,9 +201,10 @@ export class GoogleSheetsClient {
         throw new Error('GOOGLE_REFRESH_TOKEN not found. Run: npm run setup-gmail');
       }
 
-      const values = rowToValues(row);
+      const headers = await this.readHeaders(spreadsheetId, sheetName);
+      const values = buildRow(row, headers);
 
-      const range = `${sheetName}!A:Z`;
+      const range = `${sheetName}!A:${colLetter(headers.length)}`;
 
       await this.sheets.spreadsheets.values.append({
         spreadsheetId,
@@ -218,7 +253,8 @@ export class GoogleSheetsClient {
     sheetName: string
   ): Promise<JobRow[]> {
     try {
-      const range = `${sheetName}!A2:Z`; // Skip header row
+      const headers = await this.readHeaders(spreadsheetId, sheetName);
+      const range = `${sheetName}!A2:${colLetter(headers.length)}`; // Skip header row
 
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId,
@@ -227,7 +263,7 @@ export class GoogleSheetsClient {
 
       const rows = response.data.values || [];
 
-      return rows.map((row: string[]) => valuesToRow(row));
+      return rows.map((row: string[]) => parseRow(row, headers));
 
     } catch (error) {
       console.error('❌ Error reading rows:', error);
@@ -256,11 +292,12 @@ export class GoogleSheetsClient {
       // Merge updates with existing row
       const updatedRow = { ...rows[rowIndex], ...updates };
 
-      const values = rowToValues(updatedRow);
+      const headers = await this.readHeaders(spreadsheetId, sheetName);
+      const values = buildRow(updatedRow, headers);
 
       // Row 2 is index 0 in our data, so actual row is rowIndex + 2
       const actualRow = rowIndex + 2;
-      const range = `${sheetName}!A${actualRow}:Z${actualRow}`;
+      const range = `${sheetName}!A${actualRow}:${colLetter(headers.length)}${actualRow}`;
 
       await this.sheets.spreadsheets.values.update({
         spreadsheetId,
