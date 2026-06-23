@@ -54,7 +54,13 @@ export function formatEntry(
 function geoLabel(search: string): string {
   const s = search.toLowerCase();
   if (s.includes("top applicant")) return "Top Applicant";
-  if (s.includes(", us") || s.includes(", united states")) return "Remote US";
+  if (
+    s.includes(", us") ||
+    s.includes(", united states") ||
+    s.includes("levels") ||
+    s.includes("builtin")
+  )
+    return "Remote US";
   if (
     s.includes("san francisco") ||
     s.includes("sf bay") ||
