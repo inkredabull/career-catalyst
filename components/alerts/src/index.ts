@@ -170,23 +170,21 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
       Object.values(fresh).map(async (job) => {
         const { verdict, reasoning } = await scoreJob(job);
         job.judgment = verdict;
-        if (verdict !== "🔴") {
-          try {
-            await saveScore(job.id, {
-              job,
-              verdict,
-              reasoning,
-              scoredAt: new Date().toISOString(),
-            });
-          } catch (err) {
-            log(
-              "WARN",
-              "Score save failed for %s (%s): %s",
-              job.id,
-              job.title,
-              (err as Error).message,
-            );
-          }
+        try {
+          await saveScore(job.id, {
+            job,
+            verdict,
+            reasoning,
+            scoredAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          log(
+            "WARN",
+            "Score save failed for %s (%s): %s",
+            job.id,
+            job.title,
+            (err as Error).message,
+          );
         }
         log("DEBUG", "Scored [%s]: %s — %s", verdict, job.company, job.title);
       }),
