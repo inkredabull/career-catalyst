@@ -57,8 +57,8 @@ function geoLabel(search: string): string {
   if (
     s.includes(", us") ||
     s.includes(", united states") ||
-    s.includes("levels") ||
-    s.includes("builtin")
+    s.includes("greenhouse") ||
+    s.includes("lever")
   )
     return "Remote US";
   if (
@@ -67,7 +67,8 @@ function geoLabel(search: string): string {
     s.includes("ashby") ||
     s.includes("wellfound") ||
     s.includes("indeed") ||
-    s.includes("anthropic")
+    s.includes("anthropic") ||
+    s.includes("builtinsf")
   )
     return "San Francisco / Bay Area";
   return "Other";

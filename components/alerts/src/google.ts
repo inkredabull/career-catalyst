@@ -28,7 +28,8 @@ const NOISE_SEGMENTS = new Set([
   "linkedin",
   "indeed",
   "glassdoor",
-  "levels",
+  "greenhouse",
+  "lever",
   "builtin",
 ]);
 
@@ -127,15 +128,21 @@ const GOOGLE_SEARCHES: GoogleSearch[] = [
     suffix: '-"new grad" -"intern"',
   },
   {
-    label: "Levels/US",
-    source: "Levels.fyi",
-    prefix: "site:levels.fyi/jobs",
+    label: "Greenhouse/US",
+    source: "Greenhouse",
+    prefix: "site:boards.greenhouse.io",
     suffix: '-"new grad" -"intern"',
   },
   {
-    label: "BuiltIn/US",
-    source: "BuiltIn",
-    prefix: "site:builtin.com/jobs",
+    label: "Lever/US",
+    source: "Lever",
+    prefix: "site:jobs.lever.co",
+    suffix: '-"new grad" -"intern"',
+  },
+  {
+    label: "BuiltInSF/SF",
+    source: "BuiltInSF",
+    prefix: "site:builtinsf.com/jobs",
     suffix: '-"new grad" -"intern"',
   },
 ];
@@ -160,6 +167,9 @@ export async function fetchGoogleResults(
 ): Promise<SearchResults> {
   const apiKey = requireEnv(ENV.SERPER_API_KEY);
   const afterDate = timeFrameToAfterDate(timeFrame);
+  const prevDay = new Date(afterDate + "T12:00:00Z");
+  prevDay.setUTCDate(prevDay.getUTCDate() - 1);
+  const afterDateMinus1 = prevDay.toISOString().split("T")[0];
 
   const enabledTitles = Object.entries(SEARCH_TITLES)
     .filter(([, enabled]) => enabled)
@@ -169,9 +179,13 @@ export async function fetchGoogleResults(
   const results: SearchResults = {};
 
   for (const { label, source, prefix, suffix } of GOOGLE_SEARCHES) {
-    const parts = [prefix, titleClause, suffix, `after:${afterDate}`].filter(
-      Boolean,
-    );
+    const parts = [
+      prefix,
+      titleClause,
+      suffix,
+      `after:${afterDate}`,
+      `after:${afterDateMinus1}`,
+    ].filter(Boolean);
     const query = parts.join(" ");
 
     log("DEBUG", "Google search: %s (after %s)", label, afterDate);
