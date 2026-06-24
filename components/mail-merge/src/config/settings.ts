@@ -11,6 +11,7 @@ export const SCRIPT_PROPS = {
   PHOTO_URL: 'PHOTO_URL',
   RESUME_URL: 'RESUME_URL',
   WARMUP_EXCLUDE_LABEL_PREFIXES: 'WARMUP_EXCLUDE_LABEL_PREFIXES',
+  WARMUP_EXCLUDE_EMAILS: 'WARMUP_EXCLUDE_EMAILS',
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */

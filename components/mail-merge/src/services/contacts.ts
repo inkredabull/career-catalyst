@@ -163,9 +163,11 @@ export interface WarmupContact {
 }
 
 export const pickRandomContacts = (count = 5): WarmupContact[] => {
-  const rawPrefixes = PropertiesService.getScriptProperties()
-    .getProperty(SCRIPT_PROPS.WARMUP_EXCLUDE_LABEL_PREFIXES) ?? '';
+  const props = PropertiesService.getScriptProperties();
+  const rawPrefixes = props.getProperty(SCRIPT_PROPS.WARMUP_EXCLUDE_LABEL_PREFIXES) ?? '';
   const excludedPrefixes = rawPrefixes.split(',').map(p => p.trim()).filter(Boolean);
+  const rawEmails = props.getProperty(SCRIPT_PROPS.WARMUP_EXCLUDE_EMAILS) ?? '';
+  const excludedEmails = new Set(rawEmails.split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
 
   const HARDCODED_EXCLUDED_LABELS = ['Archetype/Unhelpful'];
 
@@ -184,6 +186,7 @@ export const pickRandomContacts = (count = 5): WarmupContact[] => {
 
   const all = getAllContacts().filter(contact => {
     if (!contact.names?.[0]?.displayName) return true;
+    if (contact.emailAddresses?.some(e => excludedEmails.has((e.value ?? '').toLowerCase()))) return false;
     const memberships = contact.memberships ?? [];
     const userMemberships = memberships.filter(
       m => m.contactGroupMembership?.contactGroupId != null &&
