@@ -7,3 +7,5 @@ coverage/
 
 # LinkedIn session credentials — treated as secrets, never commit
 src/config/credentials.ts
+.vercel
+.env*

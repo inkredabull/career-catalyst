@@ -183,7 +183,6 @@ export async function fetchGoogleResults(
       prefix,
       titleClause,
       suffix,
-      `after:${afterDate}`,
       `after:${afterDateMinus1}`,
     ].filter(Boolean);
     const query = parts.join(" ");
