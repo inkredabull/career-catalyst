@@ -104,22 +104,24 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
   const draftLines: string[] = [];
 
   for (const { displayName, contactUrl, email } of contacts) {
-    const recipientEmail = email || myEmail;
+    if (!email) {
+      Logger.log('Skipping warmup draft for %s — no email address', displayName);
+      draftLines.push(`${displayName} (no email — draft skipped)\n${contactUrl}`);
+      continue;
+    }
     const parts = displayName.trim().split(/\s+/);
     const row: Record<string, string> = {
-      [COLS.RECIPIENT]: recipientEmail,
+      [COLS.RECIPIENT]: email,
       [COLS.FULL_NAME]: displayName,
       [COLS.FIRST_NAME]: parts[0] ?? '',
       ContactURL: contactUrl,
     };
     const msgObj = fillInTemplateFromObject(emailTemplate.message, row, WARMUP_TEMPLATE);
-    GmailApp.createDraft(recipientEmail, msgObj.subject, msgObj.text, { htmlBody: msgObj.html, attachments });
-    Logger.log('Created warmup draft for %s (%s)', displayName, recipientEmail);
+    GmailApp.createDraft(email, msgObj.subject, msgObj.text, { htmlBody: msgObj.html, attachments });
+    Logger.log('Created warmup draft for %s (%s)', displayName, email);
 
-    const draftSearchUrl = recipientEmail
-      ? `https://mail.google.com/mail/u/0/#search/in:drafts+to:${encodeURIComponent(recipientEmail)}`
-      : 'https://mail.google.com/mail/u/0/#drafts';
-    draftLines.push(`${displayName} (${recipientEmail || 'no email'})\n${draftSearchUrl}`);
+    const draftSearchUrl = `https://mail.google.com/mail/u/0/#search/in:drafts+to:${encodeURIComponent(email)}`;
+    draftLines.push(`${displayName} (${email})\n${draftSearchUrl}`);
   }
 
   const body = draftLines.join('\n\n');
