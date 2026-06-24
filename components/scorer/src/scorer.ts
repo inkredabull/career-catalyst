@@ -181,16 +181,59 @@ ${CV}
 ${RUBRIC}
 `.trim();
 
-// ─── URL FETCHER (via Jina Reader — no API key needed) ───────────────────────
-async function fetchUrl(url: string): Promise<string> {
+// ─── URL FETCHER ─────────────────────────────────────────────────────────────
+// Strategy: try Jina Reader first (better text extraction), fall back to direct
+// fetch + naive HTML stripping. Set JINA_API_KEY env var to bypass IP blocks.
+async function fetchViaJina(url: string): Promise<string> {
   const jinaUrl = `https://r.jina.ai/${url}`;
+  const headers: Record<string, string> = { Accept: "text/plain" };
+  if (process.env.JINA_API_KEY) {
+    headers["Authorization"] = `Bearer ${process.env.JINA_API_KEY}`;
+  }
   const res = await fetch(jinaUrl, {
-    headers: { Accept: "text/plain" },
+    headers,
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`Jina fetch failed: ${res.status} ${res.statusText}`);
   const text = await res.text();
+  if (text.includes("AuthenticationRequiredError") || text.includes("blocked")) {
+    throw new Error(`Jina blocked: ${text.slice(0, 200)}`);
+  }
   return text.slice(0, 12_000);
+}
+
+async function fetchDirect(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml",
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) throw new Error(`Direct fetch failed: ${res.status} ${res.statusText}`);
+  const html = await res.text();
+  // Strip tags and collapse whitespace for a rough plain-text extraction
+  const text = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return text.slice(0, 12_000);
+}
+
+async function fetchUrl(url: string): Promise<string> {
+  try {
+    return await fetchViaJina(url);
+  } catch (jinaErr) {
+    process.stderr.write(`⚠️  Jina unavailable (${(jinaErr as Error).message}), trying direct fetch...\n`);
+    return await fetchDirect(url);
+  }
 }
 
 // ─── AGENTIC LOOP ─────────────────────────────────────────────────────────────
