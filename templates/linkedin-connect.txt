@@ -1,0 +1,1 @@
+"Hi {{firstName}}, saw you're speaking at {{event}}. I can't make it after all; did you? Best takeaway? Seems you're a go-to for {{summary}}. Do you SFIRL? Cerebral Valley? How else are you meeting great minds in the city?"

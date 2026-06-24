@@ -1695,8 +1695,14 @@ app.get('/connect', async (req, res) => {
   try {
     // Build the connection message
     const template =
-      process.env.LINKEDIN_MESSAGE_TEMPLATE ??
-      "Hi {{firstName}}, I came across your work in {{domain}}{{round}} and would love to connect!";
+      (() => {
+        if (process.env.LINKEDIN_MESSAGE_TEMPLATE) return process.env.LINKEDIN_MESSAGE_TEMPLATE;
+        try {
+          return fs.readFileSync(path.resolve(__dirname, '..', '..', 'templates', 'linkedin-connect.txt'), 'utf-8').trim();
+        } catch {
+          return 'Hi {{firstName}}, I came across your work in {{domain}}{{round}} and would love to connect!';
+        }
+      })();
     const roundSuffix = round ? ` (${round})` : '';
     const message = template
       .replace(/\{\{firstName\}\}/g, firstName)

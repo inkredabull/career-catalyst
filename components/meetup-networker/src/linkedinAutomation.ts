@@ -1,6 +1,19 @@
 import { execSync } from 'child_process';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { resolve, dirname } from 'path';
 import { LinkedInProfile } from './profileLookup.js';
+
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+function loadConnectTemplate(): string {
+  if (process.env.LINKEDIN_MESSAGE_TEMPLATE) return process.env.LINKEDIN_MESSAGE_TEMPLATE;
+  try {
+    return readFileSync(resolve(projectRoot, 'templates', 'linkedin-connect.txt'), 'utf-8').trim();
+  } catch {
+    return 'Hi {{firstName}}, looking forward to connecting!';
+  }
+}
 
 function generateConnectScript(message: string): string {
   return `(function() {
@@ -134,8 +147,7 @@ export async function openMessageModal(
 ): Promise<void> {
   const firstName = profile.firstName || profile.name.split(' ')[0];
   const summary = profile.condensedSummary || profile.domain || 'your industry';
-  const messageTemplate = process.env.LINKEDIN_MESSAGE_TEMPLATE ||
-    'Hi {{firstName}}, looking forward to connecting!';
+  const messageTemplate = loadConnectTemplate();
   const message = messageTemplate
     .replace(/\{\{firstName\}\}/g, firstName)
     .replace(/\{\{summary\}\}/g, summary)
