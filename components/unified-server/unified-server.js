@@ -1565,198 +1565,51 @@ app.get('/check-blurb/:jobId/:person', (req, res) => {
   }
 });
 
-function generateConnectScript(message) {
-  return `(async function() {
-    const LOG = msg => console.log('[NETWORKER] ' + msg);
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const message = ${JSON.stringify(message)};
-    LOG('Script injected. Message: ' + message.slice(0, 40) + '…');
-
-    const isPending = Array.from(document.querySelectorAll('button'))
-      .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
-    if (isPending) { LOG('Skipping — already pending'); return; }
-
-    const deepQ = sel => {
-      let el = document.querySelector(sel);
-      if (el) return el;
-      for (const id of ['interop-shadowdom', 'interop-outlet']) {
-        const host = document.querySelector('[data-testid="' + id + '"]') || document.getElementById(id);
-        if (host?.shadowRoot) { el = host.shadowRoot.querySelector(sel); if (el) return el; }
-      }
-      for (const host of document.querySelectorAll('*')) {
-        if (host.shadowRoot) { el = host.shadowRoot.querySelector(sel); if (el) return el; }
-      }
-      return null;
-    };
-    const findAddNote = () => {
-      let btn = deepQ('button[aria-label="Add a note"]');
-      if (btn) return btn;
-      const roots = [document, ...Array.from(document.querySelectorAll('*')).filter(h => h.shadowRoot).map(h => h.shadowRoot)];
-      for (const root of roots) {
-        btn = Array.from(root.querySelectorAll('button')).find(b =>
-          (b.innerText || b.textContent || '').trim().toLowerCase().includes('add a note')
-        );
-        if (btn) return btn;
-      }
-      return null;
-    };
-
-    const getTopCard = () => {
-      const h1 = document.querySelector('h1');
-      if (h1) {
-        let node = h1.parentElement;
-        while (node && node !== document.body) {
-          const ck = node.getAttribute('componentkey') || '';
-          if (ck.endsWith('Topcard') || ck.includes('Topcard')) return node;
-          node = node.parentElement;
-        }
-      }
-      return document.querySelector('[componentkey*="Topcard"]') || document;
-    };
-    const topCard = getTopCard();
-
-    const directConnect = Array.from(topCard.querySelectorAll('button, a')).find(b => {
-      const label = (b.getAttribute('aria-label') || '').toLowerCase();
-      const text = (b.innerText || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
-      return label.startsWith('invite ') || text === 'connect';
-    });
-
-    if (directConnect) {
-      directConnect.click();
-      await sleep(3000);
-    } else {
-      let moreBtn = null;
-      const overflowSvgs = topCard.querySelectorAll('svg[id="overflow-web-ios-small"]');
-      for (const svg of overflowSvgs) {
-        const btn = svg.closest('button');
-        if (btn) { moreBtn = btn; break; }
-      }
-      if (!moreBtn) {
-        moreBtn = topCard.querySelector('button[aria-label*="More actions"]') ||
-                  Array.from(topCard.querySelectorAll('button')).find(b => {
-                    const label = (b.getAttribute('aria-label') || '').trim().toLowerCase();
-                    const text = (b.innerText || '').trim();
-                    return label === 'more' || text === '...' || text === '…';
-                  }) || null;
-      }
-      if (!moreBtn) { LOG('ERROR: Could not find Connect or More button'); return; }
-      moreBtn.click();
-      await sleep(2000);
-
-      const conn = Array.from(document.querySelectorAll('a[role="menuitem"]')).find(el => {
-        const text = (el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase();
-        const label = (el.getAttribute('aria-label') || '').toLowerCase();
-        const href = (el.getAttribute('href') || '').toLowerCase();
-        return text === 'connect' || label.includes('invite') || href.includes('invite');
-      });
-      if (!conn) { LOG('ERROR: Connect not found in dropdown'); return; }
-      conn.click();
-      await sleep(1000);
-    }
-
-    LOG('Polling for "Add a note" button (up to 10s)');
-    let addNote = null;
-    const addNoteDeadline = Date.now() + 10000;
-    while (Date.now() < addNoteDeadline) {
-      addNote = findAddNote();
-      if (addNote) break;
-      await sleep(200);
-    }
-    if (addNote) {
-      addNote.click();
-      const taDeadline = Date.now() + 5000;
-      while (Date.now() < taDeadline) {
-        if (deepQ('textarea')) break;
-        await sleep(200);
-      }
-    }
-
-    const ta = deepQ('textarea');
-    if (ta) {
-      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
-      nativeSetter.call(ta, message);
-      ta.dispatchEvent(new Event('input', { bubbles: true }));
-      ta.dispatchEvent(new Event('change', { bubbles: true }));
-      LOG('Textarea filled');
-    } else {
-      LOG('ERROR: no textarea found — modal may not have opened');
-    }
-  })();`;
-}
-
-// Open a LinkedIn profile in Chrome and inject a personalised connect modal
-app.get('/connect', async (req, res) => {
-  const { firstName, round, domain, linkedInUrl } = req.query;
+// Open a LinkedIn profile in Chrome, inject a connect modal, optionally follow the company
+// and append a company row to the tracking sheet.
+// Delegates all Chrome automation to @inkredabull/career-catalyst-linkedin-automation.
+app.get('/connect', (req, res) => {
+  const { firstName, round, domain, linkedInUrl, companyLinkedInUrl, companyUrl } = req.query;
 
   if (!firstName || !linkedInUrl) {
     return res.status(400).json({ success: false, error: 'firstName and linkedInUrl are required' });
   }
 
-  try {
-    // Build the connection message
-    const template =
-      (() => {
-        if (process.env.LINKEDIN_MESSAGE_TEMPLATE) return process.env.LINKEDIN_MESSAGE_TEMPLATE;
-        try {
-          return fs.readFileSync(path.resolve(__dirname, '..', '..', 'templates', 'linkedin-connect.txt'), 'utf-8').trim();
-        } catch {
-          return 'Hi {{firstName}}, I came across your work in {{domain}}{{round}} and would love to connect!';
-        }
-      })();
-    const roundSuffix = round ? ` (${round})` : '';
-    const message = template
-      .replace(/\{\{firstName\}\}/g, firstName)
-      .replace(/\{\{domain\}\}/g, domain ?? 'your space')
-      .replace(/\{\{round\}\}/g, roundSuffix)
-      .replace(/\{\{summary\}\}/g, domain ?? 'your space')
-      .replace(/\{\{event\}\}/g, '');
+  const args = [
+    'run', 'dev',
+    '--workspace=@inkredabull/career-catalyst-linkedin-automation',
+    '--',
+    'connect',
+    '--firstName', String(firstName),
+    '--linkedInUrl', String(linkedInUrl),
+  ];
+  if (domain)             args.push('--domain',             String(domain));
+  if (round)              args.push('--round',              String(round));
+  if (companyLinkedInUrl) args.push('--companyLinkedInUrl', String(companyLinkedInUrl));
+  if (companyUrl)         args.push('--companyUrl',         String(companyUrl));
 
-    // Count existing tabs so we can target the new one
-    let startTabCount = 1;
-    try {
-      const result = execSync(
-        `osascript -e 'tell application "Google Chrome" to count tabs of front window'`,
-        { encoding: 'utf-8' }
-      ).trim();
-      startTabCount = parseInt(result, 10);
-    } catch {
-      // Chrome not open or no window — new tab will be index 1
-      startTabCount = 0;
+  const child = spawn('npm', args, {
+    cwd: path.resolve(__dirname, '..', '..'),
+    env: { ...process.env },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let preview = '';
+  child.stdout.on('data', d => {
+    const line = d.toString();
+    process.stdout.write(`[connect] ${line}`);
+    const m = line.match(/\[connect\] message: (.+)/);
+    if (m) preview = m[1].trim();
+  });
+  child.stderr.on('data', d => process.stderr.write(`[connect:err] ${d}`));
+
+  child.on('close', code => {
+    if (code !== 0) {
+      res.status(500).json({ success: false, error: `linkedin-automation exited with code ${code}` });
+    } else {
+      res.json({ success: true, message: `Connect modal injected for ${firstName}`, preview });
     }
-
-    // Open the LinkedIn profile in Chrome
-    execSync(`open -a "Google Chrome" ${JSON.stringify(String(linkedInUrl))}`, { stdio: 'ignore' });
-
-    // Wait for the page to load
-    await new Promise(r => setTimeout(r, 4000));
-
-    // Inject the connect script into the new tab
-    const tabIndex = startTabCount + 1;
-    const connectScript = generateConnectScript(message);
-    const tmpFile = `/tmp/li_connect_${Date.now()}.js`;
-    require('fs').writeFileSync(tmpFile, connectScript, 'utf-8');
-
-    const appleScript = `
-set jsCode to read POSIX file "${tmpFile}"
-tell application "Google Chrome"
-  tell tab ${tabIndex} of front window
-    execute javascript jsCode
-  end tell
-end tell`;
-
-    try {
-      execSync('osascript', { input: appleScript, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
-    } finally {
-      try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
-    }
-
-    console.log(`[connect] Injected connect modal for ${firstName} → ${linkedInUrl}`);
-    res.json({ success: true, message: `Connect modal injected for ${firstName}`, preview: message });
-
-  } catch (error) {
-    console.error('[connect] Error:', error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
+  });
 });
 
 // Append mutual connections rows to Google Sheet
