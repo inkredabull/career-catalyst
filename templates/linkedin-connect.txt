@@ -1,1 +1,1 @@
-"Hi {{firstName}}, saw you're speaking at {{event}}. I can't make it after all; did you? Best takeaway? Seems you're a go-to for {{summary}}. Do you SFIRL? Cerebral Valley? How else are you meeting great minds in the city?"
+Congrats on the {{round}}! I help founders create order out of chaos, address team throughput, improve cybersecurity, roll out Gen AI safely, and foster great talent. I'm local; quick chat if you need any help? https://calendly.com/bluxomelabs/quick-chat 
