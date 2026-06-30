@@ -25,7 +25,8 @@
     "sheets:add": "ts-node scripts/add-job-to-sheet.ts",
     "apply": "ts-node components/apply/src/cli.ts",
     "assess": "ts-node components/scorer/src/cli.ts",
-    "prep": "ts-node components/prep/src/cli.ts"
+    "prep": "ts-node components/prep/src/cli.ts",
+    "generate-cv": "npm run generate-cv --workspace=@inkredabull/career-catalyst-core"
   },
   "keywords": [
     "monorepo",
