@@ -47,18 +47,58 @@ Judgment labels (pick exactly one):
 `.trim();
 
 // ---------------------------------------------------------------------------
-// JD fetch via Jina Reader
+// JD fetch — Jina Reader with ScrapingBee fallback
 // ---------------------------------------------------------------------------
+
+async function fetchViaJina(url: string): Promise<string> {
+  const res = await fetch(`https://r.jina.ai/${url}`, {
+    headers: { Accept: "text/plain" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  log("DEBUG", "Jina HTTP %s for %s", res.status, url.slice(0, 80));
+  if (!res.ok) return "";
+  const text = await res.text();
+  // Treat DDoS/block responses as empty so we fall through to ScrapingBee
+  if (
+    text.toLowerCase().includes("ddos") ||
+    text.toLowerCase().includes("blocked") ||
+    text.length < 200
+  ) {
+    log("DEBUG", "Jina returned suspected block page, will try fallback");
+    return "";
+  }
+  return text.slice(0, 12_000);
+}
+
+async function fetchViaScrapingBee(url: string): Promise<string> {
+  const apiKey = process.env[ENV.SCRAPINGBEE_API_KEY];
+  if (!apiKey) return "";
+  try {
+    const params = new URLSearchParams({
+      api_key: apiKey,
+      url,
+      render_js: "false",
+      extract_rules: JSON.stringify({ body: "body" }),
+    });
+    const res = await fetch(`https://app.scrapingbee.com/api/v1?${params}`, {
+      signal: AbortSignal.timeout(20_000),
+    });
+    log("DEBUG", "ScrapingBee HTTP %s for %s", res.status, url.slice(0, 80));
+    if (!res.ok) return "";
+    const text = await res.text();
+    return text.slice(0, 12_000);
+  } catch (err) {
+    log("DEBUG", "ScrapingBee failed: %s", (err as Error).message);
+    return "";
+  }
+}
 
 async function fetchJD(url: string): Promise<string> {
   try {
-    const res = await fetch(`https://r.jina.ai/${url}`, {
-      headers: { Accept: "text/plain" },
-      signal: AbortSignal.timeout(15_000),
-    });
-    log("DEBUG", "Jina HTTP %s for %s", res.status, url.slice(0, 80));
-    const text = await res.text();
-    return text.slice(0, 12_000);
+    const jina = await fetchViaJina(url);
+    if (jina) return jina;
+    log("DEBUG", "Falling back to ScrapingBee for %s", url.slice(0, 80));
+    return await fetchViaScrapingBee(url);
   } catch {
     return "";
   }
