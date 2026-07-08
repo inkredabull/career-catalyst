@@ -1,78 +1,91 @@
-# alerts
+# career-catalyst-alerts
 
-Google Apps Script component that searches LinkedIn for new job postings by title and geography, then emails a digest of results.
+Vercel-hosted job alert system that searches LinkedIn and Google (via Serper) for new job postings, scores each one with Claude AI, and emails a digest using Resend.
 
-Runs on a GAS time-based trigger (e.g. every 8 hours). No browser required once deployed.
-
----
-
-## How it works
-
-1. For each title in `TITLES` × each geo filter (SF, US), calls the LinkedIn Voyager job-search API
-2. Filters out excluded companies and software-engineer roles
-3. De-duplicates results by job ID across all searches
-4. Emails the digest to `MY_EMAIL`
+Runs on a Vercel cron schedule (every 4 hours). No manual intervention required once deployed.
 
 ---
 
-## Setup
+## Architecture
 
-### 1. Install dependencies
-
-```bash
-npm install
+```
+Vercel Cron (every 4h)
+        │
+        ▼
+   getOpenReqs()
+        │
+        ├─── LinkedIn Voyager API  ─┐
+        ├─── Google/Serper API     ─┼─► merge & de-dup by job ID
+        └─── LinkedIn Top Applicant─┘
+                   │
+                   ▼
+           filterUnseen()  ◄── GCS: seen.json
+                   │
+                   ▼
+            applyStopList() ◄── GCS: stop-lists.json
+                   │
+                   ▼
+            scoreJob() ──► Jina Reader → ScrapingBee (fallback)
+                           Claude Sonnet (14-dimension rubric)
+                           GCS: score blobs (id → reasoning)
+                   │
+                   ▼
+            notify() ──► Resend email digest
+                         • Grouped by geo (Top Applicant / SF Bay Area / Remote US / Other)
+                         • 🟢/🟡 jobs with "Why?" score links
+                         • Collapsible 🔴 Pass section
+                         • Collapsible run log
+                   │
+                   ▼
+            saveSeen() ──► GCS: seen.json
 ```
 
-### 2. Link to the Google Sheet / Script
+### Search sources
 
-```bash
-npx clasp clone <scriptId> --rootDir dist
-```
+| Label | Source | Scope |
+|---|---|---|
+| LinkedIn SF/US | LinkedIn Voyager API | SF Bay Area + US Remote |
+| Top Applicant | LinkedIn Top Applicant feed | US |
+| Ashby/SF | Serper `site:jobs.ashbyhq.com` | San Francisco |
+| Wellfound/SF | Serper `site:wellfound.com` | San Francisco |
+| Indeed/SF | Serper `site:indeed.com` | SF Bay Area / Remote |
+| Anthropic/SF | Serper `site:anthropic.com/jobs` | San Francisco |
+| Greenhouse/US | Serper `site:boards.greenhouse.io` | US |
+| Lever/US | Serper `site:jobs.lever.co` | US |
+| BuiltInSF/SF | Serper `site:builtinsf.com/jobs` | San Francisco |
+| Web/US | Serper broad web search | US |
 
-`.clasp.json` is gitignored — create it per machine.
+### Scoring
 
-### 3. Set Script Properties
+Each new job is scored by Claude Sonnet against a 14-dimension rubric (skills alignment, compensation, remote-friendliness, culture, etc.). The score and reasoning are saved to GCS so the email's "Why?" links serve them on demand via `/api/score`.
 
-In the GAS editor: **Project Settings → Script Properties**, add:
+JD text is fetched via **Jina Reader** (`r.jina.ai`) with **ScrapingBee** as an automatic fallback when LinkedIn blocks the Jina request.
 
-| Key | Value |
+### Email digest
+
+Jobs are grouped by geography and color-coded by verdict:
+- 🟢 Strong Fit — Pursue Actively
+- 🟡 Conditional Fit — Dig Deeper Before Committing
+- 🔴 Pass — collapsed at bottom with "Why?" links
+
+Each entry includes block buttons (👎 company / 👎 title) that hit `/api/block`, and a Track link for the JD extractor.
+
+---
+
+## Technologies
+
+| Layer | Tool |
 |---|---|
-| `MY_EMAIL` | Your email address for the digest |
-| `LI_COOKIE` | Full LinkedIn session cookie string (from browser DevTools) |
-| `LI_CSRF_TOKEN` | LinkedIn CSRF token, e.g. `ajax:5203108709841703172` |
-
-**To get LinkedIn credentials:**
-1. Open LinkedIn in Chrome, go to Jobs search
-2. DevTools → Network → any `voyagerJobsDashJobCards` request
-3. Copy the full `cookie` header value → `LI_COOKIE`
-4. Copy the `csrf-token` header value → `LI_CSRF_TOKEN`
-
-> LinkedIn sessions expire. Rotate credentials when you see auth errors in GAS execution logs.
-
-### 4. Build and deploy
-
-```bash
-npm run deploy
-```
-
-### 5. Set a time trigger
-
-In the GAS editor: **Triggers → Add Trigger**
-- Function: `getOpenReqs`
-- Event source: Time-driven
-- Type: Hours timer, every 8 hours (or as preferred)
-
----
-
-## Customisation
-
-**Add/remove job titles** — edit `TITLES` in [src/config/constants.ts](src/config/constants.ts)
-
-**Change time window** — change `TIME_FRAME` in `constants.ts` (`ONE_DAY`, `ONE_WEEK`, `EIGHT_HOURS`)
-
-**Exclude companies** — add to `COMPANIES_TO_EXCLUDE` in `constants.ts`
-
-**Change geo** — adjust `SF_FILTER` / `US_FILTER` or add new filter objects and reference them in `index.ts`
+| Runtime | Vercel Functions (Node.js) |
+| Schedule | Vercel Cron |
+| LinkedIn data | LinkedIn Voyager API (session cookie auth) |
+| Google search | Serper API |
+| JD fetching | Jina Reader + ScrapingBee fallback |
+| AI scoring | Anthropic Claude Sonnet (`claude-sonnet-4-6`) |
+| Storage | Google Cloud Storage (seen.json, stop-lists, score blobs) |
+| Email | Resend |
+| Language | TypeScript (strict) |
+| Tests | Jest (104 tests) |
 
 ---
 
@@ -81,29 +94,79 @@ In the GAS editor: **Triggers → Add Trigger**
 ```
 src/
 ├── config/
-│   ├── settings.ts    # Script Property keys, requireProp helper
-│   └── constants.ts   # Geo IDs, filters, titles, excluded companies
-├── clock.ts           # pause() with jitter to avoid rate limits
-├── linkedin.ts        # Voyager API calls, URL builder, result extractor
-└── index.ts           # Orchestration: getResults(), notify(), getOpenReqs()
+│   ├── settings.ts      # ENV key constants, requireEnv helper
+│   ├── constants.ts     # Geo IDs, LinkedIn filters, time frames, thresholds
+│   └── titles.ts        # Job title search list (enabled/disabled map)
+├── utils/
+│   └── logger.ts        # Level-based logger; verbosity via LOG_LEVEL env var
+├── clock.ts             # pause() with jitter to avoid rate limits
+├── filters.ts           # titlePassesPatterns() — regex pattern matching
+├── linkedin.ts          # Voyager API calls, Top Applicant feed, result extractor
+├── google.ts            # Serper API calls, title parser, GOOGLE_SEARCHES list
+├── scoring.ts           # Claude scoring: fetchJD (Jina+ScrapingBee), scoreJob()
+├── seen.ts              # GCS read/write: seen.json, stop-lists, score blobs
+├── notify.ts            # Email builder and Resend send: formatEntry(), notify()
+└── index.ts             # Orchestration: getResults(), getOpenReqs()
+api/
+├── cron.ts              # POST /api/cron — Vercel cron entry point
+├── block.ts             # GET /api/block?type=company|title&value=... — stop-list writer
+└── score.ts             # GET /api/score?id=... — serves stored scoring reasoning
 ```
 
 ---
 
-## PII / secrets policy
+## Environment variables
 
-Nothing sensitive is committed. Credentials live in GAS Script Properties only:
+| Variable | Description |
+|---|---|
+| `MY_EMAIL` | Digest recipient address |
+| `LI_COOKIE` | LinkedIn session cookie (from browser DevTools) |
+| `LI_CSRF_TOKEN` | LinkedIn CSRF token (`ajax:...`) |
+| `SERPER_API_KEY` | Serper API key for Google searches |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude scoring |
+| `SCRAPINGBEE_API_KEY` | ScrapingBee API key (JD fetch fallback) |
+| `RESEND_API_KEY` | Resend API key for email delivery |
+| `GCS_BUCKET` | GCS bucket name for seen/stop-list/score storage |
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | GCS service account JSON (stringified) |
+| `CRON_SECRET` | Bearer token Vercel sends with cron requests |
+| `WEB_APP_URL` | Base URL of this Vercel app (for block/score links in email) |
+| `TRACK_BASE_URL` | Base URL of the JD extractor service |
+| `LOG_LEVEL` | `DEBUG` / `INFO` / `WARN` (default: `INFO`) |
+| `SEARCH_TIME_FRAME` | Override time window: `r28800` / `r86400` / `r604800` |
 
-- `MY_EMAIL` — recipient address
-- `LI_COOKIE` — LinkedIn session (rotates; treat as a secret)
-- `LI_CSRF_TOKEN` — LinkedIn CSRF token
+Store all secrets in Vercel project environment variables (production + preview). For local dev, copy to `.env.local`.
 
-`dist/`, `node_modules/`, and `.clasp.json` are gitignored.
+**To get LinkedIn credentials:**
+1. Open LinkedIn in Chrome, go to Jobs search
+2. DevTools → Network → any `voyagerJobsDashJobCards` request
+3. Copy the full `cookie` header value → `LI_COOKIE`
+4. Copy the `csrf-token` header value → `LI_CSRF_TOKEN`
 
-## Reference
+> LinkedIn sessions expire. Rotate credentials when you see 401/403 errors in Vercel logs.
 
-Set SEARCH_TIME_FRAME in Script Properties to one of:
+---
 
-r28800 — 8 hours
-r86400 — 24 hours
-r604800 — 7 days
+## Local development
+
+```bash
+npm install
+npm run type-check   # tsc --noEmit
+npm test             # jest (104 tests)
+npm run lint         # eslint src api
+```
+
+To run a one-off cron locally, set env vars in `.env.local` and hit the cron endpoint via `vercel dev`.
+
+---
+
+## Customisation
+
+**Add/remove job titles** — edit `SEARCH_TITLES` in [src/config/titles.ts](src/config/titles.ts) (set `true`/`false`)
+
+**Add a search source** — append to `GOOGLE_SEARCHES` in [src/google.ts](src/google.ts); add the site name to `NOISE_SEGMENTS`; add a geo routing clause in `geoLabel()` in [src/notify.ts](src/notify.ts)
+
+**Change time window** — set `SEARCH_TIME_FRAME` env var or change `TIME_FRAME` in `constants.ts`
+
+**Block a company/title** — use the 👎 links in the email, or hit `/api/block?type=company&value=Acme` directly
+
+**Adjust scoring thresholds** — `STRONG_FIT_MAX_APPLICANTS` and `APPLICANT_SATURATION_THRESHOLD` in `constants.ts`
