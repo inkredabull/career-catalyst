@@ -146,12 +146,38 @@ async function getTopApplicantResults(): Promise<SearchResults> {
   return results;
 }
 
+export function deduplicateByCompanyTitle(
+  results: SearchResults,
+): SearchResults {
+  const seen = new Set<string>();
+  const deduped: SearchResults = {};
+  for (const [id, job] of Object.entries(results)) {
+    const key = `${job.company.toLowerCase()}|||${job.title.toLowerCase()}`;
+    if (seen.has(key)) {
+      log(
+        "DEBUG",
+        "Dedup (company+title): [%s] %s — %s",
+        job.search,
+        job.company,
+        job.title,
+      );
+      continue;
+    }
+    seen.add(key);
+    deduped[id] = job;
+  }
+  const dropped = Object.keys(results).length - Object.keys(deduped).length;
+  if (dropped > 0) log("INFO", "Deduped %s cross-source duplicates", dropped);
+  return deduped;
+}
+
 export async function getResults(): Promise<SearchResults> {
   const timeFrame = process.env[ENV.SEARCH_TIME_FRAME] ?? TIME_FRAME;
   let results: SearchResults = {};
   results = mergeResults(results, await getLinkedinSearchResults(timeFrame));
   results = mergeResults(results, await fetchGoogleResults(timeFrame));
   results = mergeResults(results, await getTopApplicantResults());
+  results = deduplicateByCompanyTitle(results);
   return applyStopList(results);
 }
 
@@ -166,29 +192,28 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
 
   if (Object.keys(fresh).length > 0) {
     log("INFO", "Scoring %s fresh jobs...", Object.keys(fresh).length);
-    await Promise.all(
-      Object.values(fresh).map(async (job) => {
-        const { verdict, reasoning } = await scoreJob(job);
-        job.judgment = verdict;
-        try {
-          await saveScore(job.id, {
-            job,
-            verdict,
-            reasoning,
-            scoredAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          log(
-            "WARN",
-            "Score save failed for %s (%s): %s",
-            job.id,
-            job.title,
-            (err as Error).message,
-          );
-        }
-        log("DEBUG", "Scored [%s]: %s — %s", verdict, job.company, job.title);
-      }),
-    );
+    for (const job of Object.values(fresh)) {
+      const { verdict, reasoning } = await scoreJob(job);
+      job.judgment = verdict;
+      try {
+        await saveScore(job.id, {
+          job,
+          verdict,
+          reasoning,
+          scoredAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        log(
+          "WARN",
+          "Score save failed for %s (%s): %s",
+          job.id,
+          job.title,
+          (err as Error).message,
+        );
+      }
+      log("DEBUG", "Scored [%s]: %s — %s", verdict, job.company, job.title);
+      await pause(500);
+    }
 
     for (const job of Object.values(fresh)) {
       if (

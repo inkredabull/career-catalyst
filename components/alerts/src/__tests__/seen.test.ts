@@ -1,4 +1,5 @@
 import { filterUnseen, markAsSeen, pruneSeen, SEEN_TTL_MS } from "../seen";
+import { deduplicateByCompanyTitle, mergeResults } from "../index";
 import { SearchResults } from "../linkedin";
 
 const job = (id: string): SearchResults => ({
@@ -83,5 +84,61 @@ describe("pruneSeen", () => {
 
   it("returns empty object for empty input", () => {
     expect(pruneSeen({}, Date.now())).toEqual({});
+  });
+});
+
+describe("deduplicateByCompanyTitle", () => {
+  const makeJob = (
+    id: string,
+    company: string,
+    title: string,
+    search = "test",
+  ): SearchResults => ({
+    [id]: { id, company, title, url: `https://example.com/${id}`, search },
+  });
+
+  it("keeps unique company+title combinations", () => {
+    const results = {
+      ...makeJob("1", "Acme", "CTO"),
+      ...makeJob("2", "Globex", "VP Engineering"),
+    };
+    expect(Object.keys(deduplicateByCompanyTitle(results))).toHaveLength(2);
+  });
+
+  it("removes duplicate company+title from a second source", () => {
+    const results = {
+      ...makeJob("url-a", "FutureSight", "CTO", "Greenhouse/US"),
+      ...makeJob("url-b", "FutureSight", "CTO", "Lever/US"),
+      ...makeJob("url-c", "FutureSight", "CTO", "BuiltInSF/SF"),
+    };
+    const deduped = deduplicateByCompanyTitle(results);
+    expect(Object.keys(deduped)).toHaveLength(1);
+    expect(Object.values(deduped)[0].id).toBe("url-a");
+  });
+
+  it("is case-insensitive", () => {
+    const results = {
+      ...makeJob("1", "Acme Corp", "vp engineering"),
+      ...makeJob("2", "ACME CORP", "VP Engineering"),
+    };
+    expect(Object.keys(deduplicateByCompanyTitle(results))).toHaveLength(1);
+  });
+
+  it("returns empty object for empty input", () => {
+    expect(deduplicateByCompanyTitle({})).toEqual({});
+  });
+});
+
+describe("mergeResults", () => {
+  it("merges two result sets", () => {
+    const a = { "1": { id: "1", company: "A", title: "T", url: "", search: "" } };
+    const b = { "2": { id: "2", company: "B", title: "T", url: "", search: "" } };
+    expect(Object.keys(mergeResults(a, b))).toEqual(["1", "2"]);
+  });
+
+  it("second set wins on key collision", () => {
+    const a = { "1": { id: "1", company: "Old", title: "T", url: "", search: "" } };
+    const b = { "1": { id: "1", company: "New", title: "T", url: "", search: "" } };
+    expect(mergeResults(a, b)["1"].company).toBe("New");
   });
 });
