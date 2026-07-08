@@ -53,7 +53,7 @@ Judgment labels (pick exactly one):
 async function fetchViaJina(url: string): Promise<string> {
   const res = await fetch(`https://r.jina.ai/${url}`, {
     headers: { Accept: "text/plain" },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(8_000),
   });
   log("DEBUG", "Jina HTTP %s for %s", res.status, url.slice(0, 80));
   if (!res.ok) return "";
@@ -81,7 +81,7 @@ async function fetchViaScrapingBee(url: string): Promise<string> {
       extract_rules: JSON.stringify({ body: "body" }),
     });
     const res = await fetch(`https://app.scrapingbee.com/api/v1?${params}`, {
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(12_000),
     });
     log("DEBUG", "ScrapingBee HTTP %s for %s", res.status, url.slice(0, 80));
     if (!res.ok) return "";
@@ -95,9 +95,14 @@ async function fetchViaScrapingBee(url: string): Promise<string> {
 
 async function fetchJD(url: string): Promise<string> {
   try {
-    const jina = await fetchViaJina(url);
-    if (jina) return jina;
-    log("DEBUG", "Falling back to ScrapingBee for %s", url.slice(0, 80));
+    // LinkedIn consistently blocks Jina — skip straight to ScrapingBee
+    if (!url.includes("linkedin.com")) {
+      const jina = await fetchViaJina(url);
+      if (jina) return jina;
+      log("DEBUG", "Falling back to ScrapingBee for %s", url.slice(0, 80));
+    } else {
+      log("DEBUG", "LinkedIn URL — using ScrapingBee directly for %s", url.slice(0, 80));
+    }
     return await fetchViaScrapingBee(url);
   } catch {
     return "";
