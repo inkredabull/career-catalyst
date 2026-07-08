@@ -171,6 +171,24 @@ export function deduplicateByCompanyTitle(
   return deduped;
 }
 
+async function withConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  const queue = [...items];
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (queue.length > 0) {
+        const item = queue.shift()!;
+        await fn(item);
+      }
+    },
+  );
+  await Promise.all(workers);
+}
+
 export async function getResults(): Promise<SearchResults> {
   const timeFrame = process.env[ENV.SEARCH_TIME_FRAME] ?? TIME_FRAME;
   let results: SearchResults = {};
@@ -192,7 +210,7 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
 
   if (Object.keys(fresh).length > 0) {
     log("INFO", "Scoring %s fresh jobs...", Object.keys(fresh).length);
-    for (const job of Object.values(fresh)) {
+    await withConcurrency(Object.values(fresh), 5, async (job) => {
       const { verdict, reasoning } = await scoreJob(job);
       job.judgment = verdict;
       try {
@@ -212,8 +230,7 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
         );
       }
       log("DEBUG", "Scored [%s]: %s — %s", verdict, job.company, job.title);
-      await pause(500);
-    }
+    });
 
     for (const job of Object.values(fresh)) {
       if (
