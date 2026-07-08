@@ -209,6 +209,8 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
   const fresh = filterUnseen(results, seen);
 
   if (Object.keys(fresh).length > 0) {
+    // Mark fresh jobs as seen BEFORE scoring so a timeout doesn't cause re-scoring on the next run
+    await saveSeen(markAsSeen(fresh, seen));
     log("INFO", "Scoring %s fresh jobs...", Object.keys(fresh).length);
     await withConcurrency(Object.values(fresh), 5, async (job) => {
       const { verdict, reasoning } = await scoreJob(job);
@@ -292,8 +294,6 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
     flushLogs(),
     passed,
   );
-  log("INFO", "Email sent, saving seen...");
-  await saveSeen(markAsSeen(fresh, seen));
   log("INFO", "Done.");
 }
 
