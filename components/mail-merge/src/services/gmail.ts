@@ -86,7 +86,7 @@ render();
 
 // ── Warmup draft creation ─────────────────────────────────────────────────────
 
-const WARMUP_TEMPLATE = 'Q2 2026 latest-and-greatest';
+const WARMUP_TEMPLATE = 'Catching up + a quick ask';
 
 export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
