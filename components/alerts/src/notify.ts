@@ -146,7 +146,7 @@ export async function notify(
   await resend.emails.send({
     from: "alerts@bluxomelabs.com",
     to: email,
-    subject: `Jobs for ${new Date().toLocaleString("en-US", { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}`,
+    subject: `Jobs for ${new Date().toLocaleString("en-US", { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Los_Angeles" })}`,
     text: textSections.join("\n\n") + durationFooter,
     html: htmlSections.join("") + durationHtml + passHtml + logsHtml,
   });
