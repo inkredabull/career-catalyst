@@ -41,15 +41,6 @@ export const SHEETS = {
   SUBJECT_LINES: 'Subject Lines : Raw',
 } as const;
 
-// Subject lines shown in the send/test dropdown picker
-export const SUBJECT_LINES = [
-  'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
-  'Need some fractional ENG help?',
-  // 'Q2 2026 latest-and-greatest',
-  "Quick Favor - Exploring What's Next",
-  "Catching up + a quick ask"
-];
-
 // Feature flags - can be overridden per subject line
 export const FLAGS = {
   SEND_SMS: false,
@@ -57,33 +48,30 @@ export const FLAGS = {
   ATTACH_PHOTO: false,
 };
 
-// Per-subject-line flag overrides
-// Keys can be exact subject matches or regex patterns
-export const SUBJECT_LINE_FLAGS: Record<string, Partial<typeof FLAGS>> = {
-  'Get your help for role as {{JobTitleShorthand}} at {{Company}}?': { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
-  'Need some fractional ENG help?': { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
-  // 'Q2 2026 latest-and-greatest': { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
-  "Quick Favor - Exploring What's Next": { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
-  "Catching up + a quick ask": { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
-} as const;
+// Subject lines with their flag overrides, in picker display order
+export const SUBJECT_LINE_CONFIG = [
+  {
+    subject: 'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
+    flags: { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
+  },
+  {
+    subject: 'Need some fractional ENG help?',
+    flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
+  },
+  // { subject: 'Q2 2026 latest-and-greatest', flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } },
+  {
+    subject: "Quick Favor - Exploring What's Next",
+    flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
+  },
+  {
+    subject: "Catching up + a quick ask",
+    flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
+  },
+] as const;
 
-// Helper function to get flags for a specific subject line
+export const SUBJECT_LINES = SUBJECT_LINE_CONFIG.map(c => c.subject);
+
 export const getFlagsForSubject = (subjectLine: string): typeof FLAGS => {
-  // Check for exact matches first
-  if (SUBJECT_LINE_FLAGS[subjectLine]) {
-    return { ...FLAGS, ...SUBJECT_LINE_FLAGS[subjectLine] };
-  }
-
-  // Check for regex pattern matches
-  for (const [pattern, overrides] of Object.entries(SUBJECT_LINE_FLAGS)) {
-    if (pattern.startsWith('/') && pattern.endsWith('/')) {
-      const regex = new RegExp(pattern.slice(1, -1));
-      if (regex.test(subjectLine)) {
-        return { ...FLAGS, ...overrides };
-      }
-    }
-  }
-
-  // Return default flags if no matches found
-  return FLAGS;
+  const entry = SUBJECT_LINE_CONFIG.find(c => c.subject === subjectLine);
+  return entry ? { ...FLAGS, ...entry.flags } : FLAGS;
 };
