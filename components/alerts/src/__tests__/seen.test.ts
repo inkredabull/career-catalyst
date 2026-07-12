@@ -1,4 +1,10 @@
-import { filterUnseen, markAsSeen, pruneSeen, SEEN_TTL_MS } from "../seen";
+import {
+  filterUnseen,
+  markAsSeen,
+  pruneSeen,
+  companyTitleKey,
+  SEEN_TTL_MS,
+} from "../seen";
 import { deduplicateByCompanyTitle, mergeResults } from "../index";
 import { SearchResults } from "../linkedin";
 
@@ -33,19 +39,49 @@ describe("filterUnseen", () => {
   it("returns empty object when results are empty", () => {
     expect(filterUnseen({}, { "1": Date.now() })).toEqual({});
   });
+
+  it("excludes a job whose company+title key is in seen (cross-run repost)", () => {
+    const repost: SearchResults = {
+      "999": {
+        id: "999",
+        company: "Acme",
+        title: "CTO",
+        url: "https://linkedin.com/jobs/view/999",
+        search: "test",
+      },
+    };
+    const seen = { "ct:acme|||cto": Date.now() };
+    expect(filterUnseen(repost, seen)).toEqual({});
+  });
+
+  it("keeps a job that shares a title but differs in company", () => {
+    const result: SearchResults = {
+      "5": {
+        id: "5",
+        company: "OtherCo",
+        title: "CTO",
+        url: "https://linkedin.com/jobs/view/5",
+        search: "test",
+      },
+    };
+    const seen = { "ct:acme|||cto": Date.now() };
+    expect(filterUnseen(result, seen)).toEqual(result);
+  });
 });
 
 describe("markAsSeen", () => {
   it("adds new ids with the provided timestamp", () => {
     const now = 1000000;
     const result = markAsSeen(jobs("1", "2"), {}, now);
-    expect(result).toEqual({ "1": now, "2": now });
+    expect(result["1"]).toBe(now);
+    expect(result["2"]).toBe(now);
   });
 
   it("preserves existing entries", () => {
     const existing = { "99": 500 };
     const result = markAsSeen(jobs("1"), existing, 1000);
-    expect(result).toEqual({ "99": 500, "1": 1000 });
+    expect(result["99"]).toBe(500);
+    expect(result["1"]).toBe(1000);
   });
 
   it("updates timestamp for a previously seen id", () => {
@@ -57,6 +93,25 @@ describe("markAsSeen", () => {
     const seen = { "99": 500 };
     markAsSeen(jobs("1"), seen, 1000);
     expect(seen).toEqual({ "99": 500 });
+  });
+
+  it("also records the company+title key", () => {
+    const now = 1000000;
+    const result = markAsSeen(jobs("1"), {}, now);
+    expect(result["ct:acme|||cto"]).toBe(now);
+  });
+});
+
+describe("companyTitleKey", () => {
+  it("produces a stable lowercase key", () => {
+    const job = {
+      id: "1",
+      company: "Jobright.ai",
+      title: "Head of AI",
+      url: "",
+      search: "",
+    };
+    expect(companyTitleKey(job)).toBe("ct:jobright.ai|||head of ai");
   });
 });
 
@@ -131,14 +186,22 @@ describe("deduplicateByCompanyTitle", () => {
 
 describe("mergeResults", () => {
   it("merges two result sets", () => {
-    const a = { "1": { id: "1", company: "A", title: "T", url: "", search: "" } };
-    const b = { "2": { id: "2", company: "B", title: "T", url: "", search: "" } };
+    const a = {
+      "1": { id: "1", company: "A", title: "T", url: "", search: "" },
+    };
+    const b = {
+      "2": { id: "2", company: "B", title: "T", url: "", search: "" },
+    };
     expect(Object.keys(mergeResults(a, b))).toEqual(["1", "2"]);
   });
 
   it("second set wins on key collision", () => {
-    const a = { "1": { id: "1", company: "Old", title: "T", url: "", search: "" } };
-    const b = { "1": { id: "1", company: "New", title: "T", url: "", search: "" } };
+    const a = {
+      "1": { id: "1", company: "Old", title: "T", url: "", search: "" },
+    };
+    const b = {
+      "1": { id: "1", company: "New", title: "T", url: "", search: "" },
+    };
     expect(mergeResults(a, b)["1"].company).toBe("New");
   });
 });

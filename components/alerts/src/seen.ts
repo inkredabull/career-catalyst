@@ -12,13 +12,28 @@ const STOP_LISTS_PATH = "alerts/stop-lists.json";
 // Pure helpers — unchanged, exported for unit tests
 // ---------------------------------------------------------------------------
 
+export function companyTitleKey(job: JobResult): string {
+  return `ct:${job.company.toLowerCase()}|||${job.title.toLowerCase()}`;
+}
+
 export function filterUnseen(
   results: SearchResults,
   seen: Record<string, number>,
 ): SearchResults {
   const out: SearchResults = {};
   for (const [id, result] of Object.entries(results)) {
-    if (!seen[id]) out[id] = result;
+    if (seen[id] || seen[companyTitleKey(result)]) {
+      if (!seen[id]) {
+        log(
+          "DEBUG",
+          "Seen (company+title repeat): %s — %s",
+          result.company,
+          result.title,
+        );
+      }
+      continue;
+    }
+    out[id] = result;
   }
   return out;
 }
@@ -29,8 +44,9 @@ export function markAsSeen(
   now: number = Date.now(),
 ): Record<string, number> {
   const updated = { ...seen };
-  for (const id of Object.keys(results)) {
+  for (const [id, job] of Object.entries(results)) {
     updated[id] = now;
+    updated[companyTitleKey(job)] = now;
   }
   return updated;
 }
