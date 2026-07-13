@@ -58,8 +58,9 @@ Rules:
 
 
 ### technologiesSection
-If it makes sense to include a "Technologies:" line selectively for each role, include it, highlighting those that are relevant.
-If it is included, do not make the line in italics.  Bold "Technologies:" but not the rest of the line.
+For any role that involved hands-on technical work (engineering, architecture, building systems), you MUST include a "Technologies:" line. Do not omit it for leadership roles that were also hands-on — Head of Engineering, CTO, VP Eng, founding engineer, and similar titles almost always qualify.
+Include only technologies that are relevant to the target job description — tailor the list, don't copy blindly from the CV.
+Do not make the line italic. Bold "Technologies:" but not the rest of the line.
 
 **CRITICAL: Do NOT create a separate "TECHNOLOGIES" section at the end of the resume. All technologies should be:**
 1. Listed per-role as "Technologies:" lines, OR
