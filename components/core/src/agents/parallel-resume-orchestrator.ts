@@ -375,6 +375,8 @@ export class ParallelResumeOrchestrator {
     // Phase 4–6: Critique + Regenerate loop (skipped if --no-critique or nothing succeeded)
     if (!options.skipCritique && markdownByModel.size > 0) {
       const maxAttempts = getCritiqueAndJudgeMaxAttempts();
+      // Track last rating per model to detect non-improving passes
+      const lastRatingByModel = new Map<string, number>();
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const attemptLabel = maxAttempts > 1 ? ` (pass ${attempt}/${maxAttempts})` : '';
@@ -386,10 +388,23 @@ export class ParallelResumeOrchestrator {
 
         if (critiqueMap.size === 0) break;
 
-        // Stamp ratings onto modelResults
+        // Stamp ratings onto modelResults; skip regen for models that didn't improve
+        const modelsWithImprovement: string[] = [];
         for (const [label, data] of critiqueMap) {
           const r = modelResults.find(m => m.model === label);
           if (r) r.critiqueRating = data.rating;
+          const prev = lastRatingByModel.get(label);
+          if (prev !== undefined && data.rating - prev < 0.3) {
+            console.log(`⏭️  ${label}: score ${prev} → ${data.rating} (Δ${(data.rating - prev).toFixed(1)} < 0.3), skipping regen`);
+          } else {
+            modelsWithImprovement.push(label);
+          }
+          lastRatingByModel.set(label, data.rating);
+        }
+
+        if (modelsWithImprovement.length === 0) {
+          console.log('✅ No models improved enough to warrant regeneration — stopping early');
+          break;
         }
 
         // Prepend bullet violations to recommendations so models fix their own overlong bullets
@@ -406,18 +421,21 @@ export class ParallelResumeOrchestrator {
           console.log(`📏 Injected ${totalViolations} bullet-length violation(s) into regen feedback`);
         }
 
+        // Only regen models that showed improvement potential
+        const modelsForRegen = modelsToUse.filter(m => modelsWithImprovement.includes(m.label));
+
         console.log(`\n📝 Step 5: Parallel Regeneration with Recommendations${attemptLabel}`);
         console.log('──────────────────────────────────');
 
         const improvedResults = await this.runParallelGeneration(
-          modelsToUse, classification, job, cvContent, critiqueMap
+          modelsForRegen, classification, job, cvContent, critiqueMap
         );
 
         console.log(`\n🎨 Step 6: PDF Re-generation${attemptLabel}`);
         console.log('──────────────────────────────────');
 
-        for (let i = 0; i < modelsToUse.length; i++) {
-          const modelConfig = modelsToUse[i];
+        for (let i = 0; i < modelsForRegen.length; i++) {
+          const modelConfig = modelsForRegen[i];
           const result = improvedResults[i];
           const existing = modelResults.find(r => r.model === modelConfig.label);
 
