@@ -30,57 +30,36 @@ interface LinkedInContact {
   firstName: string;
 }
 
-/** Shows a single paged modal for one or more LinkedIn contacts (Prev/Next navigation). */
-const showLinkedInMultiDialog = (contacts: LinkedInContact[]): void => {
+/** Opens each LinkedIn profile in a new tab and auto-closes after 2 s.
+ *  Requires popups allowed for docs.google.com (one-time browser setting). */
+const openLinkedInTabs = (contacts: LinkedInContact[]): void => {
   const contactsJson = JSON.stringify(contacts);
-  const count = contacts.length;
+  const withUrl = contacts.filter(c => c.url).length;
   const html = `<!DOCTYPE html><html><head><base target="_top"><style>
-body{font-family:sans-serif;padding:16px;min-width:380px}
-h3{margin:0 0 4px}
-.nav{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.nav button{padding:4px 10px;cursor:pointer}
-.counter{font-size:13px;color:#555;flex:1;text-align:center}
-.open-btn{display:block;width:100%;padding:8px;margin-bottom:10px;font-size:13px;cursor:pointer;background:#0a66c2;color:#fff;border:none;border-radius:4px;text-align:center;text-decoration:none;box-sizing:border-box}
-.open-btn:hover{background:#004182}
-.no-url{color:#888;font-size:13px;margin-bottom:10px}
-p{margin:0 0 4px;font-size:13px}
-textarea{width:100%;height:100px;font-size:13px;padding:8px;box-sizing:border-box;resize:vertical}
-.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-button{padding:6px 16px;cursor:pointer}
+body{font-family:sans-serif;padding:16px;font-size:13px;color:#333}
+h3{margin:0 0 8px;font-size:14px}
+ul{margin:8px 0 0;padding-left:18px}
+li{margin-bottom:6px}
+.msg{color:#555;white-space:pre-wrap;font-size:12px;margin-top:2px}
 </style></head><body>
-<div class="nav">
-  <button onclick="prev()">&#9664;</button>
-  <span class="counter" id="counter"></span>
-  <button onclick="next()">&#9654;</button>
-</div>
-<div id="link-area"></div>
-<p>Message:</p>
-<textarea id="msg" readonly></textarea>
-<div class="btns">
-<button onclick="copyMsg()">Copy Message</button>
-<button onclick="google.script.host.close()">Done</button>
-</div>
+<h3 id="status">Opening ${withUrl} LinkedIn profile(s)\u2026</h3>
+<ul id="list"></ul>
 <script>
 var contacts=${contactsJson};
-var idx=0;
-function render(){
-  var c=contacts[idx];
-  document.getElementById('counter').textContent=(idx+1)+' of '+contacts.length;
-  document.getElementById('msg').value=c.message;
-  var la=document.getElementById('link-area');
-  if(c.url){la.innerHTML='<a class="open-btn" href="'+c.url+'" target="_blank">Open LinkedIn Profile \u2197</a>';}
-  else{la.innerHTML='<p class="no-url">(No LinkedIn URL found \u2014 open manually)</p>';}
-}
-function prev(){if(idx>0){idx--;render();}}
-function next(){if(idx<contacts.length-1){idx++;render();}}
-function copyMsg(){var t=document.getElementById('msg');t.select();document.execCommand('copy');t.blur();}
-render();
+var ul=document.getElementById('ul');
+contacts.forEach(function(c){
+  if(c.url) window.open(c.url,'_blank');
+  var li=document.createElement('li');
+  li.innerHTML='<strong>'+c.firstName+'</strong>'+(c.url?' \u2197':' (no URL)')+'<div class="msg">'+c.message+'</div>';
+  document.getElementById('list').appendChild(li);
+});
+setTimeout(function(){google.script.host.close();},2000);
 </script>
 </body></html>`;
 
   SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(480).setHeight(count > 1 ? 320 : 290),
-    `LinkedIn DM${count > 1 ? ` (${count} contacts)` : ''}`
+    HtmlService.createHtmlOutput(html).setWidth(420).setHeight(Math.min(80 + contacts.length * 60, 400)),
+    `LinkedIn (${contacts.length})`
   );
 };
 
@@ -317,7 +296,7 @@ export const doSendTestEmail = (
   row[COLS.RECIPIENT] = testRecipient;
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
   const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject);
-  if (linkedin) showLinkedInMultiDialog([linkedin]);
+  if (linkedin) openLinkedInTabs([linkedin]);
   Logger.log('Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
 };
@@ -375,7 +354,7 @@ export const doSendEmails = (
   SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
 
   if (linkedInContacts.length > 0) {
-    showLinkedInMultiDialog(linkedInContacts);
+    openLinkedInTabs(linkedInContacts);
   }
 };
 
