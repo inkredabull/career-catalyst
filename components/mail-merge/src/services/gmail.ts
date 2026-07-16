@@ -46,7 +46,9 @@ li{margin-bottom:6px}
 <ul id="list"></ul>
 <script>
 var contacts=${contactsJson};
-var ul=document.getElementById('ul');
+// Send contacts+messages to content.js via the parent docs.google.com frame,
+// which bridges them to the extension background for storage keyed by LinkedIn slug.
+window.parent.postMessage({type:'CC_LI_MESSAGES',contacts:contacts},'*');
 contacts.forEach(function(c){
   if(c.url) window.open(c.url,'_blank');
   var li=document.createElement('li');

@@ -1336,3 +1336,46 @@ setInterval(checkUrlChange, 1000);
 
 log('LinkedIn Networking: Content script loaded');
 log('💡 LinkedIn Feed: Post save monitoring available when enabled');
+
+// Auto-click Message and pre-fill compose modal when a pending message is stored for this profile
+(async function autoMessageIfPending() {
+  const match = location.pathname.match(/^\/in\/([^/?#]+)/);
+  if (!match) return;
+  const slug = match[1].toLowerCase();
+  const key = 'li_msg_' + slug;
+  const stored = await chrome.storage.local.get(key);
+  const message = stored[key];
+  if (!message) return;
+
+  // Consume immediately so a reload doesn't re-trigger
+  await chrome.storage.local.remove(key);
+
+  // Wait for LinkedIn SPA to render the profile top card
+  await new Promise(r => setTimeout(r, 1500));
+
+  const topCard = document.querySelector('[componentkey*="Topcard"]') || document;
+  const msgBtn = Array.from(topCard.querySelectorAll('button, a')).find(b => {
+    const label = (b.getAttribute('aria-label') || b.innerText || '').trim().toLowerCase();
+    return label === 'message' || label.startsWith('message ');
+  });
+  if (!msgBtn) { log('[AutoMsg] Message button not found on ' + slug); return; }
+  msgBtn.click();
+  log('[AutoMsg] Clicked Message button for ' + slug);
+
+  // Poll for the compose modal (contenteditable div used by LinkedIn messaging)
+  const deadline = Date.now() + 6000;
+  let editor = null;
+  while (Date.now() < deadline) {
+    editor = document.querySelector('.msg-form__contenteditable[contenteditable]')
+          || document.querySelector('div[role="textbox"][contenteditable]');
+    if (editor) break;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  if (!editor) { log('[AutoMsg] Compose editor not found for ' + slug); return; }
+
+  editor.focus();
+  document.execCommand('selectAll', false);
+  document.execCommand('insertText', false, message);
+  editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  log('[AutoMsg] Message pre-filled for ' + slug);
+})();

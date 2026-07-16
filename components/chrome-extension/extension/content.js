@@ -330,32 +330,6 @@ function createGutter() {
           </select>
         </div>
 
-        <div class="form-field">
-          <label>Create Reminders:</label>
-          <div class="reminder-checkboxes">
-            <label class="reminder-checkbox-label">
-              <input type="checkbox" id="reminder-apply" class="reminder-checkbox" checked>
-              <span>✍️ Apply</span>
-            </label>
-            <label class="reminder-checkbox-label">
-              <input type="checkbox" id="reminder-ping" class="reminder-checkbox" checked>
-              <span>📞 Ping Recruiter</span>
-            </label>
-            <label class="reminder-checkbox-label">
-              <input type="checkbox" id="reminder-prep" class="reminder-checkbox" checked>
-              <span>🎯 Interview Prep</span>
-            </label>
-            <label class="reminder-checkbox-label">
-              <input type="checkbox" id="reminder-followup" class="reminder-checkbox" checked>
-              <span>📧 Follow-up</span>
-            </label>
-            <label class="reminder-checkbox-label">
-              <input type="checkbox" id="reminder-reachout" class="reminder-checkbox" checked>
-              <span>🤝 Reach Out Directly</span>
-            </label>
-          </div>
-        </div>
-
         <div class="button-group">
           <button id="track-job-info" class="track-btn">Track</button>
         </div>
@@ -1771,13 +1745,8 @@ async function handleTrackFromForm() {
     // Get priority for reminder creation
     const reminderPriority = parseInt(document.getElementById('reminder-priority')?.value) || 5;
 
-    // Get selected reminders
-    const selectedReminders = [];
-    if (document.getElementById('reminder-apply')?.checked) selectedReminders.push('apply');
-    if (document.getElementById('reminder-ping')?.checked) selectedReminders.push('ping');
-    if (document.getElementById('reminder-prep')?.checked) selectedReminders.push('prep');
-    if (document.getElementById('reminder-followup')?.checked) selectedReminders.push('followup');
-    if (document.getElementById('reminder-reachout')?.checked) selectedReminders.push('reachout');
+    // Reminders are always created automatically on tracking (no user selection)
+    const selectedReminders = ['apply', 'followup', 'reachout'];
 
     console.log('Career Catalyst: Tracking job from form fields:', jobInfo);
     console.log('Career Catalyst: Reminder priority:', reminderPriority);
@@ -3825,6 +3794,13 @@ function checkForLinkedInFeed() {
 //   console.log('LinkedIn Feed: Running initial feed check after delay...');
 //   checkForLinkedInFeed();
 // }, 2000);
+
+// Bridge: receive LinkedIn message payloads from GAS HtmlService iframe and store via background
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'CC_LI_MESSAGES' && Array.isArray(e.data.contacts)) {
+    chrome.runtime.sendMessage({action: 'storeLinkedInMessages', contacts: e.data.contacts});
+  }
+});
 
 console.log('Career Catalyst Assistant: Content script loaded');
 console.log('💡 Console functions available:');

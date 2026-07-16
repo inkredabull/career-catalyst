@@ -259,6 +259,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       handleCreateGoogleContact(request, sendResponse);
       return true; // Keep message channel open for async response
 
+    case 'storeLinkedInMessages': {
+      const map = {};
+      for (const c of (request.contacts || [])) {
+        const match = (c.url || '').match(/\/in\/([^/?#]+)/);
+        if (match) map['li_msg_' + match[1].toLowerCase()] = c.message;
+      }
+      chrome.storage.local.set(map, () => sendResponse({ok: true}));
+      return true;
+    }
+
     default:
       sendResponse({success: false, error: 'Unknown action'});
   }
