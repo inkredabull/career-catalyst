@@ -14,12 +14,21 @@ function joinWith(items, connector) {
   return `${items.slice(0, -1).join(", ")}, ${connector} ${items[items.length - 1]}`;
 }
 
-const PAIN_POINTS = [
+const MAIN_CONTRIBUTIONS = [
   'create order out of chaos',
   'address team throughput',
   'improve cybersecurity',
   'roll out Gen AI safely',
   'foster great talent',
+];
+
+const DOMAINS = [
+  'AI-Native Engineering Leadership',
+  'Delivery & Execution at Scale',
+  'Founder / Executive Advisory',
+  'Org Design & Talent',
+  'Product & Systems Thinking',
+  'Revenue & Go-To-Market Partnership'
 ];
 
 const MESSAGE_TEMPLATES = {
@@ -28,7 +37,7 @@ const MESSAGE_TEMPLATES = {
   CONGRATS_CONNECT:
     // "Hi {{firstName}}, congrats on the {{round}} for {{domain}}! " +
     "Hi {{firstName}}, congrats on the {{round}}! " +
-    "I help founders " + joinWith(PAIN_POINTS, "and") + ". " +
+    "I help founders " + joinWith(MAIN_CONTRIBUTIONS, "and") + ". " +
     "I'm local; quick chat if you need any help? " +
     "https://calendly.com/bluxomelabs/quick-chat",
 
@@ -839,7 +848,7 @@ function extractLinkedInPostInfo(postElement) {
   }
 }
 
-function showLinkedInFeedNotification(message) {
+function showLinkedInFeedNotification(message, linkUrl, requireClose) {
   // Create a simple notification element
   const notification = document.createElement('div');
   notification.style.cssText = `
@@ -849,15 +858,55 @@ function showLinkedInFeedNotification(message) {
     background: #0a66c2;
     color: white;
     padding: 16px 24px;
+    padding-right: ${requireClose ? '40px' : '24px'};
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     z-index: 999999;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
+    position: fixed;
   `;
-  notification.textContent = message;
+
+  const messageEl = document.createElement('div');
+  messageEl.textContent = message;
+  notification.appendChild(messageEl);
+
+  if (linkUrl) {
+    const link = document.createElement('a');
+    link.href = linkUrl;
+    link.target = '_blank';
+    link.textContent = 'View contact';
+    link.style.cssText = 'display: block; margin-top: 8px; color: #cfe3fb; text-decoration: underline;';
+    notification.appendChild(link);
+  }
+
   document.body.appendChild(notification);
+
+  if (requireClose) {
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.setAttribute('aria-label', 'Close notification');
+    closeBtn.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 4px;
+    `;
+    closeBtn.onclick = () => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    };
+    notification.appendChild(closeBtn);
+    return;
+  }
 
   // Remove after 3 seconds
   setTimeout(() => {
@@ -1149,36 +1198,22 @@ function getAsGoogleContact() {
     ? emailMatch.find(e => !e.includes('linkedin.com') && !e.includes('example.com') && !e.includes('noreply')) || ''
     : '';
 
-  let vcard = 'BEGIN:VCARD\n';
-  vcard += 'VERSION:3.0\n';
-  vcard += `FN:${fullName}\n`;
-  vcard += `N:${lastName};${firstName};;;\n`;
-  if (email) vcard += `EMAIL;TYPE=WORK:${email}\n`;
-  vcard += `URL;TYPE=WORK:${linkedinUrl}\n`;
-  vcard += `CATEGORIES:${currentYear}\n`;
-  vcard += 'NOTE:Added from LinkedIn via Career Catalyst\n';
-  vcard += 'END:VCARD';
+  showLinkedInFeedNotification('Creating Google Contact…');
 
-  const blob = new Blob([vcard], { type: 'text/vcard' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${firstName}_${lastName}.vcf`.replace(/\s+/g, '_');
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  const lines = [
-    'Contact downloaded:',
-    `• Name: ${fullName}`,
-    `• LinkedIn: ${linkedinUrl}`,
-    email ? `• Email: ${email}` : '• Email: not found on page',
-    `• Label: ${currentYear}`,
-    '',
-    'Double-click the .vcf file to import into Contacts.'
-  ];
-  alert(lines.join('\n'));
+  chrome.runtime.sendMessage(
+    { action: 'createGoogleContact', contact: { firstName, lastName, email, linkedinUrl, currentYear } },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        showLinkedInFeedNotification(`⚠️ ${chrome.runtime.lastError.message}`, null, true);
+        return;
+      }
+      if (response?.success) {
+        showLinkedInFeedNotification(`✅ Contact created for ${fullName}`, response.contactUrl);
+      } else {
+        showLinkedInFeedNotification(`⚠️ Could not create contact: ${response?.error || 'unknown error'}`, null, true);
+      }
+    }
+  );
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

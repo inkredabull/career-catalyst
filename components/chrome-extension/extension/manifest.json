@@ -24,11 +24,18 @@
     "contextMenus",
     "activeTab",
     "scripting",
-    "clipboardWrite"
+    "clipboardWrite",
+    "identity"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
+  "oauth2": {
+    "client_id": "794397574132-rcqi1snreee7hn9npcgpr7ota2h9ks73.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/contacts"
+    ]
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

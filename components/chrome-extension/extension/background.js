@@ -255,6 +255,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       handleCheckBlurb(request, sendResponse);
       return true; // Keep message channel open for async response
 
+    case 'createGoogleContact':
+      handleCreateGoogleContact(request, sendResponse);
+      return true; // Keep message channel open for async response
+
     default:
       sendResponse({success: false, error: 'Unknown action'});
   }
@@ -1882,6 +1886,100 @@ async function handleGetCompanyStage(request, sendResponse) {
     sendResponse({
       success: false,
       error: error.message || 'Failed to get company stage from LinkedIn'
+    });
+  }
+}
+
+// Get a Google OAuth token via chrome.identity, retrying once on a stale cached token
+function getGoogleAuthToken(interactive) {
+  return new Promise((resolve, reject) => {
+    chrome.identity.getAuthToken({ interactive }, (token) => {
+      if (chrome.runtime.lastError || !token) {
+        reject(new Error(chrome.runtime.lastError?.message || 'Failed to obtain Google auth token'));
+        return;
+      }
+      resolve(token);
+    });
+  });
+}
+
+function removeCachedGoogleAuthToken(token) {
+  return new Promise((resolve) => {
+    chrome.identity.removeCachedAuthToken({ token }, resolve);
+  });
+}
+
+// Create a contact via the Google People API, returning { resourceName, contactUrl }
+async function createGooglePeopleContact(contact) {
+  let token = await getGoogleAuthToken(true);
+
+  const person = {
+    names: [{ givenName: contact.firstName, familyName: contact.lastName }],
+    urls: [{ value: contact.linkedinUrl, type: 'work' }],
+    biographies: [{ value: 'Added from LinkedIn via Career Catalyst', contentType: 'TEXT_PLAIN' }],
+    userDefined: [{ key: 'Year', value: contact.currentYear }]
+  };
+  if (contact.email) {
+    person.emailAddresses = [{ value: contact.email, type: 'work' }];
+  }
+
+  let response = await fetch('https://people.googleapis.com/v1/people:createContact', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(person)
+  });
+
+  if (response.status === 401) {
+    await removeCachedGoogleAuthToken(token);
+    token = await getGoogleAuthToken(true);
+    response = await fetch('https://people.googleapis.com/v1/people:createContact', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(person)
+    });
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `People API responded with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  const resourceName = data.resourceName || '';
+  const contactId = resourceName.replace('people/', '');
+  const contactUrl = contactId ? `https://contacts.google.com/person/${contactId}` : 'https://contacts.google.com';
+
+  return { resourceName, contactUrl };
+}
+
+// Handle creating a Google Contact via the People API for the LinkedIn "Get as Google Contact" action
+async function handleCreateGoogleContact(request, sendResponse) {
+  try {
+    console.log('Career Catalyst Background: Creating Google contact via People API');
+    const { firstName, lastName, email, linkedinUrl, currentYear } = request.contact || {};
+
+    if (!firstName && !lastName) {
+      sendResponse({ success: false, error: 'Contact name is required' });
+      return;
+    }
+
+    const { contactUrl } = await createGooglePeopleContact({ firstName, lastName, email, linkedinUrl, currentYear });
+
+    const tab = await chrome.tabs.create({ url: contactUrl });
+
+    sendResponse({ success: true, contactUrl, tabId: tab.id });
+
+  } catch (error) {
+    console.error('Career Catalyst Background: Failed to create Google contact:', error);
+    sendResponse({
+      success: false,
+      error: error.message || 'Failed to create Google contact'
     });
   }
 }
