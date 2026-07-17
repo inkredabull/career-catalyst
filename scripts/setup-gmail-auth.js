@@ -21,10 +21,13 @@ const oauth2Client = new google.auth.OAuth2(
   REDIRECT_URI
 );
 
-// Google API scopes - Gmail (readonly) and Sheets (read/write)
+// Google API scopes
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/spreadsheets'
+  'https://www.googleapis.com/auth/gmail.compose',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/contacts.readonly',
 ];
 
 async function getRefreshToken() {
@@ -51,8 +54,9 @@ async function getRefreshToken() {
   console.log('='.repeat(60));
   console.log('');
   console.log('📋 Scopes requested:');
-  console.log('   • Gmail (read-only) - for rejection tracking');
-  console.log('   • Sheets (read/write) - for job tracking spreadsheet');
+  console.log('   • Gmail (read, compose, send) — ReachPilot drafts + digest');
+  console.log('   • Sheets (read/write) — Warmup History + job tracking');
+  console.log('   • Contacts (readonly) — Google People API sync');
   console.log('');
   console.log('🚀 Starting local OAuth server on port', PORT);
   console.log('');

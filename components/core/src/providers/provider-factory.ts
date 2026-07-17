@@ -3,6 +3,7 @@ import { ClaudeProvider } from './claude-provider';
 import { OpenAIProvider } from './openai-provider';
 import { OpenRouterProvider } from './openrouter-provider';
 import { GeminiProvider } from './gemini-provider';
+import { BedrockProvider } from './bedrock-provider';
 
 export class ProviderFactory {
   static create(config: LLMProviderConfig): BaseLLMProvider {
@@ -15,8 +16,12 @@ export class ProviderFactory {
         return new OpenRouterProvider(config);
       case 'gemini':
         return new GeminiProvider(config);
+      case 'bedrock':
+        return new BedrockProvider(config);
       default:
-        throw new Error(`Unsupported provider: ${config.provider}. Supported: anthropic, openai, openrouter, gemini`);
+        throw new Error(
+          `Unsupported provider: ${config.provider}. Supported: anthropic, openai, openrouter, gemini, bedrock`
+        );
     }
   }
 }

@@ -26,7 +26,11 @@
     "apply": "ts-node components/apply/src/cli.ts",
     "assess": "ts-node components/scorer/src/cli.ts",
     "prep": "ts-node components/prep/src/cli.ts",
-    "generate-cv": "npm run generate-cv --workspace=@inkredabull/career-catalyst-core"
+    "warmup:plan": "ts-node -r dotenv/config components/warmup-agent/src/cli.ts plan",
+    "warmup:run": "ts-node -r dotenv/config components/warmup-agent/src/cli.ts run",
+    "warmup:sync-contacts": "ts-node -r dotenv/config components/warmup-agent/src/cli.ts sync-contacts",
+    "warmup:score": "ts-node -r dotenv/config components/warmup-agent/src/cli.ts score",
+    "warmup:init-sheet": "ts-node -r dotenv/config components/warmup-agent/src/cli.ts init-sheet"
   },
   "keywords": [
     "monorepo",

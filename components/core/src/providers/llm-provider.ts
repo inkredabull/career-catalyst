@@ -1,4 +1,4 @@
-export type LLMProvider = 'anthropic' | 'openai' | 'openrouter' | 'gemini';
+export type LLMProvider = 'anthropic' | 'openai' | 'openrouter' | 'gemini' | 'bedrock';
 export type ModelTier = 'fast' | 'quality';
 
 export interface LLMProviderConfig {
@@ -7,6 +7,8 @@ export interface LLMProviderConfig {
   model: string; // Explicit model (e.g., 'gpt-5.2-2025-12-11')
   maxTokens?: number;
   temperature?: number;
+  /** AWS region for Bedrock (defaults to AWS_REGION or us-east-1) */
+  region?: string;
 }
 
 export interface LLMRequest {

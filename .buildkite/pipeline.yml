@@ -1,0 +1,37 @@
+steps:
+  - key: lint
+    label: ":test_tube: Lint"
+    command: npm run lint --workspace=@inkredabull/career-catalyst-warmup-agent
+
+  - key: test
+    label: ":test_tube: Test warmup-agent"
+    command: npm run test --workspace=@inkredabull/career-catalyst-warmup-agent
+    plugins:
+      - bedrock-summarize#v1.0.0:
+          trigger: on-failure
+          model: "global.anthropic.claude-sonnet-4-6"
+
+  - key: run
+    label: ":robot_face: Run Morning Warmup (dry-run)"
+    depends_on: test
+    command: |
+      npm run warmup:run -- \
+        --contacts components/warmup-agent/fixtures/contacts.sample.json \
+        --dry-run \
+        --count 3 \
+        --output /tmp/run-result.json
+    env:
+      WARMUP_CONTACT_COUNT: "3"
+
+  - key: digest
+    label: ":email: Warmup digest (live runs only)"
+    depends_on: run
+    command: echo "Digest step — implemented in Phase 1"
+    soft_fail: true
+
+  - key: deploy-gas
+    label: ":rocket: Deploy mail-merge GAS"
+    depends_on: test
+    if: build.branch == "main"
+    command: cd components/mail-merge && npm run deploy
+    soft_fail: true

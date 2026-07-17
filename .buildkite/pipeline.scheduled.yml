@@ -1,0 +1,48 @@
+# Scheduled ReachPilot live run — weekday mornings
+# Configure cron in Buildkite: 0 14 * * 1-5 (7am PT Mon-Fri)
+#
+# Upload via: buildkite-agent pipeline upload .buildkite/pipeline.scheduled.yml
+
+env:
+  AWS_REGION: "us-east-1"
+  WARMUP_USE_GOOGLE_CONTACTS: "true"
+  WARMUP_CONTACT_COUNT: "5"
+
+steps:
+  - key: lint
+    label: ":test_tube: Lint"
+    command: npm run lint --workspace=@inkredabull/career-catalyst-warmup-agent
+
+  - key: test
+    label: ":test_tube: Test"
+    command: npm run test --workspace=@inkredabull/career-catalyst-warmup-agent
+    plugins:
+      - bedrock-summarize#v1.0.0:
+          trigger: on-failure
+          model: "global.anthropic.claude-sonnet-4-6"
+
+  - key: live-run
+    label: ":robot_face: ReachPilot Live Run"
+    depends_on: test
+    command: |
+      npm run warmup:run -- \
+        --from-google \
+        --count "${WARMUP_CONTACT_COUNT:-5}" \
+        --output /tmp/run-result.json
+    env:
+      WARMUP_SHEET_URL: "${WARMUP_SHEET_URL}"
+      MY_EMAIL: "${MY_EMAIL}"
+      ENRICHLAYER_API_TOKEN: "${ENRICHLAYER_API_TOKEN}"
+    plugins:
+      - aws-assume-role-with-web-identity#v1.6.0:
+          role-arn: "${AWS_BEDROCK_ROLE_ARN}"
+      - bedrock-summarize#v1.0.0:
+          trigger: on-failure
+          model: "global.anthropic.claude-sonnet-4-6"
+
+  - key: notify
+    label: ":email: Run complete"
+    depends_on: live-run
+    command: |
+      echo "ReachPilot run finished. Check digest at ${MY_EMAIL}"
+      test -f /tmp/run-result.json && head -c 500 /tmp/run-result.json
