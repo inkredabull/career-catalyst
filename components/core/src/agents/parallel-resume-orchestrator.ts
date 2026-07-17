@@ -830,6 +830,13 @@ header-includes: |
         ? path.join(os.homedir(), envStaging.slice(2))
         : envStaging;
     }
+    // Fall back to RESUME_OUTPUT_DIR if set, otherwise local output/ dir
+    const outputDir = process.env.RESUME_OUTPUT_DIR;
+    if (outputDir) {
+      return outputDir.startsWith('~/')
+        ? path.join(os.homedir(), outputDir.slice(2))
+        : outputDir;
+    }
     return resolveFromProjectRoot('output');
   }
 
