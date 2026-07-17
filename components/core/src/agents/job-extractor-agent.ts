@@ -1562,7 +1562,7 @@ Suggested actions:
         console.log(`📋 Creating ${remindersToCreate.length} selected reminder(s): ${selectedReminders.join(', ')}`);
       } else {
         // Sheet insertion now handles tracking; create only action reminders by default
-        remindersToCreate = [applyReminder, pingReminder, reachOutReminder, prepReminder, followUpReminder];
+        remindersToCreate = [applyReminder, followUpReminder, reachOutReminder];
       }
 
       if (remindersToCreate.length === 0) {
