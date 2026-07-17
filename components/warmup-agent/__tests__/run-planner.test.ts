@@ -29,6 +29,17 @@ describe('run-planner', () => {
     }
   });
 
+  it('excludes contacts without an email address', () => {
+    const noEmail = {
+      ...contacts[0]!,
+      contactId: 'people/no-email',
+      displayName: 'No Email Person',
+      email: '',
+    };
+    const spec = planRun({ contacts: [...contacts, noEmail], history: [], count: 5, now });
+    expect(spec.contacts.every(c => c.contact.displayName !== 'No Email Person')).toBe(true);
+  });
+
   it('prefers contacts not recently warmed up when history exists', () => {
     const history = [
       {

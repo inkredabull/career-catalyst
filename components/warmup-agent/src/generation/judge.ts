@@ -1,5 +1,5 @@
 import type { BaseLLMProvider } from '@inkredabull/career-catalyst-core';
-import { AGENT_DEFAULTS } from '../config';
+import { resolveMinDraftQuality } from '../config';
 import { parseJsonFromLlm, bedrockJudge } from '../llm/bedrock';
 import type { HookInfo, RenderedDraft, ScorableContact } from '../types';
 
@@ -28,7 +28,7 @@ export const buildJudgePrompt = (input: JudgeInput): string => [
   `Evidence: ${input.hook.evidence}`,
   '',
   'Score 0-100 on: specificity, warmth, non-creepiness, professional tone.',
-  `Pass threshold: ${AGENT_DEFAULTS.minDraftQuality}.`,
+  `Pass threshold: ${resolveMinDraftQuality()}.`,
   'Flag if it references private info, sounds stalker-ish, or is generic fluff.',
   '',
   'Return JSON only:',
@@ -45,13 +45,32 @@ export class DraftQualityJudge {
   async evaluate(input: JudgeInput): Promise<JudgeResponse> {
     const response = await this.llm.makeRequest({
       prompt: buildJudgePrompt(input),
-      systemPrompt: 'You are a strict but fair outreach quality reviewer. Return JSON only.',
+      systemPrompt:
+        'You are a strict but fair outreach quality reviewer. Return JSON only — no prose before or after.',
     });
 
-    const parsed = parseJsonFromLlm<JudgeResponse>(response.text);
+    let parsed: JudgeResponse;
+    try {
+      parsed = parseJsonFromLlm<JudgeResponse>(response.text);
+    } catch {
+      console.warn(
+        `⚠️  Judge returned non-JSON for ${input.contact.displayName}; using neutral fallback score`
+      );
+      const threshold = resolveMinDraftQuality();
+      const score = threshold <= 0 ? 100 : 50;
+      return {
+        score,
+        passed: score >= threshold,
+        feedback: 'Judge response was not valid JSON; applied fallback score',
+        concerns: ['judge_parse_error'],
+      };
+    }
+
+    const threshold = resolveMinDraftQuality();
     return {
       score: parsed.score,
-      passed: parsed.passed && parsed.score >= AGENT_DEFAULTS.minDraftQuality,
+      // Gate on numeric score only — LLM "passed" is advisory (often false even above threshold).
+      passed: parsed.score >= threshold,
       feedback: parsed.feedback,
       concerns: parsed.concerns ?? [],
     };

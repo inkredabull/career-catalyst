@@ -1,3 +1,4 @@
+import { resolveMinDraftQuality } from '../config';
 import type { EnrichmentResult, GeneratedTokens, HookInfo, HookType } from '../types';
 import type { ScorableContact } from '../types';
 import { fallbackTokens } from './generator';
@@ -56,8 +57,9 @@ export const judgeOffline = (tokens: GeneratedTokens): {
   const lengthBonus = Math.min(10, Math.floor(tokens.Personalization.length / 12));
   const score = Math.min(100, hookScore + lengthBonus);
 
+  const threshold = resolveMinDraftQuality();
   const passed =
-    score >= 70 ||
+    score >= threshold ||
     (tokens.hook.hookType === 'check_in' && tokens.Personalization.length >= 40);
 
   let feedback = 'Offline heuristic pass';

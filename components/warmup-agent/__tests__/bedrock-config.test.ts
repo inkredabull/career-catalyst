@@ -1,6 +1,7 @@
 import {
   BEDROCK_MODELS,
   resolveBedrockInferenceProfileId,
+  resolveMinDraftQuality,
 } from '../src/config';
 
 describe('bedrock inference profiles', () => {
@@ -24,5 +25,12 @@ describe('bedrock inference profiles', () => {
       'global.anthropic.claude-haiku-4-5-20251001-v1:0'
     );
     expect(BEDROCK_MODELS.judge).toBe('global.anthropic.claude-sonnet-4-6');
+  });
+
+  it('reads WARMUP_MIN_DRAFT_QUALITY from env', () => {
+    const prev = process.env.WARMUP_MIN_DRAFT_QUALITY;
+    process.env.WARMUP_MIN_DRAFT_QUALITY = '0';
+    expect(resolveMinDraftQuality()).toBe(0);
+    process.env.WARMUP_MIN_DRAFT_QUALITY = prev;
   });
 });

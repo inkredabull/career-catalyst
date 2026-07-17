@@ -51,6 +51,7 @@ export const filterContacts = (
   excludedLabelPrefixes: string[] = []
 ): ScorableContact[] =>
   contacts.filter(contact => {
+    if (!contact.email?.trim()) return false;
     if (isExcludedContact(contact, excludedLabels, excludedEmails)) return false;
     if (excludedLabelPrefixes.length === 0) return true;
     return !contact.labels.some(label => labelMatchesPrefix(label, excludedLabelPrefixes));

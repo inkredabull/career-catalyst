@@ -95,21 +95,30 @@ export class WarmupOrchestrator {
     for (const planned of spec.contacts) {
       let result = await this.corrector.processContact(planned, { dryRun: config.dryRun });
 
-      if (!config.dryRun && result.status === 'DRAFT_CREATED' && result.draft && result.email) {
-        try {
-          const draft = await this.gmailService.createDraft(
-            result.email,
-            result.draft.subject,
-            result.draft.bodyHtml,
-            result.draft.bodyText
-          );
-          result = { ...result, draftUrl: draft.draftUrl, draftId: draft.draftId };
-        } catch (error) {
+      if (!config.dryRun && result.status === 'DRAFT_CREATED' && result.draft) {
+        if (!result.email?.trim()) {
           result = {
             ...result,
-            status: 'FAILED',
-            error: error instanceof Error ? error.message : String(error),
+            status: 'SKIPPED',
+            error:
+              'No email address on contact — Gmail draft not created. Add email in Google Contacts and re-sync.',
           };
+        } else {
+          try {
+            const draft = await this.gmailService.createDraft(
+              result.email,
+              result.draft.subject,
+              result.draft.bodyHtml,
+              result.draft.bodyText
+            );
+            result = { ...result, draftUrl: draft.draftUrl, draftId: draft.draftId };
+          } catch (error) {
+            result = {
+              ...result,
+              status: 'FAILED',
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
         }
       }
 

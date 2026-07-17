@@ -47,30 +47,33 @@ export class BedrockProvider extends BaseLLMProvider {
     }, 1000);
 
     try {
-      const messages: Array<{ role: string; content: string }> = [];
-      if (request.systemPrompt) {
-        messages.push({ role: 'user', content: request.systemPrompt });
-      }
-
       let userContent = request.prompt;
       if (request.cachedContent) {
         userContent = `${request.cachedContent}\n\n${request.prompt}`;
       }
-      messages.push({ role: 'user', content: userContent });
 
-      const body = JSON.stringify({
+      const body: Record<string, unknown> = {
         anthropic_version: 'bedrock-2023-05-31',
         max_tokens: this.config.maxTokens ?? 4000,
         temperature: this.config.temperature,
-        messages,
-      });
+        messages: [{ role: 'user', content: userContent }],
+      };
+
+      if (request.systemPrompt) {
+        body.system = request.systemPrompt;
+      }
+
+      // Reduce adaptive thinking on reasoning models — JSON tasks need text output.
+      if (/sonnet-4-6|opus-4-[6-9]|sonnet-5|opus-4-[78]|fable-5|mythos/i.test(this.config.model)) {
+        body.output_config = { effort: 'low' };
+      }
 
       const response = await this.client.send(
         new InvokeModelCommand({
           modelId: this.config.model,
           contentType: 'application/json',
           accept: 'application/json',
-          body: new TextEncoder().encode(body),
+          body: new TextEncoder().encode(JSON.stringify(body)),
         })
       );
 
@@ -79,7 +82,11 @@ export class BedrockProvider extends BaseLLMProvider {
       process.stdout.write(`\r⏱️  Elapsed time: ${duration}s (complete)\n`);
 
       const parsed = JSON.parse(new TextDecoder().decode(response.body)) as BedrockClaudeResponse;
-      const textContent = parsed.content.find(block => block.type === 'text');
+      const text = parsed.content
+        .filter((block): block is { type: 'text'; text: string } => block.type === 'text' && Boolean(block.text))
+        .map(block => block.text)
+        .join('\n')
+        .trim();
 
       const usage = {
         inputTokens: parsed.usage.input_tokens,
@@ -91,7 +98,7 @@ export class BedrockProvider extends BaseLLMProvider {
       );
 
       return {
-        text: textContent?.text ?? '',
+        text,
         usage,
         cost: this.calculateActualCost(usage),
       };

@@ -145,6 +145,16 @@ export const AGENT_DEFAULTS = {
   maxCorrectIterations: 3,
 } as const;
 
+/** Quality gate threshold — override with WARMUP_MIN_DRAFT_QUALITY (e.g. 0.1 for demos). */
+export const resolveMinDraftQuality = (): number => {
+  const raw = process.env.WARMUP_MIN_DRAFT_QUALITY;
+  if (raw !== undefined && raw !== '') {
+    const parsed = Number(raw);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return AGENT_DEFAULTS.minDraftQuality;
+};
+
 /** Static template token defaults (dynamic tokens filled by Bedrock) */
 export const STATIC_TEMPLATE_VALUES = {
   Reciprocate: 'Either way,',

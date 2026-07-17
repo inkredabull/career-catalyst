@@ -100,7 +100,15 @@ export class WarmupMessageGenerator {
         'You write concise, warm professional outreach tokens. Return valid JSON only.',
     });
 
-    const parsed = parseJsonFromLlm<GeneratorResponse>(response.text);
+    let parsed: GeneratorResponse;
+    try {
+      parsed = parseJsonFromLlm<GeneratorResponse>(response.text);
+    } catch {
+      console.warn(
+        `⚠️  Generator returned non-JSON for ${input.contact.displayName}; using fallback tokens`
+      );
+      return fallbackTokens(input.contact);
+    }
     const hook: HookInfo = {
       hookType: parsed.hookType,
       hookText: parsed.hookText,
