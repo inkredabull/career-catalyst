@@ -101,7 +101,11 @@ async function fetchJD(url: string): Promise<string> {
       if (jina) return jina;
       log("DEBUG", "Falling back to ScrapingBee for %s", url.slice(0, 80));
     } else {
-      log("DEBUG", "LinkedIn URL — using ScrapingBee directly for %s", url.slice(0, 80));
+      log(
+        "DEBUG",
+        "LinkedIn URL — using ScrapingBee directly for %s",
+        url.slice(0, 80),
+      );
     }
     return await fetchViaScrapingBee(url);
   } catch {
