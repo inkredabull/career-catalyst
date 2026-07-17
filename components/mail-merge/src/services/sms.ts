@@ -30,7 +30,7 @@ export const sendRealSms = (to: string, message: string): void => {
 export const buildSmsMessage = (first: string, email: string): string =>
   [
     `Hey ${first}, has been a while! Is ${email} still the best to reach you at? Just emailed you there; hope I didn't land in Spam... :-) Hope you've been well!`,
-    '- Anthony Bull',
+    // '- Anthony Bull',
   ].join('\n\n');
 
 export const notifyViaSMS = (first: string, email: string, number: string): void => {

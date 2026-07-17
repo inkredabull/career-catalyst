@@ -60,6 +60,10 @@ export const SUBJECT_LINE_CONFIG = [
   },
   // { subject: 'Q2 2026 latest-and-greatest', flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } },
   {
+    subject: "Need any add'l eng firepower?",
+    flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
+  },
+  {
     subject: "Quick Favor - Exploring What's Next",
     flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
   },

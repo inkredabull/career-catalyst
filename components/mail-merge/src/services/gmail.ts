@@ -30,6 +30,17 @@ interface LinkedInContact {
   firstName: string;
 }
 
+/** True if `email` is the same mailbox as `myEmail`, ignoring plus-addressing (e.g. anthony+test@bluxomelabs.com). */
+const isSelfEmailVariant = (email: string, myEmail: string): boolean => {
+  if (!email || !myEmail) return false;
+  const normalize = (e: string): string => {
+    const [local, domain] = e.toLowerCase().trim().split('@');
+    if (!domain) return e.toLowerCase().trim();
+    return `${local.split('+')[0]}@${domain}`;
+  };
+  return normalize(email) === normalize(myEmail);
+};
+
 /** Opens each LinkedIn profile in a new tab and auto-closes after 2 s.
  *  Requires popups allowed for docs.google.com (one-time browser setting). */
 const openLinkedInTabs = (contacts: LinkedInContact[]): void => {
@@ -40,19 +51,19 @@ body{font-family:sans-serif;padding:16px;font-size:13px;color:#333}
 h3{margin:0 0 8px;font-size:14px}
 ul{margin:8px 0 0;padding-left:18px}
 li{margin-bottom:6px}
-.msg{color:#555;white-space:pre-wrap;font-size:12px;margin-top:2px}
 </style></head><body>
 <h3 id="status">Opening ${withUrl} LinkedIn profile(s)\u2026</h3>
 <ul id="list"></ul>
 <script>
 var contacts=${contactsJson};
-// Send contacts+messages to content.js via the parent docs.google.com frame,
+// Send contacts+messages to content.js in the outermost docs.google.com frame,
 // which bridges them to the extension background for storage keyed by LinkedIn slug.
-window.parent.postMessage({type:'CC_LI_MESSAGES',contacts:contacts},'*');
+// Use window.top (not window.parent) since this dialog can be nested more than one iframe deep.
+window.top.postMessage({type:'CC_LI_MESSAGES',contacts:contacts},'*');
 contacts.forEach(function(c){
   if(c.url) window.open(c.url,'_blank');
   var li=document.createElement('li');
-  li.innerHTML='<strong>'+c.firstName+'</strong>'+(c.url?' \u2197':' (no URL)')+'<div class="msg">'+c.message+'</div>';
+  li.innerHTML='<strong>'+c.firstName+'</strong>'+(c.url?' \u2197':' (no URL)');
   document.getElementById('list').appendChild(li);
 });
 setTimeout(function(){google.script.host.close();},2000);
@@ -182,6 +193,12 @@ export const sendViaGmail = (
     Logger.log('SMS Logic - isSelfOrMissing: %s', isSelfOrMissing);
 
     if (isSelfOrMissing) {
+      const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
+      if (isSelfEmailVariant(row[COLS.RECIPIENT], myEmail)) {
+        Logger.log('Recipient "%s" is a self-test variant of MY_EMAIL — skipping LinkedIn tab', row[COLS.RECIPIENT]);
+        return null;
+      }
+
       const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
       const message = buildSmsMessage(firstName, row[COLS.RECIPIENT]);
       Logger.log('Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
