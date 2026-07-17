@@ -1340,24 +1340,38 @@ log('💡 LinkedIn Feed: Post save monitoring available when enabled');
 // Auto-click Message and pre-fill compose modal when a pending message is stored for this profile
 (async function autoMessageIfPending() {
   const match = location.pathname.match(/^\/in\/([^/?#]+)/);
-  if (!match) return;
+  if (!match) { log('[AutoMsg] Not a profile URL: ' + location.pathname); return; }
   const slug = match[1].toLowerCase();
   const key = 'li_msg_' + slug;
   const stored = await chrome.storage.local.get(key);
   const message = stored[key];
-  if (!message) return;
+  if (!message) {
+    const allKeys = await chrome.storage.local.get(null);
+    const pendingSlugs = Object.keys(allKeys).filter(k => k.startsWith('li_msg_'));
+    log('[AutoMsg] No pending message for key "' + key + '". Pending keys in storage: ' + JSON.stringify(pendingSlugs));
+    return;
+  }
+  log('[AutoMsg] Found pending message for ' + slug);
 
   // Consume immediately so a reload doesn't re-trigger
   await chrome.storage.local.remove(key);
 
-  // Wait for LinkedIn SPA to render the profile top card
-  await new Promise(r => setTimeout(r, 1500));
+  // Poll for the Message button on the profile top card (cold tab loads can take a few seconds)
+  const findMsgBtn = () => {
+    const topCard = document.querySelector('[componentkey*="Topcard"]') || document;
+    return Array.from(topCard.querySelectorAll('button, a')).find(b => {
+      const label = (b.getAttribute('aria-label') || b.innerText || '').trim().toLowerCase();
+      return label === 'message' || label.startsWith('message ');
+    });
+  };
 
-  const topCard = document.querySelector('[componentkey*="Topcard"]') || document;
-  const msgBtn = Array.from(topCard.querySelectorAll('button, a')).find(b => {
-    const label = (b.getAttribute('aria-label') || b.innerText || '').trim().toLowerCase();
-    return label === 'message' || label.startsWith('message ');
-  });
+  const btnDeadline = Date.now() + 8000;
+  let msgBtn = null;
+  while (Date.now() < btnDeadline) {
+    msgBtn = findMsgBtn();
+    if (msgBtn) break;
+    await new Promise(r => setTimeout(r, 300));
+  }
   if (!msgBtn) { log('[AutoMsg] Message button not found on ' + slug); return; }
   msgBtn.click();
   log('[AutoMsg] Clicked Message button for ' + slug);

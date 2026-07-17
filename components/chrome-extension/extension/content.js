@@ -3798,7 +3798,14 @@ function checkForLinkedInFeed() {
 // Bridge: receive LinkedIn message payloads from GAS HtmlService iframe and store via background
 window.addEventListener('message', function(e) {
   if (e.data && e.data.type === 'CC_LI_MESSAGES' && Array.isArray(e.data.contacts)) {
-    chrome.runtime.sendMessage({action: 'storeLinkedInMessages', contacts: e.data.contacts});
+    console.log('[AutoMsg] Received CC_LI_MESSAGES from', e.origin, 'contacts:', e.data.contacts.map(c => c.url));
+    chrome.runtime.sendMessage({action: 'storeLinkedInMessages', contacts: e.data.contacts}, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('[AutoMsg] storeLinkedInMessages failed:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[AutoMsg] storeLinkedInMessages response:', response);
+      }
+    });
   }
 });
 

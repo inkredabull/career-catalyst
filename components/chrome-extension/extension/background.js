@@ -263,9 +263,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const map = {};
       for (const c of (request.contacts || [])) {
         const match = (c.url || '').match(/\/in\/([^/?#]+)/);
-        if (match) map['li_msg_' + match[1].toLowerCase()] = c.message;
+        if (match) {
+          map['li_msg_' + match[1].toLowerCase()] = c.message;
+        } else {
+          console.warn('[AutoMsg] Could not extract slug from contact URL:', c.url);
+        }
       }
-      chrome.storage.local.set(map, () => sendResponse({ok: true}));
+      console.log('[AutoMsg] Storing keys:', Object.keys(map));
+      chrome.storage.local.set(map, () => sendResponse({ok: true, keys: Object.keys(map)}));
       return true;
     }
 
