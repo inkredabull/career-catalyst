@@ -417,7 +417,9 @@ app.use(cors({
       origin.startsWith('chrome-extension://') ||
       origin.startsWith('http://localhost:') ||
       origin === 'https://www.linkedin.com' ||
-      origin === 'https://linkedin.com'
+      origin === 'https://linkedin.com' ||
+      origin.endsWith('.ashbyhq.com') ||
+      origin === 'https://ashbyhq.com'
     ) {
       return callback(null, true);
     }
