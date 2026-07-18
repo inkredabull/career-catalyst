@@ -207,12 +207,13 @@ export const sendViaGmail = (
       }
 
       const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
-      const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], "making a connection");
+      const topic = draftSubject ?? subjectLine;
+      const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], topic);
       Logger.log('Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
       return { url: linkedInUrl, message, firstName };
     } else {
       Logger.log('Sending SMS to: %s', cellValue);
-      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, "making a connection");
+      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, draftSubject ?? subjectLine);
     }
   }
   return null;
