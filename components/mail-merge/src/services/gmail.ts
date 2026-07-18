@@ -1,6 +1,6 @@
 // Gmail-based email sending and mail merge.
 
-import { COLS, SCRIPT_PROPS, SUBJECT_LINES, getFlagsForSubject } from '../config/settings';
+import { COLS, SCRIPT_PROPS, SUBJECT_LINES, getFlagsForSubject, getTopicForSubject } from '../config/settings';
 import { getJobMetadata } from './job-metadata';
 import { log } from '../utils/logger';
 import {
@@ -227,7 +227,10 @@ export const sendViaGmail = (
 interface SubjectOption {
   value: string;
   label: string;
+  topic: string;
 }
+
+const DEFAULT_TOPIC = 'making a connection';
 
 const getSubjectOptionsForPicker = (): SubjectOption[] =>
   SUBJECT_LINES.map(subject => {
@@ -235,13 +238,12 @@ const getSubjectOptionsForPicker = (): SubjectOption[] =>
     const sms = flags.SEND_SMS ? '🟢' : '🔴';
     const resume = flags.ATTACH_RESUME ? '🟢' : '🔴';
     const photo = flags.ATTACH_PHOTO ? '🟢' : '🔴';
-    return { value: subject, label: `${sms}📱 ${resume}📎 ${photo}🖼️  ${subject}` };
+    return { value: subject, label: `${sms}📱 ${resume}📎 ${photo}🖼️  ${subject}`, topic: getTopicForSubject(subject) };
   });
-
-const DEFAULT_TOPIC = 'making a connection';
 
 const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
   const optionsJson = JSON.stringify(options);
+  const topicMapJson = JSON.stringify(Object.fromEntries(options.map(o => [o.value, o.topic])));
   const fnJson = JSON.stringify(actionFn);
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -259,7 +261,7 @@ button{padding:6px 16px;cursor:pointer}
 <p>Select a subject line:</p>
 <select id="s"><option value="">-- Select --</option></select>
 <p>Topic (used in SMS / LinkedIn message):</p>
-<input type="text" id="t" value="${DEFAULT_TOPIC}">
+<input type="text" id="t" placeholder="${DEFAULT_TOPIC}">
 <div class="btns">
 <button id="cancel" onclick="google.script.host.close()">Cancel</button>
 <button id="ok" onclick="doSubmit()">OK</button>
@@ -269,12 +271,15 @@ button{padding:6px 16px;cursor:pointer}
 <script>
 (function(){
 var options=${optionsJson};
+var topicMap=${topicMapJson};
 var sel=document.getElementById('s');
+var tin=document.getElementById('t');
 options.forEach(function(o){var el=document.createElement('option');el.value=o.value;el.textContent=o.label;sel.appendChild(el);});
+sel.addEventListener('change',function(){tin.value=topicMap[sel.value]||'';});
 window.doSubmit=function(){
 var s=sel.value;
 if(!s){alert('Please select a subject line.');return;}
-var t=document.getElementById('t').value.trim()||'${DEFAULT_TOPIC}';
+var t=tin.value.trim()||topicMap[s]||'${DEFAULT_TOPIC}';
 document.getElementById('form').style.display='none';
 document.getElementById('loading').style.display='block';
 google.script.run

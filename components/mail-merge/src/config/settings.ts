@@ -48,27 +48,32 @@ export const FLAGS = {
   ATTACH_PHOTO: false,
 };
 
-// Subject lines with their flag overrides, in picker display order
+// Subject lines with their flag overrides and default SMS/LinkedIn topic, in picker display order
 export const SUBJECT_LINE_CONFIG = [
   {
     subject: 'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
+    defaultTopic: 'a role I found',
     flags: { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
   },
   {
     subject: 'Need some fractional ENG help?',
+    defaultTopic: 'fractional ENG help',
     flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
   },
-  // { subject: 'Q2 2026 latest-and-greatest', flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } },
+  // { subject: 'Q2 2026 latest-and-greatest', defaultTopic: 'the latest', flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } },
   {
     subject: "Need any add'l eng firepower?",
+    defaultTopic: 'adding eng firepower',
     flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
   },
   {
     subject: "Quick Favor - Exploring What's Next",
+    defaultTopic: "exploring what's next for me",
     flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
   },
   {
     subject: "Catching up + a quick ask",
+    defaultTopic: 'catching up',
     flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
   },
 ] as const;
@@ -79,3 +84,6 @@ export const getFlagsForSubject = (subjectLine: string): typeof FLAGS => {
   const entry = SUBJECT_LINE_CONFIG.find(c => c.subject === subjectLine);
   return entry ? { ...FLAGS, ...entry.flags } : FLAGS;
 };
+
+export const getTopicForSubject = (subjectLine: string): string =>
+  SUBJECT_LINE_CONFIG.find(c => c.subject === subjectLine)?.defaultTopic ?? 'making a connection';
