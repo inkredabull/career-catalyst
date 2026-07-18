@@ -29,7 +29,7 @@ export const sendRealSms = (to: string, message: string): void => {
 
 export const buildSmsMessage = (first: string, email: string, topic = 'making a connection'): string =>
   [
-    `Hey ${first}, has been a while! Is ${email} still the best to reach you at? Just emailed you about ${topic}; hope I didn't land in Spam... :-) Hope you've been well!`,
+    `Hi ${first}, is ${email} the best to reach you at? Just emailed you about ${topic}. Hope you've been well!`,
     // '- Anthony Bull',
   ].join('\n\n');
 
