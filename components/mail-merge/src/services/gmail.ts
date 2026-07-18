@@ -150,7 +150,8 @@ export const sendViaGmail = (
   row: Record<string, string>,
   msgObj: MsgObj,
   emailTemplate?: { attachments: GoogleAppsScript.Base.Blob[] } | null,
-  draftSubject?: string
+  draftSubject?: string,
+  topic?: string,
 ): LinkedInContact | null => {
   const subjectLine = msgObj.subject;
   Logger.log('Sending via Gmail: %s', subjectLine);
@@ -207,13 +208,13 @@ export const sendViaGmail = (
       }
 
       const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
-      const topic = draftSubject ?? subjectLine;
-      const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], topic);
+      const resolvedTopic = topic ?? draftSubject ?? subjectLine;
+      const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], resolvedTopic);
       Logger.log('Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
       return { url: linkedInUrl, message, firstName };
     } else {
       Logger.log('Sending SMS to: %s', cellValue);
-      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, draftSubject ?? subjectLine);
+      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, topic ?? draftSubject ?? subjectLine);
     }
   }
   return null;
@@ -237,13 +238,17 @@ const getSubjectOptionsForPicker = (): SubjectOption[] =>
     return { value: subject, label: `${sms}📱 ${resume}📎 ${photo}🖼️  ${subject}` };
   });
 
+const DEFAULT_TOPIC = 'making a connection';
+
 const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
   const optionsJson = JSON.stringify(options);
   const fnJson = JSON.stringify(actionFn);
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
-p{margin:0 0 6px}
-select{width:100%;padding:6px;font-size:13px;margin-bottom:14px}
+p{margin:0 0 4px;font-size:13px}
+select,input[type=text]{width:100%;padding:6px;font-size:13px;box-sizing:border-box}
+select{margin-bottom:10px}
+input[type=text]{margin-bottom:14px;border:1px solid #ccc;border-radius:3px}
 .btns{display:flex;gap:8px;justify-content:flex-end}
 button{padding:6px 16px;cursor:pointer}
 #loading{display:none;text-align:center;padding:12px 0;color:#555;font-size:14px}
@@ -253,6 +258,8 @@ button{padding:6px 16px;cursor:pointer}
 <div id="form">
 <p>Select a subject line:</p>
 <select id="s"><option value="">-- Select --</option></select>
+<p>Topic (used in SMS / LinkedIn message):</p>
+<input type="text" id="t" value="${DEFAULT_TOPIC}">
 <div class="btns">
 <button id="cancel" onclick="google.script.host.close()">Cancel</button>
 <button id="ok" onclick="doSubmit()">OK</button>
@@ -267,6 +274,7 @@ options.forEach(function(o){var el=document.createElement('option');el.value=o.v
 window.doSubmit=function(){
 var s=sel.value;
 if(!s){alert('Please select a subject line.');return;}
+var t=document.getElementById('t').value.trim()||'${DEFAULT_TOPIC}';
 document.getElementById('form').style.display='none';
 document.getElementById('loading').style.display='block';
 google.script.run
@@ -276,7 +284,7 @@ document.getElementById('loading').style.display='none';
 document.getElementById('form').style.display='block';
 alert(e.message);
 })
-[${fnJson}](s);
+[${fnJson}](s,t);
 };
 })();
 </script></body></html>`;
@@ -291,7 +299,7 @@ const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
   const actionFn = action === 'send' ? 'doSendEmails' : 'doSendTestEmail';
   const html = HtmlService.createHtmlOutput(buildSubjectPickerHtml(options, actionFn))
     .setWidth(500)
-    .setHeight(185);
+    .setHeight(220);
   SpreadsheetApp.getUi().showModalDialog(html, 'Choose Subject');
 };
 
@@ -299,6 +307,7 @@ const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
 
 export const doSendTestEmail = (
   subject: string,
+  topic = DEFAULT_TOPIC,
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
   const testRecipient = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.TEST_EMAIL);
@@ -322,7 +331,7 @@ export const doSendTestEmail = (
 
   row[COLS.RECIPIENT] = testRecipient;
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-  const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject);
+  const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
   if (linkedin) openLinkedInTabs([linkedin]);
   Logger.log('Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
@@ -345,6 +354,7 @@ export const queueEmails = (
 
 export const doSendEmails = (
   subject: string,
+  topic = DEFAULT_TOPIC,
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
   Logger.log('Getting draft: %s', subject);
@@ -365,7 +375,7 @@ export const doSendEmails = (
     if (row[COLS.EMAIL_SENT] === '') {
       try {
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-        const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject);
+        const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
         if (linkedin) linkedInContacts.push(linkedin);
         out.push([new Date()]);
         sentCount++;
