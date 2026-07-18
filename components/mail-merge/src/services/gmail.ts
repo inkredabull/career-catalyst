@@ -77,9 +77,9 @@ function randomDelay(min,max){return new Promise(function(r){setTimeout(r, Math.
 </script>
 </body></html>`;
 
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(420).setHeight(Math.min(80 + contacts.length * 60, 400)),
-    `LinkedIn (${contacts.length})`
+  SpreadsheetApp.getUi().showModelessDialog(
+    HtmlService.createHtmlOutput(html).setWidth(1).setHeight(1),
+    ' '
   );
 };
 
