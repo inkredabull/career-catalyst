@@ -60,13 +60,20 @@ var contacts=${contactsJson};
 // which bridges them to the extension background for storage keyed by LinkedIn slug.
 // Use window.top (not window.parent) since this dialog can be nested more than one iframe deep.
 window.top.postMessage({type:'CC_LI_MESSAGES',contacts:contacts},'*');
-contacts.forEach(function(c){
-  if(c.url) window.open(c.url,'_blank');
-  var li=document.createElement('li');
-  li.innerHTML='<strong>'+c.firstName+'</strong>'+(c.url?' \u2197':' (no URL)');
-  document.getElementById('list').appendChild(li);
-});
-setTimeout(function(){google.script.host.close();},2000);
+// Random delay between tab opens, same range as components/networker/src/commands/send.ts,
+// to avoid opening all LinkedIn tabs at once (looks less bot-like, easier on LinkedIn rate limits).
+function randomDelay(min,max){return new Promise(function(r){setTimeout(r, Math.floor(Math.random()*(max-min+1))+min);});}
+(async function(){
+  for (var i=0;i<contacts.length;i++){
+    var c=contacts[i];
+    if(c.url) window.open(c.url,'_blank');
+    var li=document.createElement('li');
+    li.innerHTML='<strong>'+c.firstName+'</strong>'+(c.url?' \u2197':' (no URL)');
+    document.getElementById('list').appendChild(li);
+    if(i<contacts.length-1) await randomDelay(1600,3750);
+  }
+  setTimeout(function(){google.script.host.close();},2000);
+})();
 </script>
 </body></html>`;
 
@@ -200,12 +207,12 @@ export const sendViaGmail = (
       }
 
       const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
-      const message = buildSmsMessage(firstName, row[COLS.RECIPIENT]);
+      const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], "making a connection");
       Logger.log('Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
       return { url: linkedInUrl, message, firstName };
     } else {
       Logger.log('Sending SMS to: %s', cellValue);
-      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue);
+      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, "making a connection");
     }
   }
   return null;
