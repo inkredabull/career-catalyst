@@ -1337,8 +1337,65 @@ setInterval(checkUrlChange, 1000);
 log('LinkedIn Networking: Content script loaded');
 log('💡 LinkedIn Feed: Post save monitoring available when enabled');
 
-// Auto-click Message and pre-fill compose modal when a pending message is stored for this profile
+// Auto-click Message and pre-fill compose modal when a pending message is stored for this profile.
+// Clicking "Message" sometimes opens an in-page modal, sometimes navigates the same tab to
+// /messaging/compose/..., and sometimes opens that URL in a brand-new tab (target="_blank") —
+// sessionStorage doesn't survive the new-tab case, so we hand the message off via chrome.storage.local
+// (shared across all tabs) keyed by the target's profileUrn, which appears both in the Message link's
+// href on the profile page and in the compose page's own URL query string.
+function extractProfileUrnParam(urlStr) {
+  try {
+    return new URL(urlStr, location.origin).searchParams.get('profileUrn') || '';
+  } catch {
+    return '';
+  }
+}
+
+const PENDING_MSG_FALLBACK_KEY = 'li_pending_msg_latest';
+const pendingMsgKeyForUrn = (profileUrn) => 'li_pending_msg_' + encodeURIComponent(profileUrn);
+
+async function fillPendingMessage() {
+  const profileUrn = extractProfileUrnParam(location.href);
+  const specificKey = profileUrn ? pendingMsgKeyForUrn(profileUrn) : null;
+  const keysToTry = [specificKey, PENDING_MSG_FALLBACK_KEY].filter(Boolean);
+
+  const stored = await chrome.storage.local.get(keysToTry);
+  const foundKey = keysToTry.find(k => stored[k]);
+  if (!foundKey) {
+    const allKeys = await chrome.storage.local.get(null);
+    const pendingKeys = Object.keys(allKeys).filter(k => k.startsWith('li_pending_msg_'));
+    log('[AutoMsg] No pending message found. profileUrn: "' + profileUrn + '", tried keys: ' + JSON.stringify(keysToTry) + ', all pending keys in storage: ' + JSON.stringify(pendingKeys));
+    return false;
+  }
+  const message = stored[foundKey];
+  log('[AutoMsg] Found pending message under key "' + foundKey + '"');
+
+  await chrome.storage.local.remove(keysToTry);
+
+  const deadline = Date.now() + 6000;
+  let editor = null;
+  while (Date.now() < deadline) {
+    editor = document.querySelector('.msg-form__contenteditable[contenteditable]')
+          || document.querySelector('div[role="textbox"][contenteditable]');
+    if (editor) break;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  if (!editor) { log('[AutoMsg] Compose editor not found (pending-message handoff)'); return false; }
+
+  editor.focus();
+  document.execCommand('selectAll', false);
+  document.execCommand('insertText', false, message);
+  editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  log('[AutoMsg] Message pre-filled via pending-message handoff');
+  return true;
+}
+
 (async function autoMessageIfPending() {
+  // Handle a message queued just before a Message-button click that ended up navigating (possibly
+  // to a new tab) to a fresh URL, e.g. /messaging/compose/... — runs on every LinkedIn page load.
+  const filled = await fillPendingMessage();
+  if (filled) return;
+
   const match = location.pathname.match(/^\/in\/([^/?#]+)/);
   if (!match) { log('[AutoMsg] Not a profile URL: ' + location.pathname); return; }
   const slug = match[1].toLowerCase();
@@ -1373,23 +1430,30 @@ log('💡 LinkedIn Feed: Post save monitoring available when enabled');
     await new Promise(r => setTimeout(r, 300));
   }
   if (!msgBtn) { log('[AutoMsg] Message button not found on ' + slug); return; }
-  msgBtn.click();
-  log('[AutoMsg] Clicked Message button for ' + slug);
 
-  // Poll for the compose modal (contenteditable div used by LinkedIn messaging)
-  const deadline = Date.now() + 6000;
-  let editor = null;
-  while (Date.now() < deadline) {
-    editor = document.querySelector('.msg-form__contenteditable[contenteditable]')
-          || document.querySelector('div[role="textbox"][contenteditable]');
-    if (editor) break;
-    await new Promise(r => setTimeout(r, 200));
+  // Stash before clicking, in case the click navigates (possibly to a new tab) to a fresh URL.
+  // Write under both the URN-specific key (if the link's href reveals the target profileUrn) and a
+  // generic fallback key, so the eventual compose page can match by URN or fall back to "latest".
+  const msgHref = msgBtn.getAttribute('href') || msgBtn.href || '';
+  const profileUrn = extractProfileUrnParam(msgHref);
+  const writes = { [PENDING_MSG_FALLBACK_KEY]: message };
+  if (profileUrn) writes[pendingMsgKeyForUrn(profileUrn)] = message;
+  await chrome.storage.local.set(writes);
+
+  // Prefer a direct navigation over a synthetic click: LinkedIn's SPA click handlers don't
+  // consistently react to a programmatic .click() (it worked in some cases, silently no-op'd in
+  // others), but a real anchor's href is always a reliable, fully-formed compose URL to navigate to.
+  const absoluteHref = msgBtn.href || msgHref;
+  if (absoluteHref) {
+    log('[AutoMsg] Navigating directly to Message href for ' + slug + (profileUrn ? ' (profileUrn matched)' : ' (no profileUrn in href)'));
+    window.location.href = absoluteHref;
+  } else {
+    msgBtn.click();
+    log('[AutoMsg] Clicked Message button for ' + slug + ' (no href available, used synthetic click)');
   }
-  if (!editor) { log('[AutoMsg] Compose editor not found for ' + slug); return; }
 
-  editor.focus();
-  document.execCommand('selectAll', false);
-  document.execCommand('insertText', false, message);
-  editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
-  log('[AutoMsg] Message pre-filled for ' + slug);
+  // If this tab is still here (in-page modal, no navigation), fill immediately.
+  // If a navigation happened (same tab or new tab), this whole IIFE may already be dead — the new
+  // page's own load will handle it via the fillPendingMessage() call at the top of this script.
+  await fillPendingMessage();
 })();
