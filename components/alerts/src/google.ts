@@ -31,6 +31,7 @@ const NOISE_SEGMENTS = new Set([
   "greenhouse",
   "lever",
   "builtin",
+  "levels",
 ]);
 
 /** Parses a raw Google/Serper result title into job title + company.
@@ -143,6 +144,12 @@ const GOOGLE_SEARCHES: GoogleSearch[] = [
     label: "BuiltInSF/SF",
     source: "BuiltInSF",
     prefix: "site:builtinsf.com/jobs",
+    suffix: '-"new grad" -"intern"',
+  },
+  {
+    label: "Levels/US",
+    source: "Levels.fyi",
+    prefix: "site:levels.fyi/jobs",
     suffix: '-"new grad" -"intern"',
   },
 ];
