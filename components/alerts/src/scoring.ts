@@ -149,7 +149,7 @@ End with a blank line then: Verdict: [🟢 Strong Fit — Pursue Actively | 🟡
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: "claude-haiku-4-5",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1500,
       system:
         "You are a job scoring assistant for a VP Engineering / CTO candidate. Score each dimension and end with the verdict.",
