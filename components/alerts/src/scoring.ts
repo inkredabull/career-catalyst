@@ -150,7 +150,7 @@ End with a blank line then: Verdict: [🟢 Strong Fit — Pursue Actively | 🟡
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1500,
+      max_tokens: 2500,
       system:
         "You are a job scoring assistant for a VP Engineering / CTO candidate. Score each dimension and end with the verdict.",
       messages: [{ role: "user", content: userMessage }],
@@ -161,7 +161,7 @@ End with a blank line then: Verdict: [🟢 Strong Fit — Pursue Actively | 🟡
       .map((b) => b.text)
       .join("");
 
-    const verdictMatch = text.match(/Verdict:\s*(🟢|🟡|🔴)/);
+    const verdictMatch = text.match(/Verdict[^🟢🟡🔴\n]*[:\s]+(🟢|🟡|🔴)/i);
     let verdict: ScoreResult["verdict"] = "?";
     if (verdictMatch) {
       verdict = verdictMatch[1] as ScoreResult["verdict"];
