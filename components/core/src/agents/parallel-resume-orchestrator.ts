@@ -4,7 +4,7 @@ import { ResumeCriticAgent } from './resume-critic-agent';
 import { ProviderFactory } from '../providers/provider-factory';
 import { JobListing } from '../types';
 import { LLMProviderConfig } from '../providers/llm-provider';
-import { getCritiqueAndJudgeMaxAttempts } from '../config';
+import { getCritiqueAndJudgeMaxAttempts, getLLMAutoConfirm, getResumeOutputDir } from '../config';
 import { resolveFromProjectRoot } from '../utils/project-root';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -541,7 +541,7 @@ export class ParallelResumeOrchestrator {
   }
 
   private async confirmCost(models: ParallelConfig['models'], estimatedCost: number, withCritique: boolean): Promise<boolean> {
-    if (process.env.LLM_AUTO_CONFIRM === 'true') {
+    if (getLLMAutoConfirm()) {
       console.log(`💰 Auto-confirmed: ~$${estimatedCost.toFixed(4)}\n`);
       return true;
     }
@@ -831,13 +831,11 @@ header-includes: |
         : envStaging;
     }
     // Fall back to RESUME_OUTPUT_DIR if set, otherwise local output/ dir
-    const outputDir = process.env.RESUME_OUTPUT_DIR;
-    if (outputDir) {
-      return outputDir.startsWith('~/')
-        ? path.join(os.homedir(), outputDir.slice(2))
-        : outputDir;
+    try {
+      return getResumeOutputDir();
+    } catch {
+      return resolveFromProjectRoot('output');
     }
-    return resolveFromProjectRoot('output');
   }
 
   private createComparisonFolder(jobId: string, company: string): string {
@@ -878,19 +876,7 @@ header-includes: |
   }
 
   private getOutputDirectory(): string {
-    const envDir = process.env.RESUME_OUTPUT_DIR;
-    if (envDir) {
-      // Handle tilde expansion
-      if (envDir.startsWith('~/')) {
-        const homeDir = os.homedir();
-        return path.join(homeDir, envDir.slice(2));
-      }
-      return envDir;
-    }
-
-    // Default to Google Drive location
-    const homeDir = os.homedir();
-    return path.join(homeDir, 'Google Drive', 'My Drive', 'Professional', 'Job Search', 'Applications', 'Resumes');
+    return getResumeOutputDir();
   }
 
   private async generatePDF(

@@ -3,75 +3,13 @@
 import { Command } from 'commander';
 import { InterviewPrepAgent } from './agents/interview-prep-agent';
 import { StatementType, AboutMeSection } from './types';
-import { getAnthropicConfig } from '@inkredabull/career-catalyst-core';
+import { getAnthropicConfig, getCvPath } from '@inkredabull/career-catalyst-core';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as fss from 'fs';
 import { execSync } from 'child_process';
 import * as readline from 'readline';
 
-async function findCvFile(): Promise<string> {
-  let projectRoot = process.cwd();
-  try {
-    let currentDir = process.cwd();
-    while (currentDir !== path.dirname(currentDir)) {
-      const pkgPath = path.join(currentDir, 'package.json');
-      if (fss.existsSync(pkgPath)) {
-        const pkg = JSON.parse(fss.readFileSync(pkgPath, 'utf-8'));
-        if (pkg.workspaces) {
-          projectRoot = currentDir;
-          break;
-        }
-      }
-      currentDir = path.dirname(currentDir);
-    }
-  } catch {
-    // fall through: use cwd
-  }
-
-  if (process.env.CV_PATH) {
-    const candidates = [
-      process.env.CV_PATH,
-      path.resolve(projectRoot, process.env.CV_PATH),
-    ];
-    for (const p of candidates) {
-      try {
-        await fs.access(p);
-        console.log(`📄 Using CV file from CV_PATH: ${p}`);
-        return p;
-      } catch {
-        // try next
-      }
-    }
-    throw new Error(`CV file not found at CV_PATH=${process.env.CV_PATH} (tried relative to cwd and project root)`);
-  }
-
-  const possiblePaths = [
-    'cv.txt',
-    './cv.txt',
-    'CV.txt',
-    './CV.txt',
-    'sample-cv.txt',
-    './sample-cv.txt',
-    path.join(projectRoot, 'cv.txt'),
-    path.join(projectRoot, 'CV.txt'),
-    path.join(projectRoot, 'sample-cv.txt'),
-    path.join(projectRoot, 'data', 'cv.txt'),
-    path.join(projectRoot, 'data', 'CV.txt')
-  ];
-
-  for (const cvPath of possiblePaths) {
-    try {
-      await fs.access(cvPath);
-      console.log(`📄 Found CV file: ${cvPath}`);
-      return cvPath;
-    } catch {
-      // continue
-    }
-  }
-
-  throw new Error('CV file not found. Set CV_PATH in .env or create cv.txt in the project root.');
-}
 
 function unescapeRTF(content: string): string {
   return content
@@ -108,7 +46,7 @@ async function interactiveAboutMeGeneration(jobId: string, options: any): Promis
       config.model,
       config.maxTokens
     );
-    const cvFile = await findCvFile();
+    const cvFile = getCvPath();
 
     const materialOptions = {
       emphasis: options.emphasis,
@@ -505,7 +443,7 @@ program
           process.exit(1);
         }
 
-        const cvFile = await findCvFile();
+        const cvFile = getCvPath();
 
         if (!options.content) {
           console.log('🎙️ Generating comprehensive interview preparation...');
@@ -576,7 +514,7 @@ program
         return;
       }
 
-      const cvFile = await findCvFile();
+      const cvFile = getCvPath();
 
       if (!options.content) {
         console.log('📝 Generating interview material...');
@@ -672,7 +610,7 @@ for (const [commandName, section] of Object.entries(sectionCommands)) {
     .option('--view', 'View the section content')
     .action(async (jobId: string, options) => {
       try {
-        const cvFile = await findCvFile();
+        const cvFile = getCvPath();
         const config = getAnthropicConfig();
         const interviewPrepAgent = new InterviewPrepAgent(config.anthropicApiKey, config.model, config.maxTokens);
 

@@ -1,5 +1,6 @@
 import * as readline from 'readline';
 import { BaseLLMProvider, LLMRequest } from '../providers/llm-provider';
+import { getLLMAutoConfirm } from '../config';
 
 export async function confirmCostEstimate(
   provider: BaseLLMProvider,
@@ -30,8 +31,8 @@ export async function confirmCostEstimate(
   console.log('='.repeat(60));
 
   // Check for AUTO_CONFIRM environment variable (useful for CI/testing)
-  if (process.env.LLM_AUTO_CONFIRM === 'true') {
-    console.log('✅ Auto-confirmed via LLM_AUTO_CONFIRM=true\n');
+  if (getLLMAutoConfirm()) {
+    console.log('✅ Auto-confirmed via LLM_AUTO_CONFIRM\n');
     return true;
   }
 

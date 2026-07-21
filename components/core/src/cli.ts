@@ -9,7 +9,7 @@ import { OutreachAgent } from './agents/outreach-agent';
 import { MetricsAgent } from './agents/metrics-agent';
 import { WhoGotHiredAgent } from './agents/whogothired-agent';
 import { ModeDetectorAgent } from './agents/mode-detector-agent';
-import { getConfig, getAnthropicConfig, getResumeGenerationConfig, getCritiqueAndJudgeMaxAttempts, getBlurbConfig } from './config';
+import { getConfig, getAnthropicConfig, getResumeGenerationConfig, getCritiqueAndJudgeMaxAttempts, getBlurbConfig, getCvPath } from './config';
 import { BlurbGeneratorAgent } from './agents/blurb-generator-agent';
 import { maybeRefreshOpenRouterModels } from './utils/openrouter-model-refresh';
 import { LLMProviderConfig } from './providers/llm-provider';
@@ -21,69 +21,6 @@ import { execSync } from 'child_process';
 import { createSheetsLogger } from './integrations/sheets-logger';
 import { resolveFromProjectRoot } from './utils/project-root';
 
-// Helper function to find CV file automatically
-async function findCvFile(): Promise<string> {
-  let projectRoot = process.cwd();
-  try {
-    let currentDir = process.cwd();
-    while (currentDir !== path.dirname(currentDir)) {
-      const pkgPath = path.join(currentDir, 'package.json');
-      if (fss.existsSync(pkgPath)) {
-        const pkg = JSON.parse(fss.readFileSync(pkgPath, 'utf-8'));
-        if (pkg.workspaces) {
-          projectRoot = currentDir;
-          break;
-        }
-      }
-      currentDir = path.dirname(currentDir);
-    }
-  } catch {
-    // fall through: use cwd
-  }
-
-  if (process.env.CV_PATH) {
-    const candidates = [
-      process.env.CV_PATH,
-      path.resolve(projectRoot, process.env.CV_PATH),
-    ];
-    for (const p of candidates) {
-      try {
-        await fs.access(p);
-        console.log(`📄 Using CV file from CV_PATH: ${p}`);
-        return p;
-      } catch {
-        // try next
-      }
-    }
-    throw new Error(`CV file not found at CV_PATH=${process.env.CV_PATH} (tried relative to cwd and project root)`);
-  }
-
-  const possiblePaths = [
-    'cv.txt',
-    './cv.txt',
-    'CV.txt',
-    './CV.txt',
-    'sample-cv.txt',
-    './sample-cv.txt',
-    path.join(projectRoot, 'cv.txt'),
-    path.join(projectRoot, 'CV.txt'),
-    path.join(projectRoot, 'sample-cv.txt'),
-    path.join(projectRoot, 'data', 'cv.txt'),
-    path.join(projectRoot, 'data', 'CV.txt')
-  ];
-
-  for (const cvPath of possiblePaths) {
-    try {
-      await fs.access(cvPath);
-      console.log(`📄 Found CV file: ${cvPath}`);
-      return cvPath;
-    } catch {
-      // continue
-    }
-  }
-
-  throw new Error('CV file not found. Set CV_PATH in .env or create cv.txt in the project root.');
-}
 
 const program = new Command();
 
@@ -659,7 +596,7 @@ program
     try {
       const { ParallelResumeOrchestrator } = await import('./agents/parallel-resume-orchestrator');
 
-      const cvFile = await findCvFile();
+      const cvFile = getCvPath();
       const configPath = options.config ? path.resolve(options.config) : undefined;
       await maybeRefreshOpenRouterModels(configPath);
       const orchestrator = new ParallelResumeOrchestrator(configPath);

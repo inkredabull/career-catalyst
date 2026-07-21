@@ -8,7 +8,8 @@ import {
   resolveFromProjectRoot,
   ApplicationFormField,
   ApplicationFormData,
-  ApplicationResult
+  ApplicationResult,
+  getCvPath
 } from '@inkredabull/career-catalyst-core';
 import { InterviewPrepAgent } from '@inkredabull/career-catalyst-prep';
 import * as fs from 'fs';
@@ -19,23 +20,6 @@ import axios from 'axios';
 import { Stagehand } from '@browserbasehq/stagehand';
 import * as readline from 'readline';
 
-function findCvFileSync(): string | null {
-  const projectRoot = resolveFromProjectRoot('.');
-  if (process.env.CV_PATH) {
-    const candidates = [
-      process.env.CV_PATH,
-      path.resolve(projectRoot, process.env.CV_PATH),
-    ];
-    return candidates.find(p => fs.existsSync(p)) ?? null;
-  }
-  const candidates = [
-    path.join(projectRoot, 'cv.txt'),
-    path.join(projectRoot, 'CV.txt'),
-    path.join(projectRoot, 'sample-cv.txt'),
-    'cv.txt', 'CV.txt', 'sample-cv.txt',
-  ];
-  return candidates.find(p => fs.existsSync(p)) ?? null;
-}
 
 export class ApplicationAgent extends BaseAgent {
   private resumeAgent: ResumeCreatorAgent;
@@ -795,10 +779,7 @@ export class ApplicationAgent extends BaseAgent {
 
         try {
           // Find CV file for interview prep generation
-          const cvFilePath = findCvFileSync();
-          if (!cvFilePath) {
-            throw new Error('No CV file found. Set CV_PATH in .env or ensure cv.txt exists in the project directory.');
-          }
+          const cvFilePath = getCvPath();
 
           console.log(`📄 Using CV file: ${cvFilePath}`);
 
@@ -868,11 +849,13 @@ export class ApplicationAgent extends BaseAgent {
       console.log('🔄 Generating tailored resume using ResumeCreatorAgent...');
 
       // Find CV file
-      const cvFilePath = findCvFileSync();
-      if (!cvFilePath) {
+      let cvFilePath: string;
+      try {
+        cvFilePath = getCvPath();
+      } catch {
         return {
           success: false,
-          error: 'No CV file found. Set CV_PATH in .env or ensure cv.txt exists in the current directory.'
+          error: 'No CV file found. Set CV_PATH in career-catalyst.config.json or ensure cv.txt exists in the project directory.'
         };
       }
 
@@ -910,7 +893,7 @@ export class ApplicationAgent extends BaseAgent {
   private extractPersonalInfo(): any {
     // Extract from CV file
     try {
-      const cvContent = fs.readFileSync(findCvFileSync() || 'cv.txt', 'utf-8');
+      const cvContent = fs.readFileSync(getCvPath(), 'utf-8');
       const lines = cvContent.split('\n');
 
       const personalInfo: any = {};
@@ -1286,7 +1269,7 @@ Provide only the field value, nothing else:`;
   private async generateExperienceResponse(field: ApplicationFormField, applicationData: any): Promise<string> {
     let cvContent = '';
     try {
-      cvContent = fs.readFileSync(findCvFileSync() || 'cv.txt', 'utf-8');
+      cvContent = fs.readFileSync(getCvPath(), 'utf-8');
     } catch (error) {
       console.warn('⚠️  Could not load CV file for experience response');
     }

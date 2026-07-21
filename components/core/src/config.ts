@@ -5,92 +5,118 @@ import fs from 'fs';
 import { AgentConfig } from './types';
 import { LLMProviderConfig } from './providers/llm-provider';
 
-// Find and load .env from project root (supports running from workspace packages)
-function loadEnvFromProjectRoot() {
-  let currentDir = __dirname;
+const APP_CONFIG_FILE = 'career-catalyst.config.json';
 
-  // Walk up to find project root (contains package.json with workspaces)
+type AppConfig = Record<string, string | number | boolean>;
+let _appConfig: AppConfig | null = null;
+
+function findProjectRoot(): string | null {
+  let currentDir = __dirname;
   while (currentDir !== path.dirname(currentDir)) {
     const pkgPath = path.join(currentDir, 'package.json');
     if (fs.existsSync(pkgPath)) {
       try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-        if (pkg.workspaces) {
-          // Found project root, load .env from here
-          const envPath = path.join(currentDir, '.env');
-          if (fs.existsSync(envPath)) {
-            dotenv.config({ path: envPath });
-            return;
-          }
-        }
-      } catch {
-        // Continue searching
-      }
+        if (pkg.workspaces) return currentDir;
+      } catch { /* continue */ }
     }
     currentDir = path.dirname(currentDir);
   }
+  return null;
+}
 
-  // Fallback to default behavior
+function loadEnvFromProjectRoot() {
+  const root = findProjectRoot();
+  if (root) {
+    const envPath = path.join(root, '.env');
+    if (fs.existsSync(envPath)) { dotenv.config({ path: envPath }); return; }
+  }
   dotenv.config();
+}
+
+function loadAppConfig(): AppConfig {
+  if (_appConfig) return _appConfig;
+  const root = findProjectRoot();
+  if (root) {
+    const cfgPath = path.join(root, APP_CONFIG_FILE);
+    if (fs.existsSync(cfgPath)) {
+      try {
+        _appConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf-8')) as AppConfig;
+        return _appConfig;
+      } catch { /* fall through */ }
+    }
+  }
+  _appConfig = {};
+  return _appConfig;
+}
+
+/** Resolve a config value: process.env wins, then career-catalyst.config.json, then fallback. */
+function cfg(key: string, fallback: string): string {
+  if (process.env[key] !== undefined) return process.env[key] as string;
+  const ac = loadAppConfig();
+  if (ac[key] !== undefined) return String(ac[key]);
+  return fallback;
 }
 
 loadEnvFromProjectRoot();
 
 export function getConfig(): AgentConfig {
   const openaiApiKey = process.env.OPENAI_API_KEY;
-  
-  if (!openaiApiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is required');
-  }
-
+  if (!openaiApiKey) throw new Error('OPENAI_API_KEY environment variable is required');
   return {
     openaiApiKey,
-    model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
-    temperature: process.env.OPENAI_TEMPERATURE ? parseFloat(process.env.OPENAI_TEMPERATURE) : 0.3,
-    maxTokens: process.env.OPENAI_MAX_TOKENS ? parseInt(process.env.OPENAI_MAX_TOKENS) : 2000,
+    model: cfg('OPENAI_MODEL', 'gpt-3.5-turbo'),
+    temperature: parseFloat(cfg('OPENAI_TEMPERATURE', '0.3')),
+    maxTokens: parseInt(cfg('OPENAI_MAX_TOKENS', '2000')),
   };
 }
 
 export function getAnthropicConfig(): { anthropicApiKey: string; model: string; maxTokens: number; maxRoles: number } {
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!anthropicApiKey) {
-    throw new Error('ANTHROPIC_API_KEY environment variable is required');
-  }
-
+  if (!anthropicApiKey) throw new Error('ANTHROPIC_API_KEY environment variable is required');
   return {
     anthropicApiKey,
-    model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929',
-    maxTokens: process.env.ANTHROPIC_MAX_TOKENS ? parseInt(process.env.ANTHROPIC_MAX_TOKENS) : 8000,
-    maxRoles: process.env.MAX_ROLES ? parseInt(process.env.MAX_ROLES) : 4,
+    model: cfg('ANTHROPIC_MODEL', 'claude-sonnet-4-5-20250929'),
+    maxTokens: parseInt(cfg('ANTHROPIC_MAX_TOKENS', '8000')),
+    maxRoles: parseInt(cfg('MAX_ROLES', '4')),
   };
 }
 
 export function getAutoResumeConfig(): { threshold: number; cvPath: string | null } {
   return {
-    threshold: process.env.AUTO_RESUME_THRESHOLD ? parseInt(process.env.AUTO_RESUME_THRESHOLD) : 80,
-    cvPath: process.env.AUTO_RESUME_CV_PATH || null,
+    threshold: parseInt(cfg('AUTO_RESUME_THRESHOLD', '80')),
+    cvPath: cfg('AUTO_RESUME_CV_PATH', '') || null,
   };
 }
 
 export function getCritiqueAndJudgeMaxAttempts(): number {
-  return process.env.CRITIQUE_AND_JUDGE_MAX_ATTEMPTS ? parseInt(process.env.CRITIQUE_AND_JUDGE_MAX_ATTEMPTS) : 2;
+  return parseInt(cfg('CRITIQUE_AND_JUDGE_MAX_ATTEMPTS', '2'));
 }
 
 export function getResumeOutputDir(): string {
-  const envDir = process.env.RESUME_OUTPUT_DIR;
-  if (envDir) {
-    // Handle tilde expansion for home directory
-    if (envDir.startsWith('~/')) {
-      const homeDir = os.homedir();
-      return path.join(homeDir, envDir.slice(2));
-    }
-    return envDir;
+  const dir = cfg('RESUME_OUTPUT_DIR', '');
+  if (dir) {
+    return dir.startsWith('~/') ? path.join(os.homedir(), dir.slice(2)) : dir;
   }
+  return path.join(os.homedir(), 'Google Drive', 'My Drive', 'Professional', 'Job Search', 'Applications', 'Resumes');
+}
 
-  // Fallback to default Google Drive location
-  const homeDir = os.homedir();
-  return path.join(homeDir, 'Google Drive', 'My Drive', 'Professional', 'Job Search', 'Applications', 'Resumes');
+export function getLLMAutoConfirm(): boolean {
+  return cfg('LLM_AUTO_CONFIRM', 'false').toLowerCase() === 'true';
+}
+
+export function getCvPath(): string {
+  const root = findProjectRoot() ?? process.cwd();
+  const raw = cfg('CV_PATH', './work-history/cv.txt');
+  // Resolve relative paths from project root
+  const resolved = path.isAbsolute(raw) ? raw : path.resolve(root, raw);
+  if (fs.existsSync(resolved)) return resolved;
+  // Fallback discovery
+  for (const name of ['work-history/cv.txt', 'cv.txt', 'CV.txt', 'sample-cv.txt']) {
+    const p = path.join(root, name);
+    if (fs.existsSync(p)) return p;
+  }
+  throw new Error(`CV file not found. Set CV_PATH in career-catalyst.config.json or place cv.txt in the project root.`);
 }
 
 export interface ResumeGenerationConfig {
@@ -126,33 +152,19 @@ export function getBlurbConfig(): LLMProviderConfig {
 
 export function getResumeGenerationConfig(): ResumeGenerationConfig {
   // Resume provider - REQUIRED (no default)
-  const resumeProvider = process.env.RESUME_LLM_PROVIDER as 'anthropic' | 'openai' | 'openrouter' | undefined;
+  const resumeProvider = cfg('RESUME_LLM_PROVIDER', '') as 'anthropic' | 'openai' | 'openrouter' | '';
   if (!resumeProvider) {
-    throw new Error(
-      'RESUME_LLM_PROVIDER environment variable is required.\n' +
-      'Set to "anthropic", "openai", or "openrouter" in your .env file.'
-    );
+    throw new Error('RESUME_LLM_PROVIDER is required. Set it in career-catalyst.config.json or .env (anthropic | openai | openrouter).');
   }
-
   if (!['anthropic', 'openai', 'openrouter'].includes(resumeProvider)) {
-    throw new Error(
-      `Invalid RESUME_LLM_PROVIDER: "${resumeProvider}"\n` +
-      'Must be "anthropic", "openai", or "openrouter"'
-    );
+    throw new Error(`Invalid RESUME_LLM_PROVIDER: "${resumeProvider}". Must be anthropic, openai, or openrouter.`);
   }
 
-  // Resume model - REQUIRED (no default)
-  const resumeModel = process.env.RESUME_LLM_MODEL;
+  const resumeModel = cfg('RESUME_LLM_MODEL', '');
   if (!resumeModel) {
-    throw new Error(
-      'RESUME_LLM_MODEL environment variable is required.\n' +
-      'Examples:\n' +
-      '  - Anthropic: claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929\n' +
-      '  - OpenAI: gpt-4o-mini, gpt-4o, gpt-5.2-2025-12-11'
-    );
+    throw new Error('RESUME_LLM_MODEL is required. Set it in career-catalyst.config.json or .env.');
   }
 
-  // Resume API key
   const resumeApiKey = resumeProvider === 'anthropic'
     ? process.env.ANTHROPIC_API_KEY
     : resumeProvider === 'openrouter'
@@ -161,39 +173,23 @@ export function getResumeGenerationConfig(): ResumeGenerationConfig {
 
   if (!resumeApiKey) {
     const keyName = resumeProvider === 'anthropic' ? 'ANTHROPIC_API_KEY'
-      : resumeProvider === 'openrouter' ? 'OPENROUTER_API_KEY'
-      : 'OPENAI_API_KEY';
-    throw new Error(`${keyName} environment variable is required for resume generation`);
+      : resumeProvider === 'openrouter' ? 'OPENROUTER_API_KEY' : 'OPENAI_API_KEY';
+    throw new Error(`${keyName} is required for resume generation`);
   }
 
-  // Critique provider - REQUIRED (no default)
-  const critiqueProvider = process.env.CRITIQUE_LLM_PROVIDER as 'anthropic' | 'openai' | 'openrouter' | undefined;
+  const critiqueProvider = cfg('CRITIQUE_LLM_PROVIDER', '') as 'anthropic' | 'openai' | 'openrouter' | '';
   if (!critiqueProvider) {
-    throw new Error(
-      'CRITIQUE_LLM_PROVIDER environment variable is required.\n' +
-      'Set to "anthropic", "openai", or "openrouter" in your .env file.'
-    );
+    throw new Error('CRITIQUE_LLM_PROVIDER is required. Set it in career-catalyst.config.json or .env.');
   }
-
   if (!['anthropic', 'openai', 'openrouter'].includes(critiqueProvider)) {
-    throw new Error(
-      `Invalid CRITIQUE_LLM_PROVIDER: "${critiqueProvider}"\n` +
-      'Must be "anthropic", "openai", or "openrouter"'
-    );
+    throw new Error(`Invalid CRITIQUE_LLM_PROVIDER: "${critiqueProvider}". Must be anthropic, openai, or openrouter.`);
   }
 
-  // Critique model - REQUIRED (no default)
-  const critiqueModel = process.env.CRITIQUE_LLM_MODEL;
+  const critiqueModel = cfg('CRITIQUE_LLM_MODEL', '');
   if (!critiqueModel) {
-    throw new Error(
-      'CRITIQUE_LLM_MODEL environment variable is required.\n' +
-      'Examples:\n' +
-      '  - Anthropic: claude-sonnet-4-5-20250929\n' +
-      '  - OpenAI: gpt-4o, gpt-5.2-2025-12-11'
-    );
+    throw new Error('CRITIQUE_LLM_MODEL is required. Set it in career-catalyst.config.json or .env.');
   }
 
-  // Critique API key
   const critiqueApiKey = critiqueProvider === 'anthropic'
     ? process.env.ANTHROPIC_API_KEY
     : critiqueProvider === 'openrouter'
@@ -202,9 +198,8 @@ export function getResumeGenerationConfig(): ResumeGenerationConfig {
 
   if (!critiqueApiKey) {
     const keyName = critiqueProvider === 'anthropic' ? 'ANTHROPIC_API_KEY'
-      : critiqueProvider === 'openrouter' ? 'OPENROUTER_API_KEY'
-      : 'OPENAI_API_KEY';
-    throw new Error(`${keyName} environment variable is required for critique`);
+      : critiqueProvider === 'openrouter' ? 'OPENROUTER_API_KEY' : 'OPENAI_API_KEY';
+    throw new Error(`${keyName} is required for critique`);
   }
 
   return {
@@ -214,8 +209,8 @@ export function getResumeGenerationConfig(): ResumeGenerationConfig {
     critiqueProvider,
     critiqueModel,
     critiqueApiKey,
-    maxTokens: parseInt(process.env.ANTHROPIC_MAX_TOKENS || '8000'),
-    maxRoles: parseInt(process.env.MAX_ROLES || '4'),
-    temperature: parseFloat(process.env.OPENAI_TEMPERATURE || '0.3')
+    maxTokens: parseInt(cfg('ANTHROPIC_MAX_TOKENS', '8000')),
+    maxRoles: parseInt(cfg('MAX_ROLES', '4')),
+    temperature: parseFloat(cfg('OPENAI_TEMPERATURE', '0.3')),
   };
 }

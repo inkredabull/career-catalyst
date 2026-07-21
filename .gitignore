@@ -115,6 +115,7 @@ jspm_packages/
 # Output files
 work-history/*
 *.json
+!career-catalyst.config.json
 !package.json
 !package-lock.json
 !tsconfig.json

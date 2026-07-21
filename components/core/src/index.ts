@@ -7,7 +7,7 @@ export { OutreachAgent } from './agents/outreach-agent';
 export { WebScraper } from './utils/web-scraper';
 export { resolveFromProjectRoot } from './utils/project-root';
 export * from './types';
-export { getConfig, getAnthropicConfig } from './config';
+export { getConfig, getAnthropicConfig, getCvPath } from './config';
 export type { LLMProvider, LLMProviderConfig, LLMRequest, LLMResponse, CostEstimate } from './providers/llm-provider';
 export { BaseLLMProvider } from './providers/llm-provider';
 export { ProviderFactory } from './providers/provider-factory';

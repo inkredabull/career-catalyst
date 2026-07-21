@@ -1,13 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "fs";
-import { resolve } from "path";
+import { getCvPath } from "@inkredabull/career-catalyst-core";
 
 // ─── CV ───────────────────────────────────────────────────────────────────────
-const projectRoot = resolve(__dirname, "../../..");
-const cvPath = process.env.CV_PATH
-  ? resolve(projectRoot, process.env.CV_PATH)
-  : resolve(projectRoot, "cv.txt");
-export const CV = readFileSync(cvPath, "utf8").trim();
+export const CV = readFileSync(getCvPath(), "utf8").trim();
 
 // ─── APPLICANT SATURATION ─────────────────────────────────────────────────────
 // A posting with this many or more applicants is oversaturated — an application is
