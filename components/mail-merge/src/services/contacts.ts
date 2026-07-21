@@ -71,22 +71,34 @@ export const getContactDetails = (fullName: string): ContactDetails => {
 // ── Sheet integration ─────────────────────────────────────────────────────────
 
 export const fetchContactToSheet = (): void => {
-  const spreadsheet = SpreadsheetApp.getActive();
-  const sheet = spreadsheet.getSheetByName('Data');
-  if (!sheet) throw new Error("Sheet 'Data' not found");
-
+  const sheet = SpreadsheetApp.getActiveSheet();
   const data = sheet.getDataRange().getValues() as string[][];
-  const headers = data.shift() as string[];
-  const currentCell = sheet.getActiveCell();
-  const rowIndex = currentCell.getRow();
-  const row = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0] as string[];
+  const heads = data.shift() as string[];
+  const recipientIdx = heads.indexOf(COLS.RECIPIENT);
+  const fullNameIdx  = heads.indexOf(COLS.FULL_NAME);
+  const cellIdx      = heads.indexOf(COLS.CELL);
+  const linkedInIdx  = heads.indexOf(COLS.LINKEDIN);
 
-  const fullName = row[headers.indexOf(COLS.FULL_NAME)];
-  const contact = getContactDetails(fullName);
+  if (recipientIdx === -1 || fullNameIdx === -1) {
+    SpreadsheetApp.getUi().alert(`Sheet must have columns "${COLS.RECIPIENT}" and "${COLS.FULL_NAME}".`);
+    return;
+  }
 
-  currentCell.setValue(contact.email);
-  currentCell.offset(0, 1).setValue(contact.mobile);
-  currentCell.offset(0, 2).setValue(contact.linkedin);
+  let filled = 0;
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i]!;
+    if (row[recipientIdx] !== '' || !row[fullNameIdx]) continue;
+    const contact = getContactDetails(String(row[fullNameIdx]));
+    if (!contact.email) continue;
+    sheet.getRange(i + 2, recipientIdx + 1).setValue(contact.email);
+    if (cellIdx !== -1 && !row[cellIdx] && contact.mobile)
+      sheet.getRange(i + 2, cellIdx + 1).setValue(contact.mobile);
+    if (linkedInIdx !== -1 && !row[linkedInIdx] && contact.linkedin)
+      sheet.getRange(i + 2, linkedInIdx + 1).setValue(contact.linkedin);
+    filled++;
+  }
+
+  SpreadsheetApp.getActive().toast(`${filled} Recipient(s) filled`, '✅ Lookup Complete', 4);
 };
 
 export const getLinkedInUrlToSheet = (): void => {
