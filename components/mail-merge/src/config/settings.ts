@@ -76,6 +76,11 @@ export const SUBJECT_LINE_CONFIG = [
     defaultTopic: 'quick ask about opportunities',
     flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
   },
+  {
+    subject: "Willing to be a reference?",
+    defaultTopic: 'being a reference',
+    flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
+  },
 ] as const;
 
 export const SUBJECT_LINES = SUBJECT_LINE_CONFIG.map(c => c.subject);
