@@ -4,7 +4,7 @@ import { ResumeCriticAgent } from './resume-critic-agent';
 import { ProviderFactory } from '../providers/provider-factory';
 import { JobListing } from '../types';
 import { LLMProviderConfig } from '../providers/llm-provider';
-import { getCritiqueAndJudgeMaxAttempts, getLLMAutoConfirm, getResumeOutputDir } from '../config';
+import { getCritiqueAndJudgeMaxAttempts, getLLMAutoConfirm, getResumeOutputDir, getResumeGenerationConfig } from '../config';
 import { resolveFromProjectRoot } from '../utils/project-root';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -104,26 +104,13 @@ export class ParallelResumeOrchestrator {
   }
 
   /**
-   * Generate default configuration from environment variables
-   * Uses RESUME_LLM_* and CRITIQUE_LLM_* settings from .env
+   * Generate default configuration from RESUME_LLM_* / CRITIQUE_LLM_* settings,
+   * resolved via getResumeGenerationConfig() (process.env, falling back to
+   * career-catalyst.config.json) so this path stays consistent with the rest
+   * of the app instead of reading process.env directly.
    */
   private generateConfigFromEnv(): ParallelConfig {
-    const resumeProvider = process.env.RESUME_LLM_PROVIDER as 'anthropic' | 'openai' | undefined;
-    const resumeModel = process.env.RESUME_LLM_MODEL;
-    const critiqueProvider = process.env.CRITIQUE_LLM_PROVIDER as 'anthropic' | 'openai' | undefined;
-    const critiqueModel = process.env.CRITIQUE_LLM_MODEL;
-
-    if (!resumeProvider || !resumeModel) {
-      throw new Error(
-        'RESUME_LLM_PROVIDER and RESUME_LLM_MODEL environment variables are required when parallel-config.json is not present.\n\n' +
-        'Add to your .env file:\n' +
-        '  RESUME_LLM_PROVIDER=anthropic  # or "openai"\n' +
-        '  RESUME_LLM_MODEL=claude-sonnet-4-5-20250929\n' +
-        '  CRITIQUE_LLM_PROVIDER=anthropic\n' +
-        '  CRITIQUE_LLM_MODEL=claude-sonnet-4-5-20250929\n\n' +
-        'Or create a parallel-config.json file for custom model configurations.'
-      );
-    }
+    const { resumeProvider, resumeModel, critiqueProvider, critiqueModel } = getResumeGenerationConfig();
 
     const models: ParallelConfig['models'] = [
       {
@@ -135,8 +122,7 @@ export class ParallelResumeOrchestrator {
     ];
 
     // Add critique model if different from resume model
-    if (critiqueProvider && critiqueModel &&
-        (critiqueProvider !== resumeProvider || critiqueModel !== resumeModel)) {
+    if (critiqueProvider !== resumeProvider || critiqueModel !== resumeModel) {
       models.push({
         label: this.getModelLabel(critiqueProvider, critiqueModel),
         provider: critiqueProvider,
@@ -145,7 +131,7 @@ export class ParallelResumeOrchestrator {
       });
     }
 
-    console.log(`   Configured ${models.length} model(s) from .env:`);
+    console.log(`   Configured ${models.length} model(s) from RESUME_LLM_*/CRITIQUE_LLM_* settings:`);
     models.forEach((m, i) => console.log(`   ${i + 1}. ${m.label} (${m.provider})`));
 
     return {
@@ -155,8 +141,8 @@ export class ParallelResumeOrchestrator {
         temperature: 0.3,
         mode: 'leader',
         experienceFormat: 'standard',
-        critiqueProvider: 'anthropic',
-        critiqueModel: 'claude-haiku-4-5-20251001'
+        critiqueProvider,
+        critiqueModel
       }
     };
   }
