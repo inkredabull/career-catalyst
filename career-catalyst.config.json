@@ -1,6 +1,6 @@
 {
   "LOG_LEVEL": "INFO",
-  "LLM_AUTO_CONFIRM": false,
+  "LLM_AUTO_CONFIRM": true,
   "OPENAI_MODEL": "gpt-3.5-turbo",
   "OPENAI_TEMPERATURE": 0.3,
   "OPENAI_MAX_TOKENS": 2000,
@@ -13,8 +13,8 @@
   "AUTO_RESUME_CV_PATH": "",
   "NOTIFICATION_EMAIL": "",
   "LANGSMITH_ENDPOINT": "https://api.smith.langchain.com",
-  "RESUME_LLM_PROVIDER": "anthropic",
-  "RESUME_LLM_MODEL": "claude-sonnet-4-5-20250929",
-  "CRITIQUE_LLM_PROVIDER": "openai",
-  "CRITIQUE_LLM_MODEL": "gpt-5.2-2025-12-11"
+  "RESUME_LLM_PROVIDER": "openai",
+  "RESUME_LLM_MODEL": "gpt-5.2-2025-12-11",
+  "CRITIQUE_LLM_PROVIDER": "anthropic",
+  "CRITIQUE_LLM_MODEL": "claude-haiku-4-5-20251001"
 }
