@@ -32,6 +32,12 @@ export function registerDiscover(program: Command): void {
       console.log(`File:       ${filePath}`);
       console.log(`Batch size: ${batchSize}\n`);
 
+      if (!process.env.ENRICHLAYER_API_TOKEN) {
+        console.log('ENRICHLAYER_API_TOKEN not set — aborting before consuming any names from the file.');
+        console.log('Set the token and re-run.');
+        return;
+      }
+
       const content = readFileSync(filePath, 'utf-8');
       const parsedNames = parseNameList(content);
 
@@ -50,12 +56,17 @@ export function registerDiscover(program: Command): void {
         const batch = parsedNames.slice(0, batchSize);
         const remaining = parsedNames.slice(batchSize);
 
+        const before = await getCreditBalance();
+        if (before == null) {
+          console.log('Could not verify EnrichLayer credit balance — the API token appears to be invalid.');
+          console.log('Aborting before consuming any names from the file. Fix the token and re-run.');
+          return;
+        }
+        console.log(`Credit balance before: ${before}\n`);
+
         console.log(`Processing ${batch.length} names in this batch`);
         if (remaining.length > 0) console.log(`${remaining.length} names will remain for next batch`);
         console.log('');
-
-        const before = await getCreditBalance();
-        if (before != null) console.log(`Credit balance before: ${before}\n`);
 
         console.log('Looking up LinkedIn profiles…\n');
         profiles = await lookupProfiles(batch, eventInfo.eventName);
