@@ -1,7 +1,7 @@
 {
   "LOG_LEVEL": "INFO",
   "LLM_AUTO_CONFIRM": true,
-  "OPENAI_MODEL": "gpt-3.5-turbo",
+  "JOB_AGENT_LLM_MODEL": "gpt-3.5-turbo",
   "OPENAI_TEMPERATURE": 0.3,
   "OPENAI_MAX_TOKENS": 2000,
   "ANTHROPIC_MODEL": "claude-sonnet-4-5-20250929",

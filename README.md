@@ -2063,7 +2063,7 @@ python examples/langsmith_evaluation.py
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `OPENAI_API_KEY` | OpenAI API key (required for extraction/scoring) | - |
-| `OPENAI_MODEL` | OpenAI model to use | `gpt-3.5-turbo` |
+| `JOB_AGENT_LLM_MODEL` | OpenAI model for the extract/score/whogothired agents | `gpt-3.5-turbo` |
 | `OPENAI_TEMPERATURE` | Model temperature (0-1) | `0.3` |
 | `OPENAI_MAX_TOKENS` | Maximum tokens in response | `2000` |
 | `ANTHROPIC_API_KEY` | Anthropic API key (required for resume generation) | - |

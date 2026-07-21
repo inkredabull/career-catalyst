@@ -65,7 +65,7 @@ export function getConfig(): AgentConfig {
   if (!openaiApiKey) throw new Error('OPENAI_API_KEY environment variable is required');
   return {
     openaiApiKey,
-    model: cfg('OPENAI_MODEL', 'gpt-3.5-turbo'),
+    model: cfg('JOB_AGENT_LLM_MODEL', 'gpt-3.5-turbo'),
     temperature: parseFloat(cfg('OPENAI_TEMPERATURE', '0.3')),
     maxTokens: parseInt(cfg('OPENAI_MAX_TOKENS', '2000')),
   };
