@@ -55,11 +55,11 @@ export const SUBJECT_LINE_CONFIG = [
     defaultTopic: 'a role I could use your help to land',
     flags: { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
   },
-  {
-    subject: 'Need some fractional ENG help?',
-    defaultTopic: 'fractional ENG help',
-    flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
-  },
+  // {
+  //   subject: 'Need some fractional ENG help?',
+  //   defaultTopic: 'fractional ENG help',
+  //   flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
+  // },
   // { subject: 'Q2 2026 latest-and-greatest', defaultTopic: 'the latest', flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } },
   {
     subject: "Need any add'l eng firepower?",
@@ -73,7 +73,7 @@ export const SUBJECT_LINE_CONFIG = [
   },
   {
     subject: "Catching up + a quick ask",
-    defaultTopic: 'catching up',
+    defaultTopic: 'quick ask about opportunities',
     flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
   },
 ] as const;

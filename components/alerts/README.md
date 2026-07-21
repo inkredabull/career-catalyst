@@ -81,7 +81,7 @@ Each entry includes block buttons (👎 company / 👎 title) that hit `/api/blo
 | LinkedIn data | LinkedIn Voyager API (session cookie auth) |
 | Google search | Serper API |
 | JD fetching | Jina Reader + ScrapingBee fallback |
-| AI scoring | Anthropic Claude Sonnet (`claude-sonnet-4-6`) |
+| AI scoring | Anthropic Claude Haiku (`claude-haiku-4-5`) |
 | Storage | Google Cloud Storage (seen.json, stop-lists, score blobs) |
 | Email | Resend |
 | Language | TypeScript (strict) |
