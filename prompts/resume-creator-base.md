@@ -269,7 +269,7 @@ If using standard format:
 If using split format:
 ```markdown
 ## RELEVANT EXPERIENCE
-[3-5 highly aligned roles]
+[exactly 3 highly aligned roles — no more, no fewer]
 
 ## RELATED EXPERIENCE
 [2-3 supporting roles]
