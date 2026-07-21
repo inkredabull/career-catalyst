@@ -52,7 +52,7 @@ export const FLAGS = {
 export const SUBJECT_LINE_CONFIG = [
   {
     subject: 'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
-    defaultTopic: 'a role I found',
+    defaultTopic: 'a role I could use your help to land',
     flags: { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
   },
   {
