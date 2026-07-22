@@ -881,7 +881,7 @@ header-includes: |
       candidateName = this.extractCandidateName(markdownContent);
       candidateNameByModel?.set(modelLabel, candidateName);
     }
-    const baseName = `[${sanitize(modelLabel)}] ${sanitize(candidateName)} for ${sanitize(job.title)} at ${sanitize(job.company)}`;
+    const baseName = `[${sanitize(modelLabel)}] ${sanitize(candidateName)} - ${sanitize(job.title)} at ${sanitize(job.company)}`;
 
     // Persist markdown source before pandoc — survives PDF generation failures
     const mdPath = path.join(outputDir, `${baseName}.md`);
@@ -899,11 +899,13 @@ header-includes: |
   }
 
   private extractCandidateName(markdownContent: string): string {
-    // Extract name from the first # heading
+    // Extract name from the first # heading; strip tagline after " - "
     for (const line of markdownContent.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.startsWith('# ')) {
-        return trimmed.replace(/^#+\s*/, '').trim();
+        const heading = trimmed.replace(/^#+\s*/, '').trim();
+        // Heading is often "Full Name - tagline"; keep only the name part
+        return heading.split(' - ')[0].trim();
       }
     }
     return 'Resume';
