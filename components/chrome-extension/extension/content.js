@@ -153,7 +153,6 @@ function createGutter() {
       <div class="section people-section">
         <h4 class="section-header">
           👥 People I Know at This Company
-          <span id="connections-status-icon" class="status-icon" title="Enter company name to search connections">⚪</span>
         </h4>
         <p class="section-description">Find connections at this company on LinkedIn</p>
 
@@ -2338,21 +2337,8 @@ async function updateBlurbSection(jobId, person) {
 
 // Update connections section based on company name
 function updateConnectionsSection(companyName) {
-  const statusIcon = document.getElementById('connections-status-icon');
   const searchBtn = document.getElementById('search-connections');
-
-  if (!companyName || companyName.length === 0) {
-    statusIcon.textContent = '⚪';
-    statusIcon.title = 'Enter company name to search connections';
-    statusIcon.className = 'status-icon';
-    searchBtn.disabled = true;
-    return;
-  }
-
-  statusIcon.textContent = '🟢';
-  statusIcon.title = `Ready to search for connections at ${companyName}`;
-  statusIcon.className = 'status-icon ready';
-  searchBtn.disabled = false;
+  searchBtn.disabled = !companyName || companyName.length === 0;
 }
 
 // Handle LinkedIn connections search
@@ -2362,34 +2348,58 @@ async function handleSearchConnections() {
 
   const companyNameField = document.getElementById('company-name');
   const companyName = companyNameField ? companyNameField.value.trim() : '';
-  const linkedInCompanySlug = document.getElementById('linkedin-company-slug')?.value?.trim() || '';
+  let linkedInCompanySlug = document.getElementById('linkedin-company-slug')?.value?.trim() || '';
 
   console.log('  → Company name:', companyName);
-  if (linkedInCompanySlug) console.log('  → LinkedIn slug hint:', linkedInCompanySlug);
 
   if (!companyName) {
     alert('Please enter a company name first');
     return;
   }
 
-  const statusIcon = document.getElementById('connections-status-icon');
+  // If a Job ID was manually entered (as opposed to tracked), the cached job data was never
+  // pulled in — do a one-off lookup here, on click, rather than polling on every keystroke.
+  if (!linkedInCompanySlug) {
+    const jobId = document.getElementById('job-id')?.value?.trim();
+    if (jobId) {
+      try {
+        const response = await chrome.runtime.sendMessage({ action: 'loadJobFromLogs', jobId });
+        if (response && response.success && response.jobData?.linkedInCompany) {
+          linkedInCompanySlug = response.jobData.linkedInCompany;
+          const slugField = document.getElementById('linkedin-company-slug');
+          if (slugField) slugField.value = linkedInCompanySlug;
+        }
+      } catch (error) {
+        console.warn('  → Failed to load cached job data for job ID:', jobId, error);
+      }
+    }
+  }
+
+  if (linkedInCompanySlug) console.log('  → LinkedIn slug hint:', linkedInCompanySlug);
+
   const searchBtn = document.getElementById('search-connections');
 
+  // If we already have the job's cached LinkedIn company slug, use it directly — no need to
+  // resolve a numeric company ID via a fuzzy name search, which can go wrong if the company
+  // name field itself got mis-parsed during extraction.
+  if (linkedInCompanySlug) {
+    const linkedInUrl = `https://www.linkedin.com/company/${linkedInCompanySlug}/people/?facetNetwork=S%2CF`;
+    console.log('  → Using cached LinkedIn slug, opening directly:', linkedInUrl);
+    window.open(linkedInUrl, '_blank');
+    console.log('═══════════════════════════════════════════════════════════');
+    return;
+  }
+
   try {
-    // Show loading state
     searchBtn.disabled = true;
     searchBtn.textContent = '⏳ Looking up company...';
-    statusIcon.textContent = '🟡';
-    statusIcon.title = 'Searching for company on LinkedIn...';
-    statusIcon.className = 'status-icon loading';
 
-    console.log('  → Calling background script to look up LinkedIn company ID');
+    console.log('  → No cached slug — calling background script to look up LinkedIn company ID');
 
     // Call background script to look up the company's LinkedIn ID
     const response = await chrome.runtime.sendMessage({
       action: 'lookupLinkedInCompany',
-      companyName: companyName,
-      linkedInCompanySlug: linkedInCompanySlug || undefined
+      companyName: companyName
     });
 
     console.log('  → Background script response:', response);
@@ -2402,39 +2412,10 @@ async function handleSearchConnections() {
 
       // Open LinkedIn in a new tab
       window.open(linkedInUrl, '_blank');
-
-      statusIcon.textContent = '✅';
-      statusIcon.title = `Opened LinkedIn connections for ${companyName}`;
-      statusIcon.className = 'status-icon success';
-
-      // Reset button
-      searchBtn.textContent = '🔍 Search LinkedIn Connections';
-      searchBtn.disabled = false;
-
-      // Reset status after 3 seconds
-      setTimeout(() => {
-        statusIcon.textContent = '🟢';
-        statusIcon.title = `Ready to search for connections at ${companyName}`;
-        statusIcon.className = 'status-icon ready';
-      }, 3000);
-
     } else {
       const errorMsg = response.error || 'Could not find company on LinkedIn';
       console.log('  → Error:', errorMsg);
-
-      statusIcon.textContent = '❌';
-      statusIcon.title = errorMsg;
-      statusIcon.className = 'status-icon error';
-
-      searchBtn.textContent = '🔍 Search LinkedIn Connections';
-      searchBtn.disabled = false;
-
-      // Reset after 5 seconds
-      setTimeout(() => {
-        statusIcon.textContent = '🟢';
-        statusIcon.title = `Ready to search for connections at ${companyName}`;
-        statusIcon.className = 'status-icon ready';
-      }, 5000);
+      alert(errorMsg);
     }
 
     console.log('═══════════════════════════════════════════════════════════');
@@ -2442,19 +2423,10 @@ async function handleSearchConnections() {
   } catch (error) {
     console.error('  → LinkedIn connections search failed:', error);
     console.log('═══════════════════════════════════════════════════════════');
-
-    statusIcon.textContent = '❌';
-    statusIcon.title = `Error: ${error.message}`;
-    statusIcon.className = 'status-icon error';
-
+    alert(`Error: ${error.message}`);
+  } finally {
     searchBtn.textContent = '🔍 Search LinkedIn Connections';
     searchBtn.disabled = false;
-
-    setTimeout(() => {
-      statusIcon.textContent = '🟢';
-      statusIcon.title = `Ready to search for connections at ${companyName}`;
-      statusIcon.className = 'status-icon ready';
-    }, 5000);
   }
 }
 
