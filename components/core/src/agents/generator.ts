@@ -227,12 +227,35 @@ Description: ${this.escapeForPrompt(input.job.description)}`;
   }
 
   /**
-   * Ensures exactly one \pagebreak immediately before ## RELATED EXPERIENCE
-   * so the section always starts on page 2 in the pandoc PDF output.
+   * Ensures \pagebreak lands after the 3rd role in RELEVANT EXPERIENCE (split format).
+   * Falls back to inserting before ## RELATED EXPERIENCE if role detection fails.
+   * Strips any existing \pagebreak first to avoid duplicates.
    */
   private ensurePagebreakBeforeRelatedExperience(markdown: string): string {
-    const withoutExisting = markdown.replace(/\\pagebreak\s*\n(## RELATED EXPERIENCE)/g, '$1');
-    return withoutExisting.replace(/(## RELATED EXPERIENCE)/g, '\\pagebreak\n$1');
+    // Strip any existing pagebreaks
+    let clean = markdown.replace(/\\pagebreak\s*\n/g, '');
+
+    const relevantMatch = clean.match(/## RELEVANT EXPERIENCE\n([\s\S]*?)(?=\n## )/);
+    if (relevantMatch) {
+      const relevantBlock = relevantMatch[1];
+      const roleLines = [...relevantBlock.matchAll(/^\*\*[^*]+\*\*\s*@\s*.+$/gm)];
+
+      // If there are more than 3 roles, insert pagebreak before the 4th
+      if (roleLines.length > 3 && roleLines[3].index !== undefined) {
+        const relevantStart = clean.indexOf(relevantMatch[1]);
+        const fourthRoleAbsPos = relevantStart + roleLines[3].index;
+        const before = clean.slice(0, fourthRoleAbsPos).replace(/\n+$/, '');
+        const after = clean.slice(fourthRoleAbsPos);
+        return `${before}\n\n\\pagebreak\n${after}`;
+      }
+    }
+
+    // Fallback: insert before ## RELATED EXPERIENCE
+    if (clean.includes('## RELATED EXPERIENCE')) {
+      return clean.replace(/(## RELATED EXPERIENCE)/g, '\\pagebreak\n$1');
+    }
+
+    return clean;
   }
 
   /**
