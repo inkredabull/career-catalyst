@@ -172,12 +172,25 @@ export async function purgeOldScores(
   const cutoff = Date.now() - ttlMs;
   const bucket = getBucket();
   const [files] = await bucket.getFiles({ prefix: SCORES_PREFIX });
-  const stale = files.filter((f) => {
+  const stale: typeof files = [];
+  for (const f of files) {
     const updated = f.metadata.updated
       ? new Date(f.metadata.updated as string).getTime()
       : 0;
-    return updated < cutoff;
-  });
+    if (updated < cutoff) {
+      stale.push(f);
+      continue;
+    }
+    // Also purge score blobs with unknown verdict so those jobs get re-scored
+    try {
+      const [contents] = await f.download();
+      const rec = JSON.parse(contents.toString("utf8")) as ScoreRecord;
+      if (rec.verdict === "?") stale.push(f);
+    } catch {
+      // unreadable blob — purge it
+      stale.push(f);
+    }
+  }
   if (stale.length > 0) {
     await Promise.all(stale.map((f) => f.delete()));
   }
