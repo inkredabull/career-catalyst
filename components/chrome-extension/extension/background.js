@@ -268,6 +268,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         } else {
           console.warn('[AutoMsg] Could not extract slug from contact URL:', c.url);
         }
+        // Fallback key by first name — covers URL slug mismatches
+        if (c.firstName) {
+          map['li_first_' + c.firstName.toLowerCase()] = c.message;
+        }
       }
       console.log('[AutoMsg] Storing keys:', Object.keys(map));
       chrome.storage.local.set(map, () => sendResponse({ok: true, keys: Object.keys(map)}));
@@ -1970,7 +1974,60 @@ async function createGooglePeopleContact(contact) {
   const contactId = resourceName.replace('people/', '');
   const contactUrl = contactId ? `https://contacts.google.com/person/${contactId}` : 'https://contacts.google.com';
 
+  if (contact.currentYear && resourceName) {
+    try {
+      const groupResourceName = await findOrCreateContactGroup(contact.currentYear, token);
+      await addContactToGroup(resourceName, groupResourceName, token);
+    } catch (labelError) {
+      // Non-fatal: the contact was created successfully, just missing its year label
+      console.warn('Career Catalyst Background: Failed to label contact with year "' + contact.currentYear + '":', labelError);
+    }
+  }
+
   return { resourceName, contactUrl };
+}
+
+// Find a Google Contacts label (People API "contact group") matching the given name, creating it if needed
+async function findOrCreateContactGroup(label, token) {
+  const listResponse = await fetch('https://people.googleapis.com/v1/contactGroups?pageSize=1000', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (listResponse.ok) {
+    const listData = await listResponse.json();
+    const existing = (listData.contactGroups || []).find(g => g.formattedName === label);
+    if (existing) return existing.resourceName;
+  }
+
+  const createResponse = await fetch('https://people.googleapis.com/v1/contactGroups', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ contactGroup: { name: label } })
+  });
+  if (!createResponse.ok) {
+    const errorData = await createResponse.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `Failed to create contact label "${label}"`);
+  }
+  const createData = await createResponse.json();
+  return createData.resourceName;
+}
+
+// Add a contact to a contact group (i.e. apply a Google Contacts label)
+async function addContactToGroup(contactResourceName, groupResourceName, token) {
+  const response = await fetch(`https://people.googleapis.com/v1/${groupResourceName}/members:modify`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ resourceNamesToAdd: [contactResourceName] })
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `Failed to add contact to label "${groupResourceName}"`);
+  }
 }
 
 // Handle creating a Google Contact via the People API for the LinkedIn "Get as Google Contact" action

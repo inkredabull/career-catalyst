@@ -1399,19 +1399,26 @@ async function fillPendingMessage() {
   const match = location.pathname.match(/^\/in\/([^/?#]+)/);
   if (!match) { log('[AutoMsg] Not a profile URL: ' + location.pathname); return; }
   const slug = match[1].toLowerCase();
-  const key = 'li_msg_' + slug;
-  const stored = await chrome.storage.local.get(key);
-  const message = stored[key];
+  const slugKey = 'li_msg_' + slug;
+
+  // Fallback: first name from the page h1 (covers URL slug mismatches between sheet and actual profile)
+  const pageFirstName = (document.querySelector('h1')?.innerText?.trim()?.split(/\s+/)?.[0] ?? '').toLowerCase();
+  const firstKey = pageFirstName ? 'li_first_' + pageFirstName : '';
+
+  const keysToCheck = [slugKey, firstKey].filter(Boolean);
+  const stored = await chrome.storage.local.get(keysToCheck);
+  const hitKey = keysToCheck.find(k => stored[k]);
+  const message = hitKey ? stored[hitKey] : undefined;
   if (!message) {
     const allKeys = await chrome.storage.local.get(null);
-    const pendingSlugs = Object.keys(allKeys).filter(k => k.startsWith('li_msg_'));
-    log('[AutoMsg] No pending message for key "' + key + '". Pending keys in storage: ' + JSON.stringify(pendingSlugs));
+    const pendingSlugs = Object.keys(allKeys).filter(k => k.startsWith('li_msg_') || k.startsWith('li_first_'));
+    log('[AutoMsg] No pending message for keys ' + JSON.stringify(keysToCheck) + '. Pending keys: ' + JSON.stringify(pendingSlugs));
     return;
   }
-  log('[AutoMsg] Found pending message for ' + slug);
+  log('[AutoMsg] Found pending message via key "' + hitKey + '" for ' + slug);
 
   // Consume immediately so a reload doesn't re-trigger
-  await chrome.storage.local.remove(key);
+  await chrome.storage.local.remove(keysToCheck.filter(k => stored[k]));
 
   // Poll for the Message button on the profile top card (cold tab loads can take a few seconds)
   const findMsgBtn = () => {
