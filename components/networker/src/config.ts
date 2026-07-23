@@ -23,7 +23,7 @@ export const MAX_ATTEMPTS = 2;
 // Claude / Anthropic
 // ---------------------------------------------------------------------------
 
-export const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
+export const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 // ---------------------------------------------------------------------------
 // Tracker data file

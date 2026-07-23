@@ -194,6 +194,8 @@ ${'='.repeat(80)}
     const possiblePaths = process.env.CV_PATH
       ? [process.env.CV_PATH, path.resolve(projectRoot, process.env.CV_PATH)]
       : [
+          path.join(projectRoot, 'work-history', 'cv.txt'),
+          path.join(projectRoot, 'work-history', 'CV.txt'),
           path.join(projectRoot, 'cv.txt'),
           path.join(projectRoot, 'CV.txt'),
           path.join(projectRoot, 'sample-cv.txt'),

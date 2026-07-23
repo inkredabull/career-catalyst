@@ -5,6 +5,7 @@ import { JobScorerAgent } from './job-scorer-agent';
 import { ResumeCreatorAgent } from './resume-creator-agent';
 import { LLMProviderConfig } from '../providers/llm-provider';
 import { resolveFromProjectRoot } from '../utils/project-root';
+import { getAnthropicConfig } from '../config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -1778,7 +1779,7 @@ Suggested actions:
       const providerConfig: LLMProviderConfig = {
         provider: 'anthropic',
         apiKey: anthropicApiKey,
-        model: 'claude-sonnet-4-5-20250929',
+        model: getAnthropicConfig().model,
         maxTokens: this.config.maxTokens,
         temperature: 0.3
       };

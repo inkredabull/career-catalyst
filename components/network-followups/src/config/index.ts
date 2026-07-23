@@ -56,7 +56,7 @@ export const DAYS = {
 export const MAX_ATTEMPTS = 2;
 
 /** Claude model to use for variant generation */
-export const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
+export const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 /** Column header labels (order must match COL indices) */
 export const HEADERS = [

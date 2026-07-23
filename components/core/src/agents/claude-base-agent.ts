@@ -6,7 +6,7 @@ export abstract class ClaudeBaseAgent {
   protected model: string;
   protected maxTokens: number;
 
-  constructor(claudeApiKey: string, model: string = 'claude-sonnet-4-5-20250929', maxTokens: number = 4000) {
+  constructor(claudeApiKey: string, model: string = (process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'), maxTokens: number = 4000) {
     this.anthropic = new Anthropic({
       apiKey: claudeApiKey,
     });
