@@ -197,7 +197,7 @@ export const pickRandomContacts = (count = 5): WarmupContact[] => {
   );
 
   const all = getAllContacts().filter(contact => {
-    if (!contact.names?.[0]?.displayName) return true;
+    if (!contact.names?.[0]?.displayName) return false;
     if (contact.emailAddresses?.some(e => excludedEmails.has((e.value ?? '').toLowerCase()))) return false;
     const memberships = contact.memberships ?? [];
     const userMemberships = memberships.filter(
