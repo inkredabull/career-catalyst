@@ -87,6 +87,23 @@ export function parseResultTitle(raw: string): {
 // Search templates
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Company Targets — add entries here to watch specific company career pages.
+// Each entry becomes a dedicated search slot so results are never filtered out
+// by the general title/geo searches.
+//
+// Fields:
+//   name   — display name shown in email and logs
+//   domain — the career page path to pass to site: (no https://)
+//   geo    — "sf" routes to SF Bay Area bucket, "us" routes to Remote US
+// ---------------------------------------------------------------------------
+export const COMPANY_TARGETS: Array<{ name: string; domain: string; geo: "sf" | "us" }> = [
+  { name: "Vercel",  domain: "vercel.com/careers",             geo: "sf" },
+  { name: "OpenAI",  domain: "boards.greenhouse.io/openai",    geo: "sf" },
+];
+
+// ---------------------------------------------------------------------------
+
 interface GoogleSearch {
   label: string;
   source: string;
@@ -152,6 +169,13 @@ const GOOGLE_SEARCHES: GoogleSearch[] = [
     prefix: "site:levels.fyi/jobs",
     suffix: '-"new grad" -"intern"',
   },
+  // Auto-generated from COMPANY_TARGETS above
+  ...COMPANY_TARGETS.map(({ name, domain }) => ({
+    label: `Target/${name}`,
+    source: name,
+    prefix: `site:${domain}`,
+    suffix: '-"new grad" -"intern"',
+  })),
 ];
 
 // ---------------------------------------------------------------------------

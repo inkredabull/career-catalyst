@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { requireEnv, ENV } from "./config/settings";
 import { JobResult, SearchResults } from "./linkedin";
+import { COMPANY_TARGETS } from "./google";
 
 const TRACK_BASE = process.env[ENV.TRACK_BASE_URL] ?? "http://localhost:3334";
 
@@ -54,6 +55,12 @@ export function formatEntry(
 function geoLabel(search: string): string {
   const s = search.toLowerCase();
   if (s.includes("top applicant")) return "Top Applicant";
+  if (s.startsWith("target/")) {
+    const name = search.slice("target/".length);
+    const target = COMPANY_TARGETS.find((t) => t.name === name);
+    if (target?.geo === "us") return "Remote US";
+    return "San Francisco / Bay Area";
+  }
   if (
     s.includes(", us") ||
     s.includes(", united states") ||
