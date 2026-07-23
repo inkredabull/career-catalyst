@@ -1555,7 +1555,7 @@ async function handleLLMQuery() {
     
     // Display successful response with appropriate metadata
     const metadata = isRealResponse 
-      ? '<small>✅ CV-aware response from Claude 3.5 Sonnet</small>'
+      ? '<small>✅ CV-aware response from Claude</small>'
       : '<small>⚠️ Mock response (MCP server not available)</small>';
     
     responseContent.innerHTML = `
