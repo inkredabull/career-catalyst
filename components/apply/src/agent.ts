@@ -9,7 +9,8 @@ import {
   ApplicationFormField,
   ApplicationFormData,
   ApplicationResult,
-  getCvPath
+  getCvPath,
+  getAnthropicConfig
 } from '@inkredabull/career-catalyst-core';
 import { InterviewPrepAgent } from '@inkredabull/career-catalyst-prep';
 import * as fs from 'fs';
@@ -36,7 +37,7 @@ export class ApplicationAgent extends BaseAgent {
     const providerConfig: LLMProviderConfig = {
       provider: 'anthropic',
       apiKey: anthropicApiKey,
-      model: 'claude-sonnet-4-5-20250929',
+      model: getAnthropicConfig().model,
       maxTokens: 4000,
       temperature: 0.3
     };
