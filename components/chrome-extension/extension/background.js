@@ -259,25 +259,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       handleCreateGoogleContact(request, sendResponse);
       return true; // Keep message channel open for async response
 
-    case 'storeLinkedInMessages': {
-      const map = {};
-      for (const c of (request.contacts || [])) {
-        const match = (c.url || '').match(/\/in\/([^/?#]+)/);
-        if (match) {
-          map['li_msg_' + match[1].toLowerCase()] = c.message;
-        } else {
-          console.warn('[AutoMsg] Could not extract slug from contact URL:', c.url);
-        }
-        // Fallback key by first name — covers URL slug mismatches
-        if (c.firstName) {
-          map['li_first_' + c.firstName.toLowerCase()] = c.message;
-        }
-      }
-      console.log('[AutoMsg] Storing keys:', Object.keys(map));
-      chrome.storage.local.set(map, () => sendResponse({ok: true, keys: Object.keys(map)}));
-      return true;
-    }
-
     default:
       sendResponse({success: false, error: 'Unknown action'});
   }

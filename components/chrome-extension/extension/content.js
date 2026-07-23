@@ -3767,15 +3767,31 @@ function checkForLinkedInFeed() {
 //   checkForLinkedInFeed();
 // }, 2000);
 
-// Bridge: receive LinkedIn message payloads from GAS HtmlService iframe and store via background
+// Bridge: receive LinkedIn message payloads from GAS HtmlService iframe and store directly via
+// chrome.storage.local (not routed through the background service worker — MV3 service workers
+// can be suspended/evicted mid-task, which was silently dropping this write with no error at all).
 window.addEventListener('message', function(e) {
   if (e.data && e.data.type === 'CC_LI_MESSAGES' && Array.isArray(e.data.contacts)) {
     console.log('[AutoMsg] Received CC_LI_MESSAGES from', e.origin, 'contacts:', e.data.contacts.map(c => c.url));
-    chrome.runtime.sendMessage({action: 'storeLinkedInMessages', contacts: e.data.contacts}, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('[AutoMsg] storeLinkedInMessages failed:', chrome.runtime.lastError.message);
+    const map = {};
+    for (const c of e.data.contacts) {
+      const match = (c.url || '').match(/\/in\/([^/?#]+)/);
+      if (match) {
+        map['li_msg_' + match[1].toLowerCase()] = c.message;
       } else {
-        console.log('[AutoMsg] storeLinkedInMessages response:', response);
+        console.warn('[AutoMsg] Could not extract slug from contact URL:', c.url);
+      }
+      // Fallback key by first name — covers URL slug mismatches between the sheet and the actual profile
+      if (c.firstName) {
+        map['li_first_' + c.firstName.toLowerCase()] = c.message;
+      }
+    }
+    console.log('[AutoMsg] Storing keys directly:', Object.keys(map));
+    chrome.storage.local.set(map, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[AutoMsg] Direct storage.local.set failed:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[AutoMsg] Direct storage.local.set succeeded for keys:', Object.keys(map));
       }
     });
   }
