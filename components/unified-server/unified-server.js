@@ -129,7 +129,7 @@ ${'='.repeat(80)}
         console.log('  -> Prompt NOT saved (no job ID provided)');
       }
 
-      const cvModel = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
+      const cvModel = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
       console.log(`  -> Calling Claude API (model: ${cvModel}, max_tokens: 150)`);
 
       const response = await this.anthropic.messages.create({
