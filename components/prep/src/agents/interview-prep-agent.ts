@@ -342,7 +342,7 @@ Format as:
     const response = await this.makeClaudeRequest(prompt);
     
     // Clean up the response
-    return this.cleanResponse(response, type);
+    return this.cleanResponse(response, type, options.person);
   }
 
   private async createAboutMeMaterial(
@@ -1320,7 +1320,7 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
     }
   }
 
-  private cleanResponse(response: string, type: StatementType): string {
+  private cleanResponse(response: string, type: StatementType, person?: 'first' | 'third'): string {
     // For about-me type, extract RTF content from code blocks if present
     if (type === 'about-me') {
       // Check if response is wrapped in markdown code blocks
@@ -1351,31 +1351,46 @@ Return ONLY the refined RTF content, no explanations or commentary.`;
     // For other types, ensure single paragraph format if needed
     if (type === 'general') {
       cleaned = cleaned.replace(/\n\n+/g, ' ').replace(/\n/g, ' ');
+      cleaned = this.enforceLengthRange(cleaned, 250, 425);
+    }
 
-      // ENFORCE length constraint: 250-425 characters
-      const maxLength = 425;
-      const minLength = 250;
+    // Cover letters state their length target per person in the prompt (getFallbackPrompt),
+    // but nothing previously enforced it — the third-person single-paragraph cap (400-500
+    // chars) was regularly blown past, ending up as long as the two-paragraph first-person
+    // version it's supposed to read as the brief counterpart to.
+    if (type === 'cover-letter') {
+      if (person === 'third') {
+        cleaned = cleaned.replace(/\n\n+/g, ' ').replace(/\n/g, ' ');
+        cleaned = this.enforceLengthRange(cleaned, 400, 500);
+      } else {
+        cleaned = this.enforceLengthRange(cleaned, 600, 850);
+      }
+    }
 
-      if (cleaned.length > maxLength) {
-        console.warn(`⚠️  Generated content exceeds maximum length (${cleaned.length} chars). Truncating to ${maxLength} chars.`);
-        // Find a good breaking point (end of sentence) near the max length
-        const truncateAt = cleaned.lastIndexOf('.', maxLength);
-        if (truncateAt > minLength && truncateAt < maxLength) {
-          cleaned = cleaned.substring(0, truncateAt + 1).trim();
-        } else {
-          // If no good sentence break, just hard truncate
-          cleaned = cleaned.substring(0, maxLength).trim();
-          // Add ellipsis if we cut off mid-sentence
-          if (!cleaned.endsWith('.') && !cleaned.endsWith('!') && !cleaned.endsWith('?')) {
-            cleaned += '...';
-          }
+    return cleaned;
+  }
+
+  /** Truncates at the last sentence boundary before maxLength; warns if outside [minLength, maxLength]. */
+  private enforceLengthRange(cleaned: string, minLength: number, maxLength: number): string {
+    if (cleaned.length > maxLength) {
+      console.warn(`⚠️  Generated content exceeds maximum length (${cleaned.length} chars). Truncating to ${maxLength} chars.`);
+      // Find a good breaking point (end of sentence) near the max length
+      const truncateAt = cleaned.lastIndexOf('.', maxLength);
+      if (truncateAt > minLength && truncateAt < maxLength) {
+        cleaned = cleaned.substring(0, truncateAt + 1).trim();
+      } else {
+        // If no good sentence break, just hard truncate
+        cleaned = cleaned.substring(0, maxLength).trim();
+        // Add ellipsis if we cut off mid-sentence
+        if (!cleaned.endsWith('.') && !cleaned.endsWith('!') && !cleaned.endsWith('?')) {
+          cleaned += '...';
         }
-        console.log(`✂️  Truncated to ${cleaned.length} characters`);
       }
+      console.log(`✂️  Truncated to ${cleaned.length} characters`);
+    }
 
-      if (cleaned.length < minLength) {
-        console.warn(`⚠️  Generated content is shorter than minimum length (${cleaned.length} chars < ${minLength} chars)`);
-      }
+    if (cleaned.length < minLength) {
+      console.warn(`⚠️  Generated content is shorter than minimum length (${cleaned.length} chars < ${minLength} chars)`);
     }
 
     return cleaned;
