@@ -66,7 +66,8 @@ function geoLabel(search: string): string {
     s.includes(", united states") ||
     s.includes("greenhouse") ||
     s.includes("lever") ||
-    s.includes("levels")
+    s.includes("levels") ||
+    s.includes("yc")
   )
     return "Remote US";
   if (
