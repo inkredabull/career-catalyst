@@ -141,7 +141,12 @@ export async function scoreJob(job: JobResult): Promise<ScoreResult> {
     jdText ? `\n## Job Description\n${jdText}` : "",
     `\nScore each of the 14 dimensions with a brief 1-2 sentence assessment and numeric score.
 Format each line as: N. Dimension Name: [score] — assessment
-End with a blank line then: Verdict: [🟢 Strong Fit — Pursue Actively | 🟡 Conditional Fit — Dig Deeper Before Committing | 🔴 Pass — Meaningful Misalignment]`,
+End with a blank line, then output EXACTLY this format (no markdown, no bold, no headers):
+Verdict: 🟢
+or
+Verdict: 🟡
+or
+Verdict: 🔴`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -161,17 +166,23 @@ End with a blank line then: Verdict: [🟢 Strong Fit — Pursue Actively | 🟡
       .map((b) => b.text)
       .join("");
 
-    const verdictMatch = text.match(/Verdict[^🟢🟡🔴\n]*[:\s]+(🟢|🟡|🔴)/i);
+    const verdictMatch = text.match(/Verdict[\s\S]{0,100}?(🟢|🟡|🔴)/i);
     let verdict: ScoreResult["verdict"] = "?";
     if (verdictMatch) {
       verdict = verdictMatch[1] as ScoreResult["verdict"];
     } else {
+      const verdictIdx = text.toLowerCase().lastIndexOf("verdict");
+      const context =
+        verdictIdx >= 0
+          ? text.slice(Math.max(0, verdictIdx - 20), verdictIdx + 150)
+          : text.slice(-300);
       log(
         "WARN",
-        'Could not parse verdict for %s — %s: "%s"',
+        'Could not parse verdict for %s — %s (len=%s): "%s"',
         job.company,
         job.title,
-        text.slice(0, 100),
+        text.length,
+        context,
       );
     }
 
