@@ -16,8 +16,12 @@ const oauth2Client = new google.auth.OAuth2(
   'urn:ietf:wg:oauth:2.0:oob' // For desktop apps
 );
 
-// Gmail API scope - readonly access to Gmail
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+// Gmail API scope - readonly access to Gmail; Drive scope - readonly access for resolving
+// résumé Drive share links (see components/core/src/utils/google-drive.ts)
+const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/drive.readonly'
+];
 
 async function getRefreshToken() {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
@@ -41,7 +45,7 @@ async function getRefreshToken() {
   console.log(authUrl);
   console.log('');
   console.log('2. Sign in with your Google account');
-  console.log('3. Grant access to Gmail (read-only)');
+  console.log('3. Grant access to Gmail and Drive (read-only)');
   console.log('4. Copy the authorization code and paste it below');
   console.log('');
 

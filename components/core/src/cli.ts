@@ -20,6 +20,7 @@ import * as fss from 'fs';
 import { execSync } from 'child_process';
 import { createSheetsLogger } from './integrations/sheets-logger';
 import { resolveFromProjectRoot } from './utils/project-root';
+import { findDriveFileLink } from './utils/google-drive';
 
 
 const program = new Command();
@@ -638,6 +639,26 @@ program
 
       if (!options.preview && process.platform === 'darwin') {
         execSync(`open "${result.comparisonFolder}"`);
+      }
+
+      if (!options.preview) {
+        const gpt5Result = result.results.find(r => r.success && r.model === 'GPT-5' && r.pdfPath);
+        if (gpt5Result?.pdfPath) {
+          try {
+            console.log('  -> Waiting for Google Drive to sync the GPT-5 resume PDF...');
+            const driveUrl = await findDriveFileLink(path.basename(gpt5Result.pdfPath));
+            if (driveUrl) {
+              jobData.resumeUrl = driveUrl;
+              jobData.updatedAt = new Date().toISOString();
+              fss.writeFileSync(path.join(jobDir, jobFile), JSON.stringify(jobData, null, 2));
+              console.log(`  -> ✅ Auto-saved Google Drive link: ${driveUrl}`);
+            } else {
+              console.warn('  -> ⚠️  Could not find synced Drive file for GPT-5 resume within timeout; use "Save Google Drive Link" manually.');
+            }
+          } catch (driveError) {
+            console.warn('  -> ⚠️  Drive link auto-save failed:', driveError instanceof Error ? driveError.message : driveError);
+          }
+        }
       }
 
     } catch (error) {
