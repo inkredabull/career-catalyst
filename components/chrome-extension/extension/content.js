@@ -218,10 +218,6 @@ function createGutter() {
           <div class="response-content"></div>
         </div>
 
-        <div id="page-questions" class="page-analysis" style="display: none;">
-          <h5>Questions Found on Page:</h5>
-          <ul id="questions-list"></ul>
-        </div>
       </div>
 
       <!-- Job Information Section -->
@@ -2507,141 +2503,206 @@ async function handleExtractJob() {
   }
 }
 
-// Analyze page content for questions
+// Analyze page content and inject AI answer buttons next to form fields
 function analyzePageContent() {
   try {
-    const questions = findQuestionsOnPage();
-    const questionsDiv = document.getElementById('page-questions');
-    const questionsList = document.getElementById('questions-list');
-    
-    if (questions.length > 0) {
-      questionsList.innerHTML = '';
-      questions.forEach(question => {
-        const li = document.createElement('li');
-        li.textContent = question;
-        li.classList.add('clickable-question');
-        li.addEventListener('click', function() {
-          populateQuestionInput(question);
-        });
-        questionsList.appendChild(li);
-      });
-      questionsDiv.style.display = 'block';
-      console.log(`Career Catalyst: Found ${questions.length} questions on page`);
+    const pairs = findLabelInputPairs();
+    if (pairs.length > 0) {
+      injectAnswerButtons(pairs);
+      console.log('Career Catalyst: Injected ' + pairs.length + ' answer buttons on page');
     } else {
-      questionsDiv.style.display = 'none';
-      console.log('Career Catalyst: No questions found on page');
+      console.log('Career Catalyst: No label-input pairs found on page');
     }
   } catch (error) {
     console.error('Career Catalyst: Error analyzing page content:', error);
   }
 }
 
-// Find questions on the current page
-function findQuestionsOnPage() {
-  const questions = [];
+// Find label-input pairs on the current page for AI button injection
+function findLabelInputPairs() {
+  const pairs = [];
+  const seenInputs = new Set();
   const seenQuestions = new Set();
 
-  // Strategy 1: Look for semantic form elements (labels, legends, field descriptions)
-  // This is the most reliable way to find actual application questions
-  const formQuestionSelectors = [
-    'label',           // Standard form labels
-    'legend',          // Fieldset legends
-    '[role="label"]',  // ARIA labels
-    '.question',       // Common class names
-    '.field-label',
-    '.form-label',
-    '.input-label',
-    '[data-qa*="question"]',
-    '[data-test*="question"]',
-    '[class*="question"]',
-    '[class*="field-title"]',
-    '[class*="label"]'
-  ];
+  const TEXT_INPUT_SELECTOR =
+    'input[type="text"], input[type="email"], input[type="number"],' +
+    'input[type="url"], input[type="tel"], textarea';
 
-  formQuestionSelectors.forEach(selector => {
-    try {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach(element => {
-        // Skip our own extension content
-        if (element.closest('#job-extractor-gutter')) return;
+  function isValidInput(inputEl) {
+    if (!inputEl) return false;
+    if (inputEl.closest('#job-extractor-gutter')) return false;
+    if (inputEl.getAttribute('data-cc-btn-injected')) return false;
+    if (seenInputs.has(inputEl)) return false;
+    const t = (inputEl.type || '').toLowerCase();
+    if (t === 'radio' || t === 'checkbox' || t === 'hidden') return false;
+    if (inputEl.tagName.toLowerCase() === 'select') return false;
+    if (inputEl.disabled) return false;
+    return true;
+  }
 
-        // Get direct text content (not nested elements)
-        let text = '';
-        Array.from(element.childNodes).forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            text += node.textContent;
-          }
-        });
+  // Strategy 1: <label for="id"> and implicit label nesting
+  document.querySelectorAll('label').forEach(function(labelEl) {
+    if (labelEl.closest('#job-extractor-gutter')) return;
 
-        // If no direct text, try the full text content but be more careful
-        if (!text.trim()) {
-          text = element.textContent || '';
+    // Extract direct text (childNodes TEXT_NODE walk)
+    let text = '';
+    Array.from(labelEl.childNodes).forEach(function(node) {
+      if (node.nodeType === Node.TEXT_NODE) text += node.textContent;
+    });
+    if (!text.trim()) text = labelEl.textContent || '';
+    text = text.trim();
+
+    const cleanedText = cleanupQuestionText(text);
+    if (!cleanedText || cleanedText.length < 10 || cleanedText.length >= 300) return;
+    if (!isLikelyQuestion(cleanedText)) return;
+    if (seenQuestions.has(cleanedText.toLowerCase())) return;
+
+    // Find associated input: explicit for → implicit nesting
+    let inputEl = null;
+    if (labelEl.htmlFor) {
+      inputEl = document.getElementById(labelEl.htmlFor);
+    }
+    if (!inputEl) {
+      inputEl = labelEl.querySelector(TEXT_INPUT_SELECTOR);
+    }
+
+    if (!isValidInput(inputEl)) return;
+
+    seenInputs.add(inputEl);
+    seenQuestions.add(cleanedText.toLowerCase());
+    pairs.push({ labelEl: labelEl, inputEl: inputEl, questionText: cleanedText });
+  });
+
+  // Strategies 2 & 3: aria-labelledby and aria-label on inputs not yet captured
+  document.querySelectorAll(TEXT_INPUT_SELECTOR).forEach(function(inputEl) {
+    if (!isValidInput(inputEl)) return;
+
+    // Strategy 2: aria-labelledby
+    const labelledById = inputEl.getAttribute('aria-labelledby');
+    if (labelledById) {
+      const refEl = document.getElementById(labelledById);
+      if (refEl) {
+        const text = cleanupQuestionText((refEl.textContent || '').trim());
+        if (text && text.length >= 10 && text.length < 300 &&
+            isLikelyQuestion(text) && !seenQuestions.has(text.toLowerCase())) {
+          seenInputs.add(inputEl);
+          seenQuestions.add(text.toLowerCase());
+          pairs.push({ labelEl: refEl, inputEl: inputEl, questionText: text });
+          return;
         }
+      }
+    }
 
-        text = text.trim();
-
-        // Look for question-like content
-        if (text && isLikelyQuestion(text) && !seenQuestions.has(text.toLowerCase())) {
-          // Clean up common prefixes like "YesNo", "TrueFalse", etc.
-          const cleanedText = cleanupQuestionText(text);
-          if (cleanedText && cleanedText.length >= 10 && cleanedText.length < 300) {
-            questions.push(cleanedText);
-            seenQuestions.add(cleanedText.toLowerCase());
-          }
-        }
-      });
-    } catch (e) {
-      console.log(`Error processing selector ${selector}:`, e);
+    // Strategy 3: aria-label
+    const ariaLabel = inputEl.getAttribute('aria-label');
+    if (ariaLabel) {
+      const text = cleanupQuestionText(ariaLabel.trim());
+      if (text && text.length >= 10 && text.length < 300 &&
+          isLikelyQuestion(text) && !seenQuestions.has(text.toLowerCase())) {
+        seenInputs.add(inputEl);
+        seenQuestions.add(text.toLowerCase());
+        pairs.push({ labelEl: null, inputEl: inputEl, questionText: text });
+      }
     }
   });
 
-  // Strategy 2: Look for text patterns that indicate questions
-  // Only do this if we haven't found many questions yet (form-based detection is preferred)
-  if (questions.length < 5) {
-    const questionPatterns = [
-      /^[A-Z][^.!]*\?$/,  // Complete question starting with capital, ending with ?
-      /^(?:What|How|Why|When|Where|Who|Which|Can\s+you|Do\s+you|Are\s+you|Have\s+you|Would\s+you|Could\s+you|Will\s+you|Should\s+you)\s+.+\?$/gi
-    ];
+  return pairs.slice(0, 15);
+}
 
-    // Target specific containers more likely to have questions
-    const questionContainers = document.querySelectorAll('form, .application-form, .questions-section, main, article, .content');
+// Restore button to idle state after a delay
+function setButtonError(btn) {
+  btn.textContent = '✗ Error';
+  btn.style.background = '#ef4444';
+  btn.style.cursor = 'pointer';
+  btn.disabled = false;
+  setTimeout(function() {
+    btn.textContent = '✨ Fill';
+    btn.style.background = '#1a73e8';
+  }, 2500);
+}
 
-    questionContainers.forEach(container => {
-      if (container.closest('#job-extractor-gutter')) return;
+// Inject small AI fill buttons directly next to question-bearing inputs on the page
+function injectAnswerButtons(pairs) {
+  pairs.forEach(function(pair) {
+    const inputEl = pair.inputEl;
+    const questionText = pair.questionText;
 
-      // Look at immediate text nodes and small text elements
-      const smallTextElements = container.querySelectorAll('p, li, h4, h5, h6, div[class*="question"], div[class*="field"]');
+    if (inputEl.getAttribute('data-cc-btn-injected')) return;
+    inputEl.setAttribute('data-cc-btn-injected', 'true');
 
-      smallTextElements.forEach(element => {
-        if (element.closest('#job-extractor-gutter')) return;
+    const btn = document.createElement('button');
+    btn.setAttribute('type', 'button');
+    btn.setAttribute('data-cc-answer-btn', 'true');
+    btn.setAttribute('title', 'AI Fill: ' + questionText.substring(0, 80));
+    btn.textContent = '✨ Fill';
+    btn.style.cssText =
+      'display:block;' +
+      'margin-top:4px;' +
+      'padding:3px 8px;' +
+      'font-size:11px;' +
+      'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;' +
+      'font-weight:600;' +
+      'color:#ffffff;' +
+      'background:#1a73e8;' +
+      'border:none;' +
+      'border-radius:4px;' +
+      'cursor:pointer;' +
+      'line-height:1.4;' +
+      'white-space:nowrap;' +
+      'width:fit-content;' +
+      'box-shadow:0 1px 3px rgba(0,0,0,0.2);' +
+      'z-index:999998;';
 
-        const text = element.textContent?.trim() || '';
+    inputEl.insertAdjacentElement('afterend', btn);
 
-        // Only process reasonably sized text blocks
-        if (text.length < 10 || text.length > 300) return;
-
-        questionPatterns.forEach(pattern => {
-          const matches = text.match(pattern);
-          if (matches) {
-            matches.forEach(match => {
-              const cleanQuestion = cleanupQuestionText(match.trim());
-              if (cleanQuestion &&
-                  cleanQuestion.length >= 10 &&
-                  cleanQuestion.length < 300 &&
-                  !seenQuestions.has(cleanQuestion.toLowerCase()) &&
-                  !isCommonNonQuestion(cleanQuestion)) {
-                questions.push(cleanQuestion);
-                seenQuestions.add(cleanQuestion.toLowerCase());
-              }
-            });
-          }
-        });
-      });
+    btn.addEventListener('mouseenter', function() {
+      if (!btn.disabled) btn.style.background = '#1557b0';
     });
-  }
+    btn.addEventListener('mouseleave', function() {
+      if (!btn.disabled) btn.style.background = '#1a73e8';
+    });
 
-  // Limit to first 15 questions
-  return questions.slice(0, 15);
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      btn.textContent = '⏳';
+      btn.disabled = true;
+      btn.style.background = '#9ca3af';
+      btn.style.cursor = 'not-allowed';
+
+      (async function() {
+        try {
+          let response = await generateCVAwareResponse(questionText);
+          if (!response) {
+            response = generateMockResponse(questionText);
+            console.log('Career Catalyst: Using mock response for field fill');
+          }
+
+          if (response) {
+            inputEl.value = response;
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+            inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+            btn.textContent = '✓ Done';
+            btn.style.background = '#10b981';
+            btn.style.cursor = 'pointer';
+            btn.disabled = false;
+
+            setTimeout(function() {
+              btn.textContent = '✨ Fill';
+              btn.style.background = '#1a73e8';
+            }, 2500);
+          } else {
+            setButtonError(btn);
+          }
+        } catch (err) {
+          console.error('Career Catalyst: Error filling field:', err);
+          setButtonError(btn);
+        }
+      })();
+    });
+  });
 }
 
 // Check if text is likely a question
@@ -2705,16 +2766,6 @@ function isCommonNonQuestion(text) {
   ];
 
   return nonQuestionPatterns.some(pattern => pattern.test(text));
-}
-
-// Populate question into input field for user review
-function populateQuestionInput(question) {
-  const input = document.getElementById('llm-input');
-  if (input) {
-    input.value = question;
-    input.focus();
-    console.log('Career Catalyst: Question populated into input:', question);
-  }
 }
 
 // Generate CV-aware response using local MCP server
