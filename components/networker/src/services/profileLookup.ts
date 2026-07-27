@@ -194,7 +194,7 @@ export async function lookupProfiles(
     if (parsed.isValid && parsed.firstName && parsed.lastName) {
       results.push(await lookupLinkedInProfile(parsed.firstName, parsed.lastName, eventName));
     } else {
-      console.log(`  Skipping: "${parsed.original}" (needs first and last name)`);
+      console.log(`  Skipping: "${parsed.original}" (${parsed.reason ?? 'needs first and last name'})`);
     }
   }
   return results;

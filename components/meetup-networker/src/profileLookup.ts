@@ -354,7 +354,7 @@ export async function lookupProfiles(
       );
       results.push(profile);
     } else {
-      console.log(`  Skipping: "${parsed.original}" (needs first and last name)`);
+      console.log(`  Skipping: "${parsed.original}" (${parsed.reason ?? 'needs first and last name'})`);
     }
   }
 

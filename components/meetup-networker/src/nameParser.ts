@@ -3,7 +3,10 @@ export interface ParsedName {
   firstName?: string;
   lastName?: string;
   isValid: boolean;
+  reason?: string;
 }
+
+const INITIAL_PATTERN = /^[A-Za-z]\.?$/;
 
 /**
  * Parse a name string to extract first and last name
@@ -31,6 +34,12 @@ export function parseName(nameStr: string): ParsedName {
   // (ignoring middle names/initials)
   const firstName = parts[0];
   const lastName = parts[parts.length - 1];
+
+  // A single-letter "last name" (e.g. "Aakash S") is too ambiguous to search/cache
+  // reliably — EnrichLayer treats it as a wildcard and can match the wrong person.
+  if (INITIAL_PATTERN.test(lastName)) {
+    return { original: nameStr, isValid: false, reason: 'last name is only an initial' };
+  }
 
   return {
     original: nameStr,
