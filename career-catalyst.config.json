@@ -16,5 +16,6 @@
   "RESUME_LLM_PROVIDER": "openai",
   "RESUME_LLM_MODEL": "gpt-5.2-2025-12-11",
   "CRITIQUE_LLM_PROVIDER": "anthropic",
-  "CRITIQUE_LLM_MODEL": "claude-haiku-4-5-20251001"
+  "CRITIQUE_LLM_MODEL": "claude-haiku-4-5-20251001",
+  "CORS_ALLOWED_ORIGINS": "https://www.linkedin.com,https://linkedin.com,https://guild.com,https://www.guild.com,https://ashbyhq.com"
 }

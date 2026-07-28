@@ -412,17 +412,18 @@ STRENGTHS
 // Initialize CV response engine
 const cvEngine = new CVResponseEngine(process.argv.includes('--llm'));
 
-// Enable CORS for Chrome extension, AMA app, and LinkedIn content scripts
+// Build allowed-origins set from config (CORS_ALLOWED_ORIGINS env var or career-catalyst.config.json)
+const _corsOriginsRaw = process.env.CORS_ALLOWED_ORIGINS || 'https://www.linkedin.com,https://linkedin.com,https://guild.com,https://www.guild.com,https://ashbyhq.com';
+const allowedOrigins = new Set(_corsOriginsRaw.split(',').map(s => s.trim()).filter(Boolean));
+
+// Enable CORS for Chrome extension, AMA app, and job-board content scripts
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // same-origin / curl
     if (
       origin.startsWith('chrome-extension://') ||
       origin.startsWith('http://localhost:') ||
-      origin === 'https://www.linkedin.com' ||
-      origin === 'https://linkedin.com' ||
-      origin.endsWith('.ashbyhq.com') ||
-      origin === 'https://ashbyhq.com'
+      allowedOrigins.has(origin)
     ) {
       return callback(null, true);
     }
