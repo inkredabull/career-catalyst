@@ -70,7 +70,7 @@ export const getContactDetails = (fullName: string): ContactDetails => {
 
 // ── Sheet integration ─────────────────────────────────────────────────────────
 
-const getMostRecentInteractionDate = (email: string): Date | null => {
+const getMostRecentInteractionDate = (email: string): GoogleAppsScript.Base.Date | null => {
   const threads = GmailApp.search(`to:${email} OR from:${email}`, 0, 1);
   return threads.length > 0 ? threads[0].getLastMessageDate() : null;
 };

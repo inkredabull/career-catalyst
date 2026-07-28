@@ -25,8 +25,8 @@ export function cmf(): string { return 'TODO_CMF_MSG'; }
 export function mnookin(): string { return 'TODO_MNOOKIN_MSG'; }
 export function li(): string { return 'TODO_LI_MSG'; }
 export function appreciate(): string { return 'TODO_APPRECIATE_MSG'; }
-export function connection(): string { return 'TODO_CONNECTION_MSG'; }
-export function intro(): string { return 'TODO_INTRO_MSG'; }
+export function connection(_personName?: string, _personUrl?: string): string { return 'TODO_CONNECTION_MSG'; }
+export function intro(_personName?: string, _jobTitle?: string, _blurb?: string): string { return 'TODO_INTRO_MSG'; }
 export function long(): string { return 'TODO_LONG_MSG'; }
 export function shot(): string { return 'TODO_SHOT_MSG'; }
 export function hope(): string { return 'TODO_HOPE_MSG'; }
@@ -49,6 +49,6 @@ export function thisYear(): string { return String(new Date().getFullYear()); }
 export function todayAbbreviated(): string {
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()] ?? '';
 }
-export function valediction(): string { return 'TODO_VALEDICTION_MSG'; }
+export function valediction(_subjectLine?: string): string { return 'TODO_VALEDICTION_MSG'; }
 export function ask(): string { return 'TODO_ASK_MSG'; }
 export function justification(): string { return 'TODO_JUSTIFICATION_MSG'; }
