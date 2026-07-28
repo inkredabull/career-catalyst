@@ -23,6 +23,7 @@ export const requireProp = (key: string): string => {
 
 // Column name constants — must match spreadsheet header row
 export const COLS = {
+  RECENT: 'Recent',
   RECIPIENT: 'Recipient',
   CELL: 'Cell',
   FIRST_NAME: 'First',

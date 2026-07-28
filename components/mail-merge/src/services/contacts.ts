@@ -70,11 +70,17 @@ export const getContactDetails = (fullName: string): ContactDetails => {
 
 // ── Sheet integration ─────────────────────────────────────────────────────────
 
+const getMostRecentInteractionDate = (email: string): Date | null => {
+  const threads = GmailApp.search(`to:${email} OR from:${email}`, 0, 1);
+  return threads.length > 0 ? threads[0].getLastMessageDate() : null;
+};
+
 export const fetchContactToSheet = (): void => {
   const sheet = SpreadsheetApp.getActiveSheet();
   const data = sheet.getDataRange().getValues() as string[][];
   const heads = data.shift() as string[];
   const recipientIdx = heads.indexOf(COLS.RECIPIENT);
+  const recentIdx    = heads.indexOf(COLS.RECENT);
   const fullNameIdx  = heads.indexOf(COLS.FULL_NAME);
   const cellIdx      = heads.indexOf(COLS.CELL);
   const linkedInIdx  = heads.indexOf(COLS.LINKEDIN);
@@ -87,18 +93,34 @@ export const fetchContactToSheet = (): void => {
   let filled = 0;
   for (let i = 0; i < data.length; i++) {
     const row = data[i]!;
-    if (row[recipientIdx] !== '' || !row[fullNameIdx]) continue;
+    const existingEmail = String(row[recipientIdx] ?? '').trim();
+
+    if (existingEmail) {
+      if (recentIdx !== -1) {
+        const lastDate = getMostRecentInteractionDate(existingEmail);
+        if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
+      }
+      filled++;
+      continue;
+    }
+
+    if (!row[fullNameIdx]) continue;
     const contact = getContactDetails(String(row[fullNameIdx]));
     if (!contact.email) continue;
+
     sheet.getRange(i + 2, recipientIdx + 1).setValue(contact.email);
     if (cellIdx !== -1 && !row[cellIdx] && contact.mobile)
       sheet.getRange(i + 2, cellIdx + 1).setValue(contact.mobile);
     if (linkedInIdx !== -1 && !row[linkedInIdx] && contact.linkedin)
       sheet.getRange(i + 2, linkedInIdx + 1).setValue(contact.linkedin);
+    if (recentIdx !== -1) {
+      const lastDate = getMostRecentInteractionDate(contact.email);
+      if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
+    }
     filled++;
   }
 
-  SpreadsheetApp.getActive().toast(`${filled} Recipient(s) filled`, '✅ Lookup Complete', 4);
+  SpreadsheetApp.getActive().toast(`${filled} row(s) updated`, '✅ Lookup Complete', 4);
 };
 
 export const getLinkedInUrlToSheet = (): void => {
