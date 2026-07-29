@@ -85,8 +85,12 @@ function archiveOldJobs() {
         if (options.dryRun) {
           console.log(`   [DRY RUN] Would move: ${jobPath} -> ${destPath}`);
         } else {
-          // Use fs.renameSync for atomic move operation
-          fs.renameSync(jobPath, destPath);
+          // Remove stale destination if it exists (e.g. from a previous partial run)
+          if (fs.existsSync(destPath)) {
+            fs.rmSync(destPath, { recursive: true, force: true });
+          }
+          fs.cpSync(jobPath, destPath, { recursive: true });
+          fs.rmSync(jobPath, { recursive: true, force: true });
           console.log(`   Moved to archive: ${destPath}`);
         }
         archivedCount++;
