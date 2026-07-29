@@ -1,7 +1,8 @@
 // Fetch and cache job metadata from the unified-server /llm endpoint.
-// Base URL is read from the NGROK_SMS_URL Script Property (same server, same tunnel).
+// Base URL is bundled at build time from .env via NGROK_SMS_URL.
 
 import { log } from '../utils/logger';
+import { NGROK_SMS_URL } from '../config/env';
 
 export interface JobMetadata {
   jobTitle: string;
@@ -72,9 +73,9 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
     return JSON.parse(cached) as JobMetadata;
   }
 
-  const baseUrl = PropertiesService.getScriptProperties().getProperty('NGROK_SMS_URL');
+  const baseUrl = NGROK_SMS_URL;
   if (!baseUrl) {
-    log('ERROR', 'NGROK_SMS_URL not set — cannot fetch job metadata for %s', jobId);
+    log('ERROR', 'NGROK_SMS_URL not set in .env — rebuild required, cannot fetch metadata for %s', jobId);
     return null;
   }
 

@@ -11,3 +11,4 @@ src/config/messages.ts
 
 # Migration source — contains PII and revoked credentials
 src/migration/Code.gs
+.env
