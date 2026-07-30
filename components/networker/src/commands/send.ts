@@ -71,6 +71,12 @@ export function registerSend(program: Command): void {
       const alreadySent = targets.filter(p => p.connectionSent).length;
       if (alreadySent > 0) console.log(`Skipping ${alreadySent} already-sent connection(s)`);
 
+      const pending = targets.filter(p => p.linkedInUrl && !p.connectionSent);
+      const pendingByTier = (['TIER_1', 'TIER_2', 'TIER_3'] as ContactPriorityTier[])
+        .map(t => `${t}=${pending.filter(p => p.priorityTier === t).length}`)
+        .join('  ');
+      console.log(`Pending by tier: ${pendingByTier}`);
+
       const candidates = targets
         .filter(p => p.linkedInUrl && isTierSelected(p.priorityTier, sendTier) && !p.connectionSent)
         .sort((a, b) => tierRank(a.priorityTier) - tierRank(b.priorityTier))
