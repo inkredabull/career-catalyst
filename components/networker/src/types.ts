@@ -56,6 +56,7 @@ export type ContactPriorityTier = 'TIER_1' | 'TIER_2' | 'TIER_3' | 'NONE';
 export interface DiscoveredProfile {
   name: string;
   firstName?: string;
+  lastName?: string;
   currentTitle?: string;
   currentCompany?: string;
   location?: string;

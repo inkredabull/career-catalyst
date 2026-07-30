@@ -106,12 +106,13 @@ export function registerSend(program: Command): void {
         await openMessageModal(profile, tabIndex, eventInfo.eventName);
 
         const nameParts = profile.name.trim().split(/\s+/);
-        markConnectionSent(
+        const sent = markConnectionSent(
           profile.firstName ?? nameParts[0] ?? '',
-          nameParts[nameParts.length - 1] ?? '',
+          profile.lastName ?? nameParts[nameParts.length - 1] ?? '',
           eventInfo.eventName
         );
-        console.log(`  Marked ${profile.name} as connection sent`);
+        if (sent) console.log(`  Marked ${profile.name} as connection sent`);
+        else console.warn(`  Could not mark ${profile.name} as connection sent — cache file not updated`);
         if (i < candidates.length - 1) await randomDelay(800, 1500);
       }
 

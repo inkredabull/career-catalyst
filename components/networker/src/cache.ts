@@ -62,7 +62,7 @@ export function saveLookupToCache(
   ensureCacheDir(eventName);
   const file = join(CACHE_DIR, normalizeEventName(eventName), cacheKey(firstName, lastName));
   try {
-    writeFileSync(file, JSON.stringify({ ...profile, cachedAt: new Date().toISOString() }, null, 2), 'utf-8');
+    writeFileSync(file, JSON.stringify({ ...profile, lastName, cachedAt: new Date().toISOString() }, null, 2), 'utf-8');
   } catch {
     console.warn(`  Warning: could not save cache for ${firstName} ${lastName}`);
   }
@@ -72,7 +72,7 @@ export function markConnectionSent(
   firstName: string,
   lastName: string,
   eventName: string
-): void {
+): boolean {
   const slug = normalizeEventName(eventName);
   const candidates = [join(CACHE_DIR, slug), join(CACHE_DIR, `${slug}-csv`)];
   const key = cacheKey(firstName, lastName);
@@ -84,12 +84,16 @@ export function markConnectionSent(
         const data = JSON.parse(readFileSync(file, 'utf-8'));
         data.connectionSent = true;
         writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
+        return true;
       } catch {
         console.warn(`  Warning: could not mark connectionSent for ${firstName} ${lastName}`);
+        return false;
       }
-      return;
     }
   }
+
+  console.warn(`  Warning: cache file not found for ${firstName} ${lastName} (key: ${key})`);
+  return false;
 }
 
 export function loadAllCachedProfiles(eventName: string): DiscoveredProfile[] {
@@ -104,7 +108,16 @@ export function loadAllCachedProfiles(eventName: string): DiscoveredProfile[] {
         .flatMap(f => {
           try {
             const { cachedAt: _ca, ...profile } = JSON.parse(readFileSync(join(dir, f), 'utf-8'));
-            return [profile as DiscoveredProfile];
+            const p = profile as DiscoveredProfile;
+            // Backfill lastName from filename for profiles saved before this field was added
+            if (!p.lastName && p.firstName) {
+              const fileBase = f.replace('.json', '');
+              const firstSlug = p.firstName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+              if (fileBase.startsWith(firstSlug + '-')) {
+                p.lastName = fileBase.slice(firstSlug.length + 1);
+              }
+            }
+            return [p];
           } catch { return []; }
         });
     } catch { continue; }
