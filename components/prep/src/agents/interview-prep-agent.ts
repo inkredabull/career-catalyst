@@ -5,6 +5,7 @@ import { StatementType, StatementOptions, StatementResult, InterviewPrepResult, 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
+import { escapeNonAsciiForRtf } from '../utils/rtf';
 
 export class InterviewPrepAgent extends ClaudeBaseAgent {
   private currentJobId: string = '';
@@ -827,7 +828,7 @@ Format as:
       // Combine into final RTF document with proper font selection and formatting
       const combinedRTF = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}
 \\f0\\fs24
-${bodies.join('\n')}
+${escapeNonAsciiForRtf(bodies.join('\n'))}
 }`;
 
       // Save combined output as RTF

@@ -9,6 +9,7 @@ import * as fs from 'fs/promises';
 import * as fss from 'fs';
 import { execSync } from 'child_process';
 import * as readline from 'readline';
+import { escapeNonAsciiForRtf } from './utils/rtf';
 
 
 function unescapeRTF(content: string): string {
@@ -21,7 +22,7 @@ function unescapeRTF(content: string): string {
 async function copyToClipboard(content: string): Promise<void> {
   let processedContent = content;
   if (content.includes('\\\\rtf1') || content.includes('\\\\par')) {
-    processedContent = unescapeRTF(content);
+    processedContent = escapeNonAsciiForRtf(unescapeRTF(content));
     console.log('📝 Unescaped RTF formatting for proper clipboard copying');
   }
   execSync('pbcopy', { input: processedContent });
