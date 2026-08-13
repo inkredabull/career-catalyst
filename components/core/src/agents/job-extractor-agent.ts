@@ -1571,9 +1571,11 @@ Suggested actions:
         return;
       }
 
-      const results = await Promise.all(remindersToCreate.map(r => reminderService.createReminder(r)));
+      // Create in one batch: each separate osascript call pays the Reminders app's
+      // multi-second Apple Event startup cost, which is what used to time these out
+      const results = await reminderService.createReminders(remindersToCreate);
 
-      const successCount = results.filter(r => r.success).length;
+      const successCount = results.filter((r: any) => r.success).length;
       if (successCount > 0) {
         console.log(`✅ Created ${successCount} reminders for ${jobTitle}, all tagged with #${jobId}`);
         remindersToCreate.forEach((reminder, idx) => {
@@ -1583,9 +1585,14 @@ Suggested actions:
         });
       }
 
-      const failedCount = results.filter(r => !r.success).length;
-      if (failedCount > 0) {
-        console.warn(`⚠️  Failed to create ${failedCount} reminder(s)`);
+      const failed = results.filter((r: any) => !r.success);
+      if (failed.length > 0) {
+        console.warn(`⚠️  Failed to create ${failed.length} reminder(s)`);
+        results.forEach((result: any, idx: number) => {
+          if (!result.success) {
+            console.warn(`   • ${remindersToCreate[idx].title}: ${result.error}`);
+          }
+        });
       }
     } catch (error) {
       // Don't fail the entire extraction if reminder creation fails
