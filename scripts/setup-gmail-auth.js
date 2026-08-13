@@ -28,6 +28,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/contacts.readonly',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
 ];
 
 async function getRefreshToken() {
@@ -57,6 +58,7 @@ async function getRefreshToken() {
   console.log('   • Gmail (read, compose, send) — ReachPilot drafts + digest');
   console.log('   • Sheets (read/write) — Warmup History + job tracking');
   console.log('   • Contacts (readonly) — Google People API sync');
+  console.log('   • Drive metadata (readonly) — resolve resume PDF share links');
   console.log('');
   console.log('🚀 Starting local OAuth server on port', PORT);
   console.log('');
