@@ -1,8 +1,8 @@
 // Fetch and cache job metadata from the unified-server /llm endpoint.
-// Base URL is bundled at build time from .env via NGROK_SMS_URL.
+// Base URL is bundled at build time from .env via NGROK_TUNNEL_URL.
 
 import { log } from '../utils/logger';
-import { NGROK_SMS_URL } from '../config/env';
+import { NGROK_TUNNEL_URL } from '../config/env';
 
 export interface JobMetadata {
   jobTitle: string;
@@ -73,9 +73,9 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
     return JSON.parse(cached) as JobMetadata;
   }
 
-  const baseUrl = NGROK_SMS_URL;
+  const baseUrl = NGROK_TUNNEL_URL;
   if (!baseUrl) {
-    log('ERROR', 'NGROK_SMS_URL not set in .env — rebuild required, cannot fetch metadata for %s', jobId);
+    log('ERROR', 'NGROK_TUNNEL_URL not set in .env — rebuild required, cannot fetch metadata for %s', jobId);
     return null;
   }
 

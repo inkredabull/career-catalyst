@@ -77,7 +77,7 @@ function showJobMetadataFn(): void {
   }
   const meta = getJobMetadata(jobId);
   if (!meta) {
-    SpreadsheetApp.getUi().alert(`No metadata found for job ${jobId}. Check NGROK_SMS_URL in .env and redeploy.`);
+    SpreadsheetApp.getUi().alert(`No metadata found for job ${jobId}. Check NGROK_TUNNEL_URL in .env and redeploy.`);
     return;
   }
   const lines = [

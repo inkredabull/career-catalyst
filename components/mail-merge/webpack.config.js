@@ -1,7 +1,7 @@
 const path = require('path');
 const webpack = require('webpack');
 const GasPlugin = require('gas-webpack-plugin');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 module.exports = {
   entry: './src/index.ts',
@@ -21,7 +21,7 @@ module.exports = {
   plugins: [
     new GasPlugin(),
     new webpack.DefinePlugin({
-      __NGROK_SMS_URL__: JSON.stringify(process.env.NGROK_SMS_URL ?? ''),
+      __NGROK_TUNNEL_URL__: JSON.stringify(process.env.NGROK_TUNNEL_URL ?? ''),
     }),
   ],
   optimization: {

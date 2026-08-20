@@ -14,7 +14,7 @@ import syncFetch from 'sync-fetch';
 // ── Bootstrap GAS shims ───────────────────────────────────────────────────────
 // Must happen before importing any GAS-coupled source modules.
 
-process.env.NGROK_SMS_URL = process.env.NGROK_SMS_URL ?? 'http://localhost:3000';
+process.env.NGROK_TUNNEL_URL = process.env.NGROK_TUNNEL_URL ?? 'http://localhost:3000';
 process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'WARN'; // suppress INFO noise during preview
 
 (global as unknown as Record<string, unknown>).UrlFetchApp = {
@@ -111,7 +111,7 @@ const row: Record<string, string> = {
 };
 
 console.log(`\nResolving template for job ID: ${jobId}`);
-console.log(`Server: ${process.env.NGROK_SMS_URL}\n`);
+console.log(`Server: ${process.env.NGROK_TUNNEL_URL}\n`);
 console.log('─'.repeat(60));
 
 let resolved: MsgObj;

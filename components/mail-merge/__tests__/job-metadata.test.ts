@@ -21,7 +21,7 @@ const mockUrlFetchApp = (status: number, body: string) => {
 beforeEach(() => {
   clearJobMetadataCache('test-job');
   // Reset env between tests
-  process.env.NGROK_SMS_URL = 'http://localhost:3000';
+  process.env.NGROK_TUNNEL_URL = 'http://localhost:3000';
   // Clear in-memory cache shim
   const cache = (global as any).CacheService.getScriptCache();
   cache.remove('job_test-job');
@@ -50,8 +50,8 @@ describe('getJobMetadata', () => {
     expect(meta).toBeNull();
   });
 
-  it('returns null when NGROK_SMS_URL is not set', () => {
-    delete process.env.NGROK_SMS_URL;
+  it('returns null when NGROK_TUNNEL_URL is not set', () => {
+    delete process.env.NGROK_TUNNEL_URL;
     const meta = getJobMetadata('test-job');
     expect(meta).toBeNull();
   });

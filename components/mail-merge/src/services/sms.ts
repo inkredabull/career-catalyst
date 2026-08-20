@@ -1,7 +1,7 @@
 // SMS sending via ngrok tunnel.
-// NGROK_SMS_URL is bundled at build time from .env — no Script Property needed.
+// NGROK_TUNNEL_URL is bundled at build time from .env — no Script Property needed.
 
-import { NGROK_SMS_URL } from '../config/env';
+import { NGROK_TUNNEL_URL } from '../config/env';
 
 export const normalizePhoneNumber = (input: string): string => {
   let digits = String(input).replace(/\D/g, '');
@@ -11,11 +11,11 @@ export const normalizePhoneNumber = (input: string): string => {
 };
 
 export const sendRealSms = (to: string, message: string): void => {
-  if (!NGROK_SMS_URL) {
-    Logger.log('NGROK_SMS_URL not set in .env — rebuild required');
+  if (!NGROK_TUNNEL_URL) {
+    Logger.log('NGROK_TUNNEL_URL not set in .env — rebuild required');
     return;
   }
-  const url = `${NGROK_SMS_URL}/send`;
+  const url = `${NGROK_TUNNEL_URL}/send`;
   const res = UrlFetchApp.fetch(url, {
     method: 'post',
     contentType: 'application/json',
