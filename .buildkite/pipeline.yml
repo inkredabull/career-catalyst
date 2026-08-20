@@ -11,6 +11,18 @@ steps:
           trigger: on-failure
           model: "global.anthropic.claude-sonnet-4-6"
 
+  - key: lint-sms-bridge
+    label: ":test_tube: Lint sms-bridge"
+    command: npm run lint --workspace=@inkredabull/career-catalyst-sms-bridge
+
+  - key: test-sms-bridge
+    label: ":test_tube: Test sms-bridge"
+    command: npm run test --workspace=@inkredabull/career-catalyst-sms-bridge
+    plugins:
+      - bedrock-summarize#v1.0.0:
+          trigger: on-failure
+          model: "global.anthropic.claude-sonnet-4-6"
+
   - key: run
     label: ":robot_face: Run Morning Warmup (dry-run)"
     depends_on: test

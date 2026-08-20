@@ -2,18 +2,18 @@
 
 Turn Google Sheets into a real SMS sender — from your own phone number.
 
-No Twilio number. No carrier hacks. No vendor lock-in.
+No Twilio. No carrier hacks. No vendor lock-in.
 
 ## Architecture
 
 ```
 Google Sheets
    ↓
-Apps Script (UrlFetch)
+Apps Script (UrlFetch)          ← components/mail-merge
    ↓
 Public HTTPS endpoint (ngrok)
    ↓
-Node.js on your Mac
+Node.js on your Mac             ← this component, port 3334
    ↓
 AppleScript
    ↓
@@ -26,83 +26,83 @@ From the recipient's point of view, it looks like you typed the text yourself.
 
 ## Key Features
 
-- **Uses your real phone number** - Messages appear to come from you
-- **Zero per-SMS fees** - No third-party SMS services required
-- **Fully private** - All messages route through your own devices
-- **No vendor dependency risk** - Complete control over your infrastructure
-- **Integrates with existing tools** - Works with Google Sheets and other apps
+- **Uses your real phone number** — messages appear to come from you
+- **Zero per-SMS fees** — no third-party SMS services required
+- **Fully private** — all messages route through your own devices
+- **No vendor dependency risk** — complete control over your infrastructure
 
-## How It Works
+## Routes
 
-### 1. Node.js SMS Bridge
+| Route | Purpose |
+| --- | --- |
+| `POST /send` | `{ to, message }` → Messages.app. Tries iMessage, falls back to SMS. |
+| `GET /health` | Liveness check, returns `ok`. |
+| `GET /extract` | Proxied to unified-server. |
+| `GET /llm` | Proxied to unified-server. |
+| `POST /generate-blurb` | Proxied to unified-server. |
 
-A tiny Node server running on your Mac receives JSON requests, triggers AppleScript, and sends messages via Messages.app.
+### Why the proxy routes exist
 
-**Design principle:** Return HTTP immediately, do the work async. This single decision avoids every timeout, gateway error, and flaky edge case.
+ngrok free-tier gives you one tunnel. `components/unified-server` (port 3000)
+also needs to be publicly reachable for JD-extractor tracking links. Rather
+than run two tunnels and keep two URLs in sync across the root `.env` and the
+Vercel env var of the same name, the tunnel terminates here and this component
+forwards those three routes upstream.
 
-### 2. ngrok for Public Access
+### Why `/send` returns 202 before doing anything
+
+`osascript` against Messages.app routinely takes seconds. Both callers reach
+this server through ngrok, and Apps Script's `UrlFetchApp` will time out and
+retry if the connection is held open. Responding `202 accepted` immediately and
+doing the work afterwards avoids every timeout and gateway error — failures are
+reported in the server log, not the HTTP response. Don't "fix" this into an
+awaited handler.
+
+## Configuration
+
+Both are optional; the defaults work for local development. They're read from
+the repo-root `.env`.
+
+| Var | Default | Notes |
+| --- | --- | --- |
+| `SMS_BRIDGE_PORT` | `3334` | Must stay in sync with the localhost fallback in `components/alerts/src/notify.ts`. |
+| `UNIFIED_SERVER_URL` | `http://localhost:3000` | Where the proxy routes forward. |
+
+## Running
+
+From the repo root:
 
 ```bash
-ngrok http 3333
+npm run build --workspace=@inkredabull/career-catalyst-sms-bridge
+npm run sms-bridge          # runs the built dist/
+npm run sms-bridge:dev      # ts-node, loads the root .env
 ```
 
-No firewall spelunking. No router configs. Just works.
+Then expose it:
 
-### 3. Apps Script Integration
-
-```javascript
-UrlFetchApp.fetch(NGROK_URL + "/send", {
-  method: "post",
-  contentType: "application/json",
-  payload: JSON.stringify({ to, message })
-});
+```bash
+ngrok http 3334
 ```
 
-Now a spreadsheet can text.
+and put the resulting URL in `NGROK_TUNNEL_URL` in the root `.env` (and in
+Vercel, for `components/alerts`).
 
-### 4. Phone Number Normalization
-
-```
-(415) 823-0858 → +14158230858
-```
-
-Proper validation prevents future headaches.
-
-## Setup
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Start the server:
-   ```bash
-   node server.js
-   ```
-
-3. Expose the server with ngrok:
-   ```bash
-   ngrok http 3333
-   ```
-
-4. Configure your Google Apps Script with the ngrok URL
-
-## Use Cases
-
-This powers lightweight ops workflows:
-- Follow-ups
-- CRM-style communications
-- Team notifications
-- Automated reminders
-
-All with almost no surface area.
+For the proxy routes to work, start unified-server too: `npm run unified-server`.
 
 ## Requirements
 
-- macOS with Messages.app
-- iPhone with SMS capability
-- Node.js
-- ngrok (or similar tunneling service)
+- macOS with Messages.app signed in
+- iPhone with Text Message Forwarding enabled (for the SMS fallback)
+- Automation permission granted to your terminal for Messages.app
+- Node.js >= 18
+- ngrok (or similar) for public access
+
+## Known gap
+
+`/send` is unauthenticated. Once tunneled, anyone who learns the URL can send
+texts from your personal number. Adding a shared-secret header requires a
+matching change in `components/mail-merge/src/services/sms.ts` plus a GAS
+redeploy, so it's tracked separately.
 
 ## License
 
