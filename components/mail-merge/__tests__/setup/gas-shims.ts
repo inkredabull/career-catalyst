@@ -3,6 +3,14 @@
 
 import syncFetch from 'sync-fetch';
 
+// webpack DefinePlugin globals — src/config/env.ts reads these at module load, so they must
+// exist before any test imports it. Read through to process.env so tests can point at a local server.
+process.env.NGROK_TUNNEL_URL = process.env.NGROK_TUNNEL_URL ?? 'http://localhost:3000';
+Object.defineProperty(global, '__NGROK_TUNNEL_URL__', {
+  configurable: true,
+  get: () => process.env.NGROK_TUNNEL_URL ?? '',
+});
+
 (global as unknown as Record<string, unknown>).UrlFetchApp = {
   fetch: (url: string, options: Record<string, unknown> = {}) => {
     const headers: Record<string, string> = { ...(options['headers'] as Record<string, string> ?? {}) };

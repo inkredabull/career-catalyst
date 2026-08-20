@@ -63,6 +63,35 @@ const generateThirdPersonBlurb = (baseUrl: string, jobId: string): string | null
   return result['blurb'] ?? null;
 };
 
+/** Probe the metadata server before a bulk send. Returns null when healthy, else a human-readable reason.
+ *  Cheap (one GET) and deliberately not cached — the whole point is to catch a tunnel that just went down. */
+export const checkMetadataServer = (): string | null => {
+  if (!NGROK_TUNNEL_URL) {
+    return 'NGROK_TUNNEL_URL is not set in .env — rebuild and redeploy before sending.';
+  }
+
+  let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
+  try {
+    response = UrlFetchApp.fetch(`${NGROK_TUNNEL_URL}/health`, {
+      method: 'get',
+      headers: { 'ngrok-skip-browser-warning': '1' },
+      muteHttpExceptions: true,
+    });
+  } catch (e) {
+    return `Cannot reach ${NGROK_TUNNEL_URL} — is unified-server running? (${e})`;
+  }
+
+  if (response.getResponseCode() !== 200) {
+    return `${NGROK_TUNNEL_URL}/health returned ${response.getResponseCode()} — is unified-server running?`;
+  }
+
+  if (!parseJsonSafely(response.getContentText(), '/health')) {
+    return `${NGROK_TUNNEL_URL}/health did not return JSON — tunnel is up but not pointed at unified-server.`;
+  }
+
+  return null;
+};
+
 export const getJobMetadata = (jobId: string): JobMetadata | null => {
   if (!jobId) return null;
 

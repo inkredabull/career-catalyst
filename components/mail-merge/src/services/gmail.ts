@@ -1,7 +1,7 @@
 // Gmail-based email sending and mail merge.
 
 import { COLS, SCRIPT_PROPS, SUBJECT_LINES, getFlagsForSubject, getTopicForSubject } from '../config/settings';
-import { getJobMetadata } from './job-metadata';
+import { getJobMetadata, checkMetadataServer } from './job-metadata';
 import { log } from '../utils/logger';
 import {
   valediction, ideal, accomplishments, aboutMe, reciprocate,
@@ -21,6 +21,21 @@ interface SendParams {
   htmlBody: string;
   attachments?: GoogleAppsScript.Base.Blob[];
 }
+
+/** Thrown by fillInTemplateFromObject when a token would render blank. Always raised *before*
+ *  anything is sent, so the row is untouched and safe to retry once the cause is fixed. */
+export class UnresolvedTemplateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnresolvedTemplateError';
+  }
+}
+
+/** Tokens allowed to render empty. Everything else aborts the row — new columns are
+ *  required by default, which is the point: an unfilled token must never reach a recipient. */
+const OPTIONAL_TOKENS = new Set([
+  'PersonName', 'PersonURL', 'ContactURL', 'LinkedIn', 'Cell', 'L', 'Recent', 'Subject',
+]);
 
 // ── LinkedIn DM modal ─────────────────────────────────────────────────────────
 
@@ -115,7 +130,15 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
       [COLS.FIRST_NAME]: parts[0] ?? '',
       ContactURL: contactUrl,
     };
-    const msgObj = fillInTemplateFromObject(emailTemplate.message, row, WARMUP_TEMPLATE);
+    let msgObj: MsgObj;
+    try {
+      msgObj = fillInTemplateFromObject(emailTemplate.message, row, WARMUP_TEMPLATE);
+    } catch (e) {
+      // Skip this contact rather than aborting the run and losing the confirmation email.
+      Logger.log('Skipping warmup draft for %s — %s', displayName, (e as Error).message);
+      draftLines.push(`${displayName} (draft skipped — ${(e as Error).message})\n${contactUrl}`);
+      continue;
+    }
     GmailApp.createDraft(email, msgObj.subject, msgObj.text, { htmlBody: msgObj.html, attachments });
     Logger.log('Created warmup draft for %s (%s)', displayName, email);
 
@@ -372,8 +395,18 @@ export const doSendEmails = (
     heads.reduce<Record<string, string>>((o, k, i) => { o[k] = r[i] ?? ''; return o; }, {})
   );
 
+  // Preflight: one probe before the first send, so a downed server surfaces as a single clear
+  // error instead of N rows of per-row failures. Throwing (rather than ui.alert) lets the subject
+  // picker's withFailureHandler show it and re-display the form.
+  const needsMetadata = rows.some(r => r[COLS.EMAIL_SENT] === '' && r[COLS.JOB_ID]);
+  if (needsMetadata) {
+    const unhealthy = checkMetadataServer();
+    if (unhealthy) throw new Error(`Aborted before sending — ${unhealthy}`);
+  }
+
   const out: [string | Date][] = [];
   let sentCount = 0;
+  const skipped: string[] = [];
   const linkedInContacts: LinkedInContact[] = [];
 
   for (const row of rows) {
@@ -385,7 +418,13 @@ export const doSendEmails = (
         out.push([new Date()]);
         sentCount++;
       } catch (e) {
-        out.push([(e as Error).message]);
+        if (e instanceof UnresolvedTemplateError) {
+          // Nothing was sent — leave the cell blank so the row is retried once the cause is fixed.
+          skipped.push(`${row[COLS.RECIPIENT] || '(no recipient)'} — ${e.message}`);
+          out.push(['']);
+        } else {
+          out.push([(e as Error).message]);
+        }
       }
     } else {
       out.push([row[COLS.EMAIL_SENT]]);
@@ -393,7 +432,15 @@ export const doSendEmails = (
   }
 
   sheet.getRange(2, emailSentColIdx + 1, out.length).setValues(out);
-  SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
+
+  if (skipped.length > 0) {
+    log('WARN', 'Skipped %s row(s), left blank for retry:\n%s', skipped.length, skipped.join('\n'));
+    SpreadsheetApp.getActive().toast(
+      `Sent ${sentCount}, skipped ${skipped.length} — see logs`, '⚠️ Mail Merge Incomplete', 10
+    );
+  } else {
+    SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
+  }
 
   if (linkedInContacts.length > 0) {
     openLinkedInTabs(linkedInContacts);
@@ -443,14 +490,18 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
   log('INFO', 'Stage 0: jobId=%s', jobId || '(empty — check JobID column in sheet)');
   if (jobId) {
     const meta = getJobMetadata(jobId);
-    log('INFO', 'Stage 0: metadata %s', meta ? `found (company=${meta.Company})` : 'null — tokens will be empty');
-    if (meta) {
-      data['Company'] = meta.Company;
-      data['JobTitleActual'] = meta.jobTitle;
-      data['JobTitleShorthand'] = meta.jobTitleShorthand;
-      data['JobURL'] = meta.jobURL;
-      if (meta.thirdPersonBlurb) data['Blurb'] = meta.thirdPersonBlurb;
+    log('INFO', 'Stage 0: metadata %s', meta ? `found (company=${meta.Company})` : 'null — aborting row');
+    // Fail closed: without metadata, {{Company}}/{{JobTitle*}}/{{Intro}} would silently render blank.
+    if (!meta) {
+      throw new UnresolvedTemplateError(
+        `Job metadata unavailable for JobID ${jobId} — is unified-server running?`
+      );
     }
+    data['Company'] = meta.Company;
+    data['JobTitleActual'] = meta.jobTitle;
+    data['JobTitleShorthand'] = meta.jobTitleShorthand;
+    data['JobURL'] = meta.jobURL;
+    if (meta.thirdPersonBlurb) data['Blurb'] = meta.thirdPersonBlurb;
   }
 
   // Stage 1: Named token substitutions (Blurb falls back to PROFILE if no job blurb)
@@ -488,8 +539,22 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
     if (!data['L']) data['L'] = parts.length > 1 ? parts[parts.length - 1]! : '';
   }
 
-  // Stage 2: Generic {{key}} replacement from row data
-  s = s.replace(/{{[^{}]+}}/g, key => escapeData(data[key.replace(/[{}]+/g, '')] ?? ''));
+  // Stage 2: Generic {{key}} replacement from row data.
+  // Collect tokens that resolve to nothing — a post-hoc scan for leftover {{...}} can't catch
+  // these, since substitution has already erased them.
+  const missing: string[] = [];
+  s = s.replace(/{{[^{}]+}}/g, token => {
+    const key = token.replace(/[{}]+/g, '');
+    const value = data[key] ?? '';
+    if (!value && !OPTIONAL_TOKENS.has(key)) missing.push(key);
+    return escapeData(value);
+  });
+
+  if (missing.length > 0) {
+    throw new UnresolvedTemplateError(
+      `Unresolved template token(s): ${[...new Set(missing)].join(', ')}`
+    );
+  }
 
   return JSON.parse(s) as MsgObj;
 };
