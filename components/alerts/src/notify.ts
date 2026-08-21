@@ -3,7 +3,7 @@ import { requireEnv, ENV } from "./config/settings";
 import { JobResult, SearchResults } from "./linkedin";
 import { COMPANY_TARGETS } from "./google";
 
-const TRACK_BASE = process.env[ENV.NGROK_TUNNEL_URL] ?? "http://localhost:3334";
+const TRACK_BASE = process.env[ENV.NGROK_TUNNEL_URL] ?? "http://localhost:3000";
 
 const JUDGMENT_COLOR: Record<string, string> = {
   "🟢": "#22c55e",

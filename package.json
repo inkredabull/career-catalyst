@@ -16,8 +16,6 @@
     "clean": "npm run clean --workspaces && rm -rf dist",
     "unified-server": "npm run start --workspace=@inkredabull/career-catalyst-unified-server",
     "unified-server:llm": "npm run start:llm --workspace=@inkredabull/career-catalyst-unified-server",
-    "sms-bridge": "npm run start --workspace=@inkredabull/career-catalyst-sms-bridge",
-    "sms-bridge:dev": "ts-node -r dotenv/config components/sms-bridge/src/server.ts",
     "evaluate": "npm run eval --workspace=@career-catalyst/evaluation",
     "evaluate:check": "cd components/evaluation/python && source venv/bin/activate && python -m job_extractor_eval.cli --check-setup",
     "setup-gmail": "node scripts/setup-gmail-auth.js",

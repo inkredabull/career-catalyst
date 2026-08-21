@@ -1,20 +1,23 @@
 import crypto from 'crypto';
-import { Router } from 'express';
+import type { RequestHandler } from 'express';
 
 import { normalizeToHandle, sendViaMessages } from '../services/messages';
 
-export const sendRouter: Router = Router();
-
 /**
- * POST /send  { to, message }
+ * `POST /send` — `{ to, message }` → Messages.app.
+ *
+ * Mounted by components/unified-server. Exported as a bare handler rather than
+ * an express Router so it stays independent of the host app's express major
+ * version; express appears here only as a type-only import.
  *
  * Responds 202 *immediately* and does the AppleScript work afterwards. This is
  * deliberate and load-bearing: osascript against Messages.app routinely takes
- * seconds, and both callers (ngrok → Google Apps Script UrlFetch) will time out
- * and retry if we hold the connection open. Do not turn this into an awaited
- * handler — errors are reported via logs, not the response.
+ * seconds, and the caller reaches this route through ngrok from Google Apps
+ * Script, whose UrlFetch will time out and retry if we hold the connection
+ * open. Do not turn this into an awaited handler — failures are reported via
+ * logs, not the response.
  */
-sendRouter.post('/send', (req, res) => {
+export const handleSend: RequestHandler = (req, res) => {
   const { to, message } = req.body || {};
   const requestId = crypto.randomBytes(6).toString('hex');
 
@@ -37,4 +40,4 @@ sendRouter.post('/send', (req, res) => {
     .catch((err: Error) => {
       console.error(`✗ [${requestId}] osascript failed:`, err.message);
     });
-});
+};

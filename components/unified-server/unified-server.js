@@ -7,6 +7,9 @@ const { execSync, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
+// Requires components/sms-bridge to have been built (npm run build --workspaces
+// covers it; sms-bridge sorts before unified-server so ordering works out).
+const { handleSend } = require('@inkredabull/career-catalyst-sms-bridge');
 
 // Load .env from project root (two levels up from packages/unified-server)
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
@@ -1931,6 +1934,11 @@ app.all('/llm', (req, res) => {
   }
 });
 
+// SMS/iMessage send endpoint, implemented in components/sms-bridge.
+// POST /send { to, message } -> macOS Messages.app. Answers 202 immediately
+// and does the AppleScript work async; see that component's handler for why.
+app.post('/send', handleSend);
+
 // Start server
 app.listen(PORT, () => {
   console.log('🚀 Unified Career Catalyst Server');
@@ -1950,6 +1958,7 @@ app.listen(PORT, () => {
   console.log(`  • POST /linkedin-reminder - Create reminder for saved LinkedIn posts`);
   console.log(`  • POST /teal-track       - Deprecated (use Chrome extension)`);
   console.log(`  • GET  /llm?jobID=<id>  - Job info lookup (title, URL, company, blurb)`);
+  console.log(`  • POST /send             - Send SMS/iMessage via Messages.app`);
   console.log('');
   console.log('💡 Usage:');
   console.log(`  • Chrome Extension: Will connect automatically`);

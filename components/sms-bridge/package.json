@@ -1,13 +1,12 @@
 {
   "name": "@inkredabull/career-catalyst-sms-bridge",
-  "version": "1.0.0",
-  "description": "Local HTTP bridge that sends SMS/iMessage through macOS Messages.app, and fronts unified-server behind a single ngrok tunnel",
-  "main": "dist/server.js",
+  "version": "2.0.0",
+  "description": "Sends SMS/iMessage through macOS Messages.app. Consumed by unified-server, which mounts its POST /send handler.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "prebuild": "npm run clean",
-    "start": "node dist/server.js",
-    "dev": "ts-node src/server.ts",
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc --noEmit",
@@ -17,19 +16,15 @@
     "sms",
     "imessage",
     "applescript",
-    "macos",
-    "bridge"
+    "macos"
   ],
   "author": "",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "express": "^5.2.1"
-  },
   "devDependencies": {
-    "@types/express": "^5.0.0",
+    "@types/express": "^4.17.21",
     "@types/jest": "^29.5.11",
     "@types/node": "^20.10.5",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
