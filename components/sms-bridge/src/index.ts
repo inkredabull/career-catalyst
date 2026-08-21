@@ -7,6 +7,8 @@
  */
 
 export { handleSend } from './handlers/send';
+export { requireSendAuth, SEND_TOKEN_HEADER, tokensMatch } from './handlers/auth';
+export { loadSendSecret, SECRET_ENV_VAR, SECRET_FILENAME } from './config/secret';
 export {
   buildAppleScript,
   normalizeToHandle,

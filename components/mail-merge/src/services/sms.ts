@@ -1,7 +1,9 @@
-// SMS sending via ngrok tunnel.
-// NGROK_TUNNEL_URL is bundled at build time from .env — no Script Property needed.
+// SMS sending via ngrok tunnel, to POST /send on components/unified-server.
+// NGROK_TUNNEL_URL and SMS_BRIDGE_SECRET are bundled at build time from the
+// repo root (.env and .sms-bridge-secret) — no Script Properties needed.
+// Rotating the secret therefore requires a rebuild and redeploy of this bundle.
 
-import { NGROK_TUNNEL_URL } from '../config/env';
+import { NGROK_TUNNEL_URL, SMS_BRIDGE_SECRET } from '../config/env';
 
 export const normalizePhoneNumber = (input: string): string => {
   let digits = String(input).replace(/\D/g, '');
@@ -15,10 +17,15 @@ export const sendRealSms = (to: string, message: string): void => {
     Logger.log('NGROK_TUNNEL_URL not set in .env — rebuild required');
     return;
   }
+  if (!SMS_BRIDGE_SECRET) {
+    Logger.log('SMS_BRIDGE_SECRET not bundled — create .sms-bridge-secret and rebuild');
+    return;
+  }
   const url = `${NGROK_TUNNEL_URL}/send`;
   const res = UrlFetchApp.fetch(url, {
     method: 'post',
     contentType: 'application/json',
+    headers: { 'X-SMS-Bridge-Token': SMS_BRIDGE_SECRET },
     payload: JSON.stringify({ to, message }),
     followRedirects: true,
     muteHttpExceptions: true,

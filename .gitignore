@@ -24,6 +24,10 @@ build/
 .env.test.local
 .env.production.local
 
+# Shared secret guarding POST /send (components/sms-bridge).
+# .sms-bridge-secret.example is committed as the template.
+.sms-bridge-secret
+
 # OS generated files
 .DS_Store
 .DS_Store?

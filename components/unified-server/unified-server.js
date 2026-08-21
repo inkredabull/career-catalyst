@@ -9,7 +9,7 @@ const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
 // Requires components/sms-bridge to have been built (npm run build --workspaces
 // covers it; sms-bridge sorts before unified-server so ordering works out).
-const { handleSend } = require('@inkredabull/career-catalyst-sms-bridge');
+const { handleSend, requireSendAuth } = require('@inkredabull/career-catalyst-sms-bridge');
 
 // Load .env from project root (two levels up from packages/unified-server)
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
@@ -1937,7 +1937,9 @@ app.all('/llm', (req, res) => {
 // SMS/iMessage send endpoint, implemented in components/sms-bridge.
 // POST /send { to, message } -> macOS Messages.app. Answers 202 immediately
 // and does the AppleScript work async; see that component's handler for why.
-app.post('/send', handleSend);
+// Guarded by a shared secret because this is reachable from the public
+// internet whenever the ngrok tunnel is up. Fails closed if unconfigured.
+app.post('/send', requireSendAuth, handleSend);
 
 // Start server
 app.listen(PORT, () => {

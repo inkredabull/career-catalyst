@@ -11,6 +11,12 @@ Object.defineProperty(global, '__NGROK_TUNNEL_URL__', {
   get: () => process.env.NGROK_TUNNEL_URL ?? '',
 });
 
+process.env.SMS_BRIDGE_SECRET = process.env.SMS_BRIDGE_SECRET ?? 'test-secret';
+Object.defineProperty(global, '__SMS_BRIDGE_SECRET__', {
+  configurable: true,
+  get: () => process.env.SMS_BRIDGE_SECRET ?? '',
+});
+
 (global as unknown as Record<string, unknown>).UrlFetchApp = {
   fetch: (url: string, options: Record<string, unknown> = {}) => {
     const headers: Record<string, string> = { ...(options['headers'] as Record<string, string> ?? {}) };

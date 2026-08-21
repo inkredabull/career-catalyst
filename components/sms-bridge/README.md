@@ -48,9 +48,59 @@ type-only import).
 | Export | Purpose |
 | --- | --- |
 | `handleSend` | `POST /send` handler. Body: `{ to, message }`. |
+| `requireSendAuth` | Shared-secret guard, mounted in front of `handleSend`. |
 | `sendViaMessages(handle, message)` | Promise-returning send. Resolves `{ service, elapsedMs }`. |
 | `normalizeToHandle(input)` | Coerce a phone number or email into a Messages.app buddy handle. |
 | `buildAppleScript()` | The iMessage-then-SMS AppleScript, exported for testing. |
+| `loadSendSecret()` | Resolve the shared secret (env var, then dotfile). |
+
+## Authentication
+
+`/send` can text from your personal phone number and is reachable from the
+public internet whenever the ngrok tunnel is up, so it requires a shared
+secret on every request:
+
+```
+X-SMS-Bridge-Token: <secret>
+```
+
+The secret is read per request from, in order:
+
+1. `SMS_BRIDGE_SECRET` in the environment
+2. `.sms-bridge-secret` — a gitignored dotfile at the repo root
+
+Because it's read per request, rotating it does **not** require restarting
+unified-server.
+
+### Setup
+
+```bash
+cp .sms-bridge-secret.example .sms-bridge-secret
+openssl rand -hex 32 >> .sms-bridge-secret   # or edit the placeholder line
+```
+
+Blank lines and `#` comments are ignored; the first remaining line is the
+secret.
+
+### It fails closed
+
+With no secret configured, `/send` returns **503** rather than running
+unauthenticated. Responses are **401** for a missing or wrong token, **202**
+on success.
+
+### Rotating the secret
+
+`components/mail-merge` is a Google Apps Script bundle with no runtime access
+to repo files, so the secret is baked in at build time by webpack
+`DefinePlugin` — exactly how `NGROK_TUNNEL_URL` already works. After changing
+the secret you must rebuild and redeploy that component or its SMS sending
+will start 401ing:
+
+```bash
+npm run deploy --workspace=@inkredabull/career-catalyst-mail-merge
+```
+
+The bundle lands in the gitignored `dist/`, so the secret is not committed.
 
 ### Why `/send` returns 202 before doing anything
 
@@ -86,6 +136,7 @@ To exercise it end to end, start unified-server and post to it:
 npm run unified-server
 curl -X POST localhost:3000/send \
   -H 'content-type: application/json' \
+  -H "X-SMS-Bridge-Token: $(grep -v '^#' .sms-bridge-secret | grep -v '^$' | head -1)" \
   -d '{"to":"+15551234567","message":"hello"}'
 ```
 
@@ -95,13 +146,6 @@ curl -X POST localhost:3000/send \
 - iPhone with Text Message Forwarding enabled (for the SMS fallback)
 - Automation permission granted to the host process for Messages.app
 - Node.js >= 18
-
-## Known gap
-
-`/send` is unauthenticated. Once unified-server is tunneled, anyone who learns
-the URL can send texts from your personal number. Adding a shared-secret header
-requires a matching change in `components/mail-merge/src/services/sms.ts` plus a
-GAS redeploy, so it's tracked separately.
 
 ## License
 
