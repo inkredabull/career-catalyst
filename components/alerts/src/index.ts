@@ -280,6 +280,16 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
   const passed = Object.fromEntries(
     Object.entries(fresh).filter(([, j]) => j.judgment === "🔴"),
   );
+  if (Object.keys(toNotify).length === 0) {
+    log(
+      "INFO",
+      "Nothing worth highlighting (%s pass, %s total fresh) — skipping email.",
+      Object.keys(passed).length,
+      Object.keys(fresh).length,
+    );
+    return;
+  }
+
   log(
     "INFO",
     "Sending email (%s jobs to highlight, %s pass, %s total fresh)...",
