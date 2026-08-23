@@ -38,9 +38,11 @@ export default async function handler(
   const { job, verdict, reasoning, scoredAt } = record;
 
   if (verdict === "?") {
-    res.status(200).send(
-      `<p style="font-family:sans-serif;color:#6b7280;padding:32px">Scoring failed for this job — the model did not return a valid verdict. This typically happens after a model misconfiguration and resolves on the next run.</p>`,
-    );
+    res
+      .status(200)
+      .send(
+        `<p style="font-family:sans-serif;color:#6b7280;padding:32px">Scoring failed for this job — the model did not return a valid verdict. This typically happens after a model misconfiguration and resolves on the next run.</p>`,
+      );
     return;
   }
 

@@ -98,9 +98,13 @@ export function parseResultTitle(raw: string): {
 //   domain — the career page path to pass to site: (no https://)
 //   geo    — "sf" routes to SF Bay Area bucket, "us" routes to Remote US
 // ---------------------------------------------------------------------------
-export const COMPANY_TARGETS: Array<{ name: string; domain: string; geo: "sf" | "us" }> = [
-  { name: "Vercel",  domain: "vercel.com/careers",             geo: "sf" },
-  { name: "OpenAI",  domain: "boards.greenhouse.io/openai",    geo: "sf" },
+export const COMPANY_TARGETS: Array<{
+  name: string;
+  domain: string;
+  geo: "sf" | "us";
+}> = [
+  { name: "Vercel", domain: "vercel.com/careers", geo: "sf" },
+  { name: "OpenAI", domain: "boards.greenhouse.io/openai", geo: "sf" },
 ];
 
 // ---------------------------------------------------------------------------
