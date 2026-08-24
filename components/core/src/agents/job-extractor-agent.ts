@@ -1466,7 +1466,9 @@ Job ID: ${jobId}
 Suggested actions:
 - Check application portal for updates
 - Send follow-up email to recruiter
-- Connect with employees on LinkedIn`,
+- Connect with employees on LinkedIn
+
+Sent emails: ${pingGmailUrl}`,
         list: config.list_name,
         priority: reminderPriority || config.default_priority,
         tags: commonTags,
@@ -1498,6 +1500,7 @@ Preparation tasks:
       };
 
       // Reminder 5: "Follow-up / further outreach" networking reminder
+      const followUpGmailUrl = `https://mail.google.com/mail/u/0/#search/in%3Asent+from%3Ame+subject%3A${encodeURIComponent(jobData.company || 'Unknown Company')}`;
       const followUpReminder = {
         title: `Follow-up / further outreach for: ${jobData.title || 'Unknown Position'} @ ${jobData.company || 'Unknown Company'}`,
         notes: `Additional networking and outreach
@@ -1511,13 +1514,15 @@ Outreach activities:
 - Reach out to employees in similar roles
 - Engage with company content on social media
 - Send thank you notes after interviews
-- Follow up on pending responses`,
+- Follow up on pending responses
+
+Sent emails: ${followUpGmailUrl}`,
         list: config.list_name,
         priority: reminderPriority || config.default_priority,
         tags: commonTags,
         dueDate: threeDaysFromToday,
         dueTime: '14:00', // Early afternoon reminder
-        url: `https://mail.google.com/mail/u/0/#search/in%3Asent+from%3Ame+subject%3A${encodeURIComponent(jobData.company || 'Unknown Company')}`
+        url: followUpGmailUrl
       };
 
       // Reminder 6: "Reach Out Directly" — 2 days after Ping reminder
