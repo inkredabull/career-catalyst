@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node unified-server.js",
-    "start:llm": "node unified-server.js --llm"
+    "start:llm": "node unified-server.js --llm",
+    "test": "jest"
   },
   "keywords": [
     "server",
@@ -18,9 +19,19 @@
   ],
   "author": "",
   "license": "MIT",
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ]
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.55.0",
     "@inkredabull/career-catalyst-sms-bridge": "*",
+    "better-sqlite3": "^13.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",

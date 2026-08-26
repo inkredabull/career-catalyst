@@ -10,6 +10,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 // Requires components/sms-bridge to have been built (npm run build --workspaces
 // covers it; sms-bridge sorts before unified-server so ordering works out).
 const { handleSend, requireSendAuth } = require('@inkredabull/career-catalyst-sms-bridge');
+const { requireFollowAuth, followHandler, startFollowWorker } = require('./linkedin-follow');
 
 // Load .env from project root (two levels up from packages/unified-server)
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
@@ -416,7 +417,7 @@ STRENGTHS
 const cvEngine = new CVResponseEngine(process.argv.includes('--llm'));
 
 // Build allowed-origins set from config (CORS_ALLOWED_ORIGINS env var or career-catalyst.config.json)
-const _corsOriginsRaw = process.env.CORS_ALLOWED_ORIGINS || 'https://www.linkedin.com,https://linkedin.com,https://guild.com,https://www.guild.com,https://ashbyhq.com';
+const _corsOriginsRaw = process.env.CORS_ALLOWED_ORIGINS || 'https://www.linkedin.com,https://linkedin.com,https://guild.com,https://www.guild.com,https://ashbyhq.com,https://job-boards.greenhouse.io,https://boards.greenhouse.io';
 const allowedOrigins = new Set(_corsOriginsRaw.split(',').map(s => s.trim()).filter(Boolean));
 
 // Enable CORS for Chrome extension, AMA app, and job-board content scripts
@@ -1941,6 +1942,11 @@ app.all('/llm', (req, res) => {
 // internet whenever the ngrok tunnel is up. Fails closed if unconfigured.
 app.post('/send', requireSendAuth, handleSend);
 
+// LinkedIn follow queue endpoint.
+// Accepts follow intents from the funding report; executes them in the background
+// via a rate-limited worker. See linkedin-follow.js for provider/config details.
+app.post('/api/linkedin/follow', requireFollowAuth, followHandler);
+
 // Start server
 app.listen(PORT, () => {
   console.log('🚀 Unified Career Catalyst Server');
@@ -1961,7 +1967,9 @@ app.listen(PORT, () => {
   console.log(`  • POST /teal-track       - Deprecated (use Chrome extension)`);
   console.log(`  • GET  /llm?jobID=<id>  - Job info lookup (title, URL, company, blurb)`);
   console.log(`  • POST /send             - Send SMS/iMessage via Messages.app`);
+  console.log(`  • POST /api/linkedin/follow - Queue a LinkedIn follow intent`);
   console.log('');
+  startFollowWorker();
   console.log('💡 Usage:');
   console.log(`  • Chrome Extension: Will connect automatically`);
   console.log(`  • CLI Commands: Use 'npm run dev' commands as usual`);
