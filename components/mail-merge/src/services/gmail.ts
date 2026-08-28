@@ -34,7 +34,7 @@ export class UnresolvedTemplateError extends Error {
 /** Tokens allowed to render empty. Everything else aborts the row — new columns are
  *  required by default, which is the point: an unfilled token must never reach a recipient. */
 const OPTIONAL_TOKENS = new Set([
-  'PersonName', 'PersonURL', 'ContactURL', 'LinkedIn', 'Cell', 'L', 'Recent', 'Subject',
+  'PersonName', 'PersonURL', 'ContactURL', 'LinkedIn', 'Cell', 'L', 'Recent', 'Subject','Zeitgeisty'
 ]);
 
 // ── LinkedIn DM modal ─────────────────────────────────────────────────────────
@@ -467,7 +467,7 @@ const getGmailTemplateFromDrafts = (subjectLine: string): {
   const msg = draft.getMessage();
   return {
     message: { subject: subjectLine, text: msg.getPlainBody(), html: msg.getBody() },
-    attachments: msg.getAttachments() as unknown as GoogleAppsScript.Base.Blob[],
+    attachments: msg.getAttachments({ includeInlineImages: false }) as unknown as GoogleAppsScript.Base.Blob[],
   };
 };
 
