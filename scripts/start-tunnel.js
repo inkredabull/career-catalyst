@@ -14,6 +14,8 @@ const ngrok = require('@ngrok/ngrok');
 const fs = require('fs');
 const path = require('path');
 
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+
 const ENV_PATH = path.resolve(__dirname, '..', '.env');
 const PORT = 3000;
 const KEY = 'NGROK_TUNNEL_URL';
