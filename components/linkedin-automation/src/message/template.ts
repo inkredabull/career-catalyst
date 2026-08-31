@@ -21,6 +21,7 @@ export interface MessageTokens {
   domain?: string;
   round?: string;
   summary?: string;
+  condensedSummary?: string;
   event?: string;
   [key: string]: string | undefined;
 }

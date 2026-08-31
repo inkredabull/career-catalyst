@@ -1,1 +1,1 @@
-Congrats on the {{round}}! Following your journey, would love to connect.
+Hi {{firstName}}, I was also slated to go to {{event}}. I couldn't make it; did you? Best takeaway? Seems you're a go-to for {{condensedSummary}}. How are you meeting great minds in the city: SFIRL? Cerebral Valley?

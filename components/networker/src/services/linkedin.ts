@@ -49,9 +49,10 @@ export async function openMessageModal(
   messageOverride?: string
 ): Promise<void> {
   const message = messageOverride ?? buildMessage(loadTemplate(), {
-    firstName: profile.firstName ?? profile.name.split(' ')[0] ?? '',
-    summary:   profile.condensedSummary ?? profile.domain ?? 'your industry',
-    event:     eventName,
+    firstName:        profile.firstName ?? profile.name.split(' ')[0] ?? '',
+    summary:          profile.condensedSummary ?? profile.domain ?? 'your industry',
+    condensedSummary: profile.condensedSummary ?? '',
+    event:            eventName,
   });
   console.log(`  Sending connect invite for ${profile.name} (tab ${tabIndex})…`);
   injectScript(tabIndex, generateConnectScript(message));
