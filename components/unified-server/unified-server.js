@@ -10,6 +10,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 // Requires components/sms-bridge to have been built (npm run build --workspaces
 // covers it; sms-bridge sorts before unified-server so ordering works out).
 const { handleSend, requireSendAuth } = require('@inkredabull/career-catalyst-sms-bridge');
+const ngrok = require('@ngrok/ngrok');
 const { requireFollowAuth, followHandler, startFollowWorker } = require('./linkedin-follow');
 
 // Load .env from project root (two levels up from packages/unified-server)
@@ -1963,18 +1964,48 @@ app.listen(PORT, () => {
   console.log('');
   console.log('🛑 To stop: Press Ctrl+C');
   console.log('=' .repeat(50));
+
+  // Start ngrok tunnel if NGROK_AUTHTOKEN is present
+  if (process.env.NGROK_AUTHTOKEN) {
+    ngrok.forward({ addr: PORT, authtoken: process.env.NGROK_AUTHTOKEN })
+      .then((listener) => {
+        const url = listener.url();
+        console.log(`🚇 ngrok tunnel: ${url}`);
+        // Patch NGROK_TUNNEL_URL in .env so other tools pick it up
+        const envPath = path.resolve(__dirname, '..', '..', '.env');
+        try {
+          let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+          const line = `NGROK_TUNNEL_URL=${url}`;
+          const re = /^NGROK_TUNNEL_URL=.*$/m;
+          content = re.test(content) ? content.replace(re, line) : content.trimEnd() + '\n' + line + '\n';
+          fs.writeFileSync(envPath, content);
+          console.log('   NGROK_TUNNEL_URL written to .env');
+        } catch (e) {
+          console.warn('   Could not write NGROK_TUNNEL_URL to .env:', e.message);
+        }
+        // Store listener reference for graceful teardown
+        process._ngrokListener = listener;
+      })
+      .catch((err) => {
+        console.warn('⚠️  ngrok tunnel failed:', err.message);
+      });
+  }
 });
 
 // Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('Unified Server: Received SIGTERM, shutting down gracefully');
+async function shutdown(signal) {
+  console.log(`Unified Server: Received ${signal}, shutting down gracefully`);
+  if (process._ngrokListener) {
+    try {
+      await process._ngrokListener.close();
+      console.log('🚇 ngrok tunnel closed');
+    } catch (_) {}
+  }
   process.exit(0);
-});
+}
 
-process.on('SIGINT', () => {
-  console.log('Unified Server: Received SIGINT, shutting down gracefully');
-  process.exit(0);
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Async background job processing function
 async function triggerAsyncJobProcessing(jobId, priority, projectDir) {
