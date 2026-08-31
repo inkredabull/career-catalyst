@@ -16,6 +16,9 @@ export interface EventInfo {
 export function parseEventFromFileName(filePath: string): EventInfo {
   const fileName = basename(filePath);
   let nameWithoutExt = fileName.replace(/\.(txt|csv)$/i, '');
+  // Restore colons: macOS/Chrome saves "Title: Subtitle" as "Title_ Subtitle"
+  // (underscore + space never otherwise occurs — date underscores have no spaces).
+  nameWithoutExt = nameWithoutExt.replace(/_ /g, ': ');
   // Normalise underscore-separated dates: "on 1_13_26" → "on 1/13/26"
   nameWithoutExt = nameWithoutExt.replace(/on\s+(\d+)_(\d+)_(\d+)/, 'on $1/$2/$3');
   return { eventName: nameWithoutExt, fileName };
