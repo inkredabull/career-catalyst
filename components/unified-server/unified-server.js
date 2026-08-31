@@ -1014,7 +1014,7 @@ app.post('/teal-track', async (req, res) => {
 // LinkedIn post reminder creation endpoint
 app.post('/linkedin-reminder', async (req, res) => {
   console.log(`[${new Date().toISOString()}] LinkedIn reminder creation request`);
-  const { title, notes, priority = 5, dueDate = null, listName = 'LinkedIn Saved Posts' } = req.body;
+  const { title, notes, priority = 5, dueDate = null, listName = 'LinkedIn Saved Posts', tags = null, url = null } = req.body;
   
   if (!title) {
     return res.status(400).json({
@@ -1051,7 +1051,17 @@ app.post('/linkedin-reminder', async (req, res) => {
       if (dueDate) {
         args.push('--due', dueDate);
       }
-      
+
+      // Add tags if provided
+      if (tags && Array.isArray(tags) && tags.length > 0) {
+        args.push('--tags', tags.join(','));
+      }
+
+      // Add url if provided
+      if (url) {
+        args.push('--url', url);
+      }
+
       console.log(`  -> Running command: npx ${args.join(' ')}`);
       
       const child = spawn('npx', args, {

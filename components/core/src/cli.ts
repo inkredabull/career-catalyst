@@ -974,6 +974,8 @@ program
   .option('--priority <priority>', 'Priority (1=High, 5=Medium, 9=Low)', '5')
   .option('--list <list>', 'Reminder list name', 'Reminders')
   .option('--due <date>', 'Due date (YYYY-MM-DD format)')
+  .option('--tags <tags>', 'Comma-separated list of tags')
+  .option('--url <url>', 'URL to attach to the reminder')
   .action(async (options) => {
     try {
       if (!options.title) {
@@ -1008,6 +1010,14 @@ program
       
       if (options.due) {
         reminderData.dueDate = options.due; // Keep as string format
+      }
+
+      if (options.tags) {
+        reminderData.tags = options.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+      }
+
+      if (options.url) {
+        reminderData.url = options.url;
       }
 
       await reminderService.createReminder(reminderData);

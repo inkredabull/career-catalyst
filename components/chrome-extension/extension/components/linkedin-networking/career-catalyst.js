@@ -975,6 +975,40 @@ async function addToMailMerge() {
     console.warn('Mail merge append failed:', err.message);
     alert(`⚠️ Could not reach server (${err.message})\nRow: ${fullName} | ${profileUrl} | ${jobIdInput.trim()}`);
   }
+
+  await createMailMergeReminder(fullName, profileUrl);
+}
+
+const MAIL_MERGE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1PpJw3tjPnwZ5G180S8VeMsR8haXdoL4JqEfdWx5dqdk/edit?gid=1276038727#gid=1276038727';
+
+async function createMailMergeReminder(fullName, profileUrl) {
+  const today = new Date().toISOString().slice(0, 10);
+  const reminderData = {
+    title: `Add to Mail Merge: ${fullName}`,
+    notes: `Added ${fullName} to mail merge sheet.\n\nLinkedIn: ${profileUrl}\n\nSpreadsheet: ${MAIL_MERGE_SHEET_URL}`,
+    priority: 5,
+    dueDate: today,
+    listName: 'Build with purpose',
+    tags: ['KR-Get-a-new-job'],
+    url: MAIL_MERGE_SHEET_URL
+  };
+
+  try {
+    const resp = await fetch('http://localhost:3000/linkedin-reminder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reminderData)
+    });
+    const data = await resp.json();
+    if (data.success) {
+      log(`✅ Reminder created for ${fullName}`);
+    } else {
+      throw new Error(data.error || 'Unknown server error');
+    }
+  } catch (err) {
+    console.warn('Reminder creation failed:', err.message);
+    alert(`⚠️ Could not create reminder (${err.message})`);
+  }
 }
 
 async function _doConnectWithNote(outreach, LOG) {
