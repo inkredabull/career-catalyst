@@ -416,23 +416,9 @@ STRENGTHS
 // Initialize CV response engine
 const cvEngine = new CVResponseEngine(process.argv.includes('--llm'));
 
-// Build allowed-origins set from config (CORS_ALLOWED_ORIGINS env var or career-catalyst.config.json)
-const _corsOriginsRaw = process.env.CORS_ALLOWED_ORIGINS || 'https://www.linkedin.com,https://linkedin.com,https://guild.com,https://www.guild.com,https://ashbyhq.com,https://job-boards.greenhouse.io,https://boards.greenhouse.io';
-const allowedOrigins = new Set(_corsOriginsRaw.split(',').map(s => s.trim()).filter(Boolean));
-
-// Enable CORS for Chrome extension, AMA app, and job-board content scripts
+// CORS is fully open — any origin is allowed (see git history for the prior allowlist).
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // same-origin / curl
-    if (
-      origin.startsWith('chrome-extension://') ||
-      origin.startsWith('http://localhost:') ||
-      allowedOrigins.has(origin)
-    ) {
-      return callback(null, true);
-    }
-    callback(new Error(`CORS: origin not allowed — ${origin}`));
-  },
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
