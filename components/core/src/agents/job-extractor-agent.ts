@@ -1576,9 +1576,11 @@ Suggested actions:
         return;
       }
 
-      // Create in one batch: each separate osascript call pays the Reminders app's
-      // multi-second Apple Event startup cost, which is what used to time these out
-      const results = await reminderService.createReminders(remindersToCreate);
+      // MacOSReminderService has no batch API — create sequentially via createReminder.
+      const results: Awaited<ReturnType<typeof reminderService.createReminder>>[] = [];
+      for (const reminder of remindersToCreate) {
+        results.push(await reminderService.createReminder(reminder));
+      }
 
       const successCount = results.filter((r: any) => r.success).length;
       if (successCount > 0) {
