@@ -11,7 +11,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 // covers it; sms-bridge sorts before unified-server so ordering works out).
 const { handleSend, requireSendAuth } = require('@inkredabull/career-catalyst-sms-bridge');
 const ngrok = require('@ngrok/ngrok');
-const { requireFollowAuth, followHandler, startFollowWorker } = require('./linkedin-follow');
+const { requireFollowAuth, followHandler, startFollowWorker, stopFollowWorker } = require('./linkedin-follow');
 
 // Load .env from project root (two levels up from packages/unified-server)
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
@@ -2002,15 +2002,29 @@ app.listen(PORT, () => {
   }
 });
 
-// Handle graceful shutdown
+// Handle graceful shutdown — guard flag prevents re-entry if signal fires twice
+let _shuttingDown = false;
 async function shutdown(signal) {
-  console.log(`Unified Server: Received ${signal}, shutting down gracefully`);
+  if (_shuttingDown) return;
+  _shuttingDown = true;
+
+  console.log('');
+  console.log(`🛑 ${signal} received — shutting down…`);
+
   if (process._ngrokListener) {
+    process.stdout.write('   closing ngrok tunnel… ');
     try {
       await process._ngrokListener.close();
-      console.log('🚇 ngrok tunnel closed');
-    } catch (_) {}
+      console.log('done');
+    } catch (e) {
+      console.log(`failed (${e.message})`);
+    }
   }
+
+  console.log('   stopping LinkedIn follow worker…');
+  stopFollowWorker();
+
+  console.log('✅ Goodbye');
   process.exit(0);
 }
 
