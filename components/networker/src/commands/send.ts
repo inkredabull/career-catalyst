@@ -8,7 +8,13 @@
 import { execSync } from 'child_process';
 import { Command } from 'commander';
 import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { parseEventFromFileName } from '../eventParser.js';
+
+const _projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+const EVENT_TEMPLATE = resolve(_projectRoot, 'templates', 'linkedin-event.txt');
 import { loadAllCachedProfiles, markConnectionSent } from '../cache.js';
 import { openMessageModal, getChromeFrontWindowTabCount } from '../services/linkedin.js';
 import { DiscoveredProfile, ContactPriorityTier } from '../types.js';
@@ -100,11 +106,16 @@ export function registerSend(program: Command): void {
       await delay(4000);
 
       console.log('\nOpening message modals…\n');
+      let pendingCount = 0;
+      let startedCount = 0;
       for (let i = 0; i < candidates.length; i++) {
         const profile = candidates[i];
         const tabIndex = startTabCount + i + 1;
-        await openMessageModal(profile, tabIndex, eventInfo.eventName);
+        const outcome = await openMessageModal(profile, tabIndex, eventInfo.eventName, undefined, EVENT_TEMPLATE);
+        if (outcome === 'pending') pendingCount++;
+        else if (outcome === 'started') startedCount++;
 
+        // Already pending or newly started both mean the invite is out — mark either way.
         const nameParts = profile.name.trim().split(/\s+/);
         const sent = markConnectionSent(
           profile.firstName ?? nameParts[0] ?? '',
@@ -116,6 +127,6 @@ export function registerSend(program: Command): void {
         if (i < candidates.length - 1) await randomDelay(800, 1500);
       }
 
-      console.log('\n✅ Message modals populated. Review and send each when ready.');
+      console.log(`\n✅ Done: ${startedCount} modal(s) opened for review, ${pendingCount} already pending (no modal needed).`);
     });
 }

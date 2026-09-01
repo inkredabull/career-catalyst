@@ -1,1 +1,1 @@
-Hi {{firstName}}, saw you're speaking at {{event}}. I can't make it after all; did you? Best takeaway? Seems you're a go-to for {{summary}}. Do you SFIRL? Cerebral Valley? How else are you meeting great minds in the city?
+Hi {{firstName}}, I was also slated to go to {{event}}. I couldn't make it; did you? Best takeaway? {{#condensedSummary}}Seems you're a go-to for {{condensedSummary}}. {{/condensedSummary}}How are you meeting great minds in the city: Shack15? SFIRL? Cerebral Valley?

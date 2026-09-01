@@ -10,7 +10,11 @@
  *
  * 2. **Script generation** — `generateConnectScript()` builds a self-contained
  *    IIFE string that will run inside the LinkedIn profile page.  The script:
- *    - Bails early if a "Pending" button is already present.
+ *    - Bails early and returns `'PENDING'` if a "Pending" button is already
+ *      present, so the caller can tell a genuine send from a no-op.
+ *    - Otherwise returns `'STARTED'` immediately and continues the rest of
+ *      the flow asynchronously in the page (the AppleScript call does not
+ *      block on it).
  *    - Looks for a visible **Connect** button on the profile hero.
  *    - If Connect is hidden, clicks the **More** dropdown and finds Connect
  *      inside the menu.
@@ -42,20 +46,33 @@ import {
   injectScript,
 } from '@inkredabull/career-catalyst-linkedin-automation';
 
+export type ConnectOutcome = 'pending' | 'started' | 'unknown';
+
 export async function openMessageModal(
   profile: DiscoveredProfile,
   tabIndex: number,
   eventName: string,
-  messageOverride?: string
-): Promise<void> {
-  const message = messageOverride ?? buildMessage(loadTemplate(), {
+  messageOverride?: string,
+  templatePath?: string
+): Promise<ConnectOutcome> {
+  const message = messageOverride ?? buildMessage(loadTemplate(templatePath), {
     firstName:        profile.firstName ?? profile.name.split(' ')[0] ?? '',
     summary:          profile.condensedSummary ?? profile.domain ?? 'your industry',
     condensedSummary: profile.condensedSummary ?? '',
     event:            eventName,
+    round:            '',
   });
-  console.log(`  Sending connect invite for ${profile.name} (tab ${tabIndex})…`);
-  injectScript(tabIndex, generateConnectScript(message));
+  const raw = injectScript(tabIndex, generateConnectScript(message)).trim();
+  if (raw === 'PENDING') {
+    console.log(`  ${profile.name}: connection already pending on LinkedIn — skipping modal`);
+    return 'pending';
+  }
+  if (raw === 'STARTED') {
+    console.log(`  Sending connect invite for ${profile.name} (tab ${tabIndex})…`);
+    return 'started';
+  }
+  console.log(`  ${profile.name}: unexpected connect-script result "${raw}" (tab ${tabIndex}) — check the tab manually`);
+  return 'unknown';
 }
 
 export function getChromeFrontWindowTabCount(): number {
