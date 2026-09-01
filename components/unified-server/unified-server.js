@@ -1576,7 +1576,7 @@ app.get('/check-blurb/:jobId/:person', (req, res) => {
 // and append a company row to the tracking sheet.
 // Delegates all Chrome automation to @inkredabull/career-catalyst-linkedin-automation.
 app.get('/connect', (req, res) => {
-  const { firstName, round, domain, linkedInUrl, companyLinkedInUrl, companyUrl } = req.query;
+  const { firstName, round, domain, summary, linkedInUrl, companyLinkedInUrl, companyUrl } = req.query;
 
   if (!firstName || !linkedInUrl) {
     return res.status(400).json({ success: false, error: 'firstName and linkedInUrl are required' });
@@ -1591,6 +1591,7 @@ app.get('/connect', (req, res) => {
     '--linkedInUrl', String(linkedInUrl),
   ];
   if (domain)             args.push('--domain',             String(domain));
+  if (summary)            args.push('--summary',            String(summary));
   if (round)              args.push('--round',              String(round));
   if (companyLinkedInUrl) args.push('--companyLinkedInUrl', String(companyLinkedInUrl));
   if (companyUrl)         args.push('--companyUrl',         String(companyUrl));

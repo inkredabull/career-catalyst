@@ -33,15 +33,16 @@ async function connect(): Promise<void> {
 
   const domain = arg('domain');
   const round = arg('round');
+  const summary = arg('summary');
   const companyLinkedInUrl = arg('companyLinkedInUrl');
   const companyUrl = arg('companyUrl');
 
   const template = loadTemplate();
   const message = buildMessage(template, {
     firstName,
-    domain: domain ?? 'your space',
-    round: round ? ` (${round})` : '',
-    summary: domain ?? 'your space',
+    domain: domain ?? summary ?? 'your space',
+    round: round ?? '',
+    summary: summary ?? domain ?? 'your space',
     event: '',
   });
 
