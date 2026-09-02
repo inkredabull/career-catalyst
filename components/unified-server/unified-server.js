@@ -1081,22 +1081,23 @@ app.post('/linkedin-reminder', async (req, res) => {
       });
       
       child.on('close', (code) => {
+        clearTimeout(timeoutHandle);
         console.log(`  -> Command finished with code ${code}`);
         console.log(`  -> STDOUT: ${stdout}`);
         console.log(`  -> STDERR: ${stderr}`);
-        
+
         if (code === 0) {
           resolve(stdout);
         } else {
           reject(new Error(`Reminder creation failed with code ${code}: ${stderr}`));
         }
       });
-      
-      // Set timeout
-      setTimeout(() => {
+
+      // Set timeout — npx/ts-node cold start (compiling TS on the fly) can take well over 10s
+      const timeoutHandle = setTimeout(() => {
         child.kill();
-        reject(new Error('Reminder creation timed out after 10 seconds'));
-      }, 10000);
+        reject(new Error('Reminder creation timed out after 30 seconds'));
+      }, 30000);
     });
     
     console.log(`  -> Reminder created successfully`);
