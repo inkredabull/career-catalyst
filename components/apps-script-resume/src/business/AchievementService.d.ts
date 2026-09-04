@@ -73,6 +73,7 @@ export declare class AchievementService {
      * @returns Category
      */
     categorizeAchievement(achievement: string, functions: string[]): string;
+    extractSituationAndTasks(challenge: string): string;
     /**
      * Generate unique ID for achievement
      * @param text - Text to hash

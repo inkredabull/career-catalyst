@@ -146,5 +146,10 @@ export declare function include(filename: string): string;
  * Menu item: "Update Table of Contents"
  */
 export declare function generateTableOfContents(): void;
+/**
+ * Extract Situation and Task from challenge text using AI
+ * Menu item: "Extract Situation & Task"
+ */
+export declare function extractSituationAndTasks(): void;
 export {};
 //# sourceMappingURL=index.d.ts.map
