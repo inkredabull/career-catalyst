@@ -1089,8 +1089,9 @@ export function generateTableOfContents(): void {
 export function extractSituationAndTasks(): void {
   try {
     const services = initializeServices();
-    const { row, headers } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
-    const challenge = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE)] as string;
+    const { row, headers, rowIndex } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
+    const challengeColIndex = headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE);
+    const challenge = row[challengeColIndex] as string;
 
     if (!challenge) {
       DialogService.showAlert('No Challenge text found in this row.');
@@ -1100,11 +1101,13 @@ export function extractSituationAndTasks(): void {
     const result = services.achievement.extractSituationAndTasks(challenge);
     const [situation, task] = result.split('|').map((s) => s.trim());
 
-    SpreadsheetApp.getUi().alert(
-      'Situation & Task',
-      `SITUATION:\n${situation ?? result}\n\nTASK:\n${task ?? '(not separated)'}`,
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
+    // challengeColIndex is 0-based; getRange col is 1-based
+    // 1-based challenge col = challengeColIndex + 1
+    // Situation: one left of challenge → 1-based col = challengeColIndex
+    // Task: one left of situation → 1-based col = challengeColIndex - 1
+    const sheet = services.sheet.getSheet(CONFIG.SHEETS.STORY_BANK);
+    sheet.getRange(rowIndex, challengeColIndex).setValue(situation ?? result);
+    sheet.getRange(rowIndex, challengeColIndex - 1).setValue(task ?? '');
   } catch (error) {
     Logger.error('Error in extractSituationAndTasks', error as Error);
     DialogService.showAlert(`Error extracting situation and tasks: ${(error as Error).message}`);
