@@ -1101,13 +1101,12 @@ export function extractSituationAndTasks(): void {
     const result = services.achievement.extractSituationAndTasks(challenge);
     const [situation, task] = result.split('|').map((s) => s.trim());
 
-    // challengeColIndex is 0-based; getRange col is 1-based
-    // 1-based challenge col = challengeColIndex + 1
-    // Situation: one left of challenge → 1-based col = challengeColIndex
-    // Task: one left of situation → 1-based col = challengeColIndex - 1
+    // challengeColIndex is 0-based; getRange col is 1-based (challengeColIndex + 1)
+    // Situation (G) = one right of Challenge → 1-based col = challengeColIndex + 2
+    // Task (H) = one right of Situation → 1-based col = challengeColIndex + 3
     const sheet = services.sheet.getSheet(CONFIG.SHEETS.STORY_BANK);
-    sheet.getRange(rowIndex, challengeColIndex).setValue(situation ?? result);
-    sheet.getRange(rowIndex, challengeColIndex - 1).setValue(task ?? '');
+    sheet.getRange(rowIndex, challengeColIndex + 2).setValue(situation ?? result);
+    sheet.getRange(rowIndex, challengeColIndex + 3).setValue(task ?? '');
   } catch (error) {
     Logger.error('Error in extractSituationAndTasks', error as Error);
     DialogService.showAlert(`Error extracting situation and tasks: ${(error as Error).message}`);
