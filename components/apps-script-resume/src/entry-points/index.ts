@@ -1082,6 +1082,35 @@ export function generateTableOfContents(): void {
   }
 }
 
+/**
+ * Extract Situation and Task from challenge text using AI
+ * Menu item: "Extract Situation & Task"
+ */
+export function extractSituationAndTasks(): void {
+  try {
+    const services = initializeServices();
+    const { row, headers } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
+    const challenge = row[headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE)] as string;
+
+    if (!challenge) {
+      DialogService.showAlert('No Challenge text found in this row.');
+      return;
+    }
+
+    const result = services.achievement.extractSituationAndTasks(challenge);
+    const [situation, task] = result.split('|').map((s) => s.trim());
+
+    SpreadsheetApp.getUi().alert(
+      'Situation & Task',
+      `SITUATION:\n${situation ?? result}\n\nTASK:\n${task ?? '(not separated)'}`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  } catch (error) {
+    Logger.error('Error in extractSituationAndTasks', error as Error);
+    DialogService.showAlert(`Error extracting situation and tasks: ${(error as Error).message}`);
+  }
+}
+
 // Make functions globally available for Google Apps Script
 declare const global: {
   onOpen: typeof onOpen;
@@ -1108,6 +1137,7 @@ declare const global: {
   handleGenerate: typeof handleGenerate;
   include: typeof include;
   generateTableOfContents: typeof generateTableOfContents;
+  extractSituationAndTasks: typeof extractSituationAndTasks;
 };
 
 global.onOpen = onOpen;
@@ -1134,3 +1164,4 @@ global.setupAPIKeys = setupAPIKeys;
 global.handleGenerate = handleGenerate;
 global.include = include;
 global.generateTableOfContents = generateTableOfContents;
+global.extractSituationAndTasks = extractSituationAndTasks;

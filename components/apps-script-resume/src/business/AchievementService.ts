@@ -187,6 +187,24 @@ FUNCTIONS: ${functions.join(', ')}`;
     });
   }
 
+  extractSituationAndTasks(challenge: string): string {
+    const prompt = `Given the following challenge, extract the 'Situation' encountered and the 'Tasks' to be undertaken. Return separated by the pipe character e.g. "|" but do not enclose the returned string in quotes.
+
+For example, take this challenge:
+"In an effort to reduce pull request cycle time, I set out to explore whether Applied AI could be used to automate backend code reviews for our Golang codebase. The goal was to test if AI tools could offer meaningful efficiency gains without compromising quality."
+
+Output would be along the lines of:
+"See if AI tools could offer meaningful efficiency gains without compromising quality.|Automate backend code reviews for our Golang codebase using Codeball."
+
+CHALLENGE:
+${challenge}`;
+
+    return this.aiService.query(prompt, {
+      maxTokens: CONFIG.AI.MAX_TOKENS.RESUME,
+      provider: 'claude',
+    });
+  }
+
   /**
    * Generate unique ID for achievement
    * @param text - Text to hash
