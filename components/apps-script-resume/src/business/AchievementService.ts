@@ -190,6 +190,9 @@ FUNCTIONS: ${functions.join(', ')}`;
   extractSituationAndTasks(challenge: string): string {
     const prompt = `Given the following challenge, extract the 'Situation' encountered and the 'Tasks' to be undertaken. Return separated by the pipe character e.g. "|" but do not enclose the returned string in quotes.
 
+'Situation' should be a concise description of the context or problem of between 90 and 105 characters.
+'Tasks' should be a concise description of the actions or objectives of between 90 and 105 characters.
+
 For example, take this challenge:
 "In an effort to reduce pull request cycle time, I set out to explore whether Applied AI could be used to automate backend code reviews for our Golang codebase. The goal was to test if AI tools could offer meaningful efficiency gains without compromising quality."
 
