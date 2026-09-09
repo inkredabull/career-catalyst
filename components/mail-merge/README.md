@@ -179,6 +179,15 @@ The `generateMessageForRow` function expects:
 
 Any other `{{ColumnName}}` token is replaced with the value from that column in the sheet row.
 
+### Which draft wins when several share a subject
+
+Runs that create drafts (`createWarmupDrafts`, and any send against a token-free subject) leave
+behind drafts whose subject line matches the template's. Template lookup therefore picks, among all
+drafts with that subject, the **oldest one that still contains `{{tokens}}`** — falling back to the
+oldest match if none do. Keep the original template draft around; deleting it and leaving only
+personalized copies makes Morning Warmup abort with a "no drafts created" notice rather than send
+everyone the same first name.
+
 ---
 
 ## Security notes

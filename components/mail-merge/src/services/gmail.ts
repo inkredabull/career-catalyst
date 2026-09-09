@@ -10,6 +10,7 @@ import {
 import { PROFILE } from '../config/profile';
 import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
 import { getLinkedInUrlByName, WarmupContact } from './contacts';
+import { containsTokens, draftsMatchingSubject, hasUnresolvedTokens, selectTemplateDraft } from './draft-template';
 
 interface MsgObj {
   subject: string;
@@ -106,6 +107,17 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
   const emailTemplate = getGmailTemplateFromDrafts(WARMUP_TEMPLATE);
   const flags = getFlagsForSubject(WARMUP_TEMPLATE);
+
+  // Every warmup draft carries the template's subject, so a stale mailbox can leave nothing but
+  // already-rendered copies to pick from. Bail with a report rather than create N drafts that all
+  // greet the same person.
+  if (!containsTokens(emailTemplate.message.text) && !containsTokens(emailTemplate.message.html)) {
+    const problem = `No draft titled "${WARMUP_TEMPLATE}" still contains {{tokens}} — every match looks like an `
+      + 'already-personalized copy. Restore the template draft (or delete the copies) and re-run.';
+    log('WARN', problem);
+    GmailApp.sendEmail(myEmail, 'Morning Warmup — no drafts created', problem);
+    return;
+  }
 
   const attachments: GoogleAppsScript.Base.Blob[] = [...emailTemplate.attachments];
   if (flags.ATTACH_PHOTO) {
@@ -462,9 +474,20 @@ const getGmailTemplateFromDrafts = (subjectLine: string): {
   attachments: GoogleAppsScript.Base.Blob[];
 } => {
   const drafts = GmailApp.getDrafts();
-  const draft = drafts.find(d => d.getMessage().getSubject() === subjectLine);
-  if (!draft) throw new Error("Oops - can't find Gmail draft");
+  const matches = draftsMatchingSubject(drafts, subjectLine);
+  if (matches.length === 0) throw new Error(`Oops - can't find Gmail draft: ${subjectLine}`);
+  if (matches.length > 1) {
+    // Expected once a run has left copies behind — worth logging so an unexpectedly high count
+    // (or a pick with no tokens, below) is visible when drafts go stale.
+    Logger.log('Found %s drafts with subject "%s" — using the template', matches.length, subjectLine);
+  }
+
+  const draft = selectTemplateDraft(matches, subjectLine);
+  if (!draft) throw new Error(`Oops - can't find Gmail draft: ${subjectLine}`);
   const msg = draft.getMessage();
+  if (matches.length > 1 && !hasUnresolvedTokens(msg)) {
+    log('WARN', 'No draft with subject "%s" still has {{tokens}} — is the original template deleted?', subjectLine);
+  }
   return {
     message: { subject: subjectLine, text: msg.getPlainBody(), html: msg.getBody() },
     attachments: msg.getAttachments({ includeInlineImages: false }) as unknown as GoogleAppsScript.Base.Blob[],
