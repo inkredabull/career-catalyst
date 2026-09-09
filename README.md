@@ -32,6 +32,9 @@ npm run unified-server
 
 # Start unified server with AI responses (for CV-aware interview assistance)
 npm run unified-server:llm
+# Note: if NGROK_AUTHTOKEN is present in .env, the server automatically opens
+# an ngrok tunnel on boot, prints the public URL, and writes it to
+# NGROK_TUNNEL_URL in .env. The tunnel is closed cleanly on Ctrl+C.
 
 # Run LangSmith evaluation (requires Python setup)
 npm run evaluate <job-id>
@@ -1791,7 +1794,8 @@ logs/{job-id}/tailored-{cv-hash}-{timestamp}.md    # Editable resume content
 - `npm run lint` - Run ESLint
 - `npm run clean` - Clean the dist directory
 - `npm run unified-server` - Start the unified server for Chrome extension integration
-- `npm run unified-server:llm` - Start the unified server with Claude 3.5 Sonnet for CV-aware AI responses
+- `npm run unified-server:llm` - Start the unified server with Claude AI for CV-aware responses
+- `npm run start:tunnel` - Start an ngrok tunnel manually (writes URL to `NGROK_TUNNEL_URL` in `.env`); not needed if `NGROK_AUTHTOKEN` is in `.env` — the unified server opens the tunnel automatically on boot
 
 ### API Changes
 
@@ -2000,11 +2004,14 @@ graph TB
 **Important Note on Server Architecture:**
 Only one server is needed: `npm run unified-server:llm`. This starts the unified server with all functionality:
 - Job extraction from URLs and HTML
-- CV-aware AI responses using Claude 3.5 Sonnet
+- CV-aware AI responses using Claude AI
 - Chrome extension integration
 - Secure local CV data access
 
 The unified server consolidates what was previously separate services into a single, efficient endpoint.
+
+**ngrok tunnel (optional):**
+If `NGROK_AUTHTOKEN` is set in `.env`, the unified server automatically opens an ngrok tunnel on startup, prints the public URL, and writes it to `NGROK_TUNNEL_URL` in `.env`. The tunnel is torn down cleanly when the server exits (Ctrl+C / SIGTERM). No separate tunnel process is needed. The `start:tunnel` script (`npm run start:tunnel`) is available as a standalone alternative if you want a tunnel without running the full server.
 
 ### Python Dependencies (Optional)
 
