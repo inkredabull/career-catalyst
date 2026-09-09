@@ -10,9 +10,10 @@
 /** Minimal slice of GmailMessage this module needs — keeps the picker unit-testable without GmailApp. */
 export interface TemplateMessage {
   getSubject(): string;
-  getDate(): Date;
+  getDate(): { getTime(): number };
   getPlainBody(): string;
   getBody(): string;
+  getAttachments(opts?: { includeInlineImages?: boolean }): unknown[];
 }
 
 export interface TemplateDraft {
