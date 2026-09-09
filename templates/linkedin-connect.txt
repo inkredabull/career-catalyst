@@ -1,1 +1,1 @@
-Congrats on the {{round}}! Following your journey, would love to connect.
+Congrats on the {{round}}! Love what you're doing around {{summary}}. Following your journey, would love to connect.
