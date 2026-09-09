@@ -7,10 +7,21 @@ describe('generateConnectScript', () => {
     expect(script).toContain(JSON.stringify('Hi Alice!'));
   });
 
-  it('returns a self-invoking async function', () => {
+  it('returns a self-invoking function wrapping an inner async IIFE', () => {
     const script = generateConnectScript('test');
-    expect(script.trim()).toMatch(/^\(async function\(\)/);
+    expect(script.trim()).toMatch(/^\(function\(\)/);
     expect(script.trim()).toMatch(/\(\);$/s);
+    expect(script).toContain('(async function() {');
+  });
+
+  it('returns PENDING synchronously without waiting on the async flow', () => {
+    const script = generateConnectScript('test');
+    expect(script).toContain("return 'PENDING';");
+  });
+
+  it('returns STARTED synchronously once the async flow is kicked off', () => {
+    const script = generateConnectScript('test');
+    expect(script).toContain("return 'STARTED';");
   });
 
   it('escapes special characters in the message safely', () => {

@@ -17,7 +17,7 @@
 /******/ 
 /************************************************************************/
 
-// UNUSED EXPORTS: AIProviderBase, AIService, AchievementService, CONFIG, ConfigService, CustomizationService, DialogService, DocumentService, EvaluationService, Logger, MenuService, ModelDiscoveryService, OpenRouterProvider, ResumeFormatter, SheetService, TextUtils, ValidationUtils, WorkHistoryExporter, chooseModel, compareModels, createCustomization, createID, evaluate, fetch, fetchWithModel, findTheme, generateAchievementWithModel, generateTableOfContents, getJudgement, getKeyPerformanceIndicator, getWorkHistoryAsGDoc, handleGenerate, include, logModelChoice, onOpen, refreshModelsMenu, setActiveCellValue, setupAPIKeys, shorten, showModal, sortSheet, viewCurrentModels
+// UNUSED EXPORTS: AIProviderBase, AIService, AchievementService, CONFIG, ConfigService, CustomizationService, DialogService, DocumentService, EvaluationService, Logger, MenuService, ModelDiscoveryService, OpenRouterProvider, ResumeFormatter, SheetService, TextUtils, ValidationUtils, WorkHistoryExporter, chooseModel, compareModels, createCustomization, createID, evaluate, extractSituationAndTasks, fetch, fetchWithModel, findTheme, generateAchievementWithModel, generateTableOfContents, getJudgement, getKeyPerformanceIndicator, getWorkHistoryAsGDoc, handleGenerate, include, logModelChoice, onOpen, refreshModelsMenu, setActiveCellValue, setupAPIKeys, shorten, showModal, sortSheet, viewCurrentModels
 
 ;// ./src/config/index.ts
 /**
@@ -1519,6 +1519,25 @@ FUNCTIONS: ${functions.join(', ')}`;
             provider: 'claude',
         });
     }
+    extractSituationAndTasks(challenge) {
+        const prompt = `Given the following challenge, extract the 'Situation' encountered and the 'Tasks' to be undertaken. Return separated by the pipe character e.g. "|" but do not enclose the returned string in quotes.
+
+'Situation' should be a concise description of the context or problem of between 180 and 210 characters.
+'Tasks' should be a concise description of the actions or objectives of between 90 and 105 characters.
+
+For example, take this challenge:
+"In an effort to reduce pull request cycle time, I set out to explore whether Applied AI could be used to automate backend code reviews for our Golang codebase. The goal was to test if AI tools could offer meaningful efficiency gains without compromising quality."
+
+Output would be along the lines of:
+"See if AI tools could offer meaningful efficiency gains without compromising quality.|Automate backend code reviews for our Golang codebase using Codeball."
+
+CHALLENGE:
+${challenge}`;
+        return this.aiService.query(prompt, {
+            maxTokens: CONFIG.AI.MAX_TOKENS.RESUME,
+            provider: 'claude',
+        });
+    }
     /**
      * Generate unique ID for achievement
      * @param text - Text to hash
@@ -2138,6 +2157,7 @@ class MenuService {
             .addItem('Create ID', 'createID')
             .addItem('Customize', 'createCustomization')
             .addSeparator()
+            .addItem('Extract Situation & Task', 'extractSituationAndTasks')
             .addItem('Update Table of Contents', 'generateTableOfContents')
             .addToUi();
     }
@@ -3106,6 +3126,34 @@ function generateTableOfContents() {
         DialogService.showAlert(`Error generating table of contents: ${error.message}`);
     }
 }
+/**
+ * Extract Situation and Task from challenge text using AI
+ * Menu item: "Extract Situation & Task"
+ */
+function extractSituationAndTasks() {
+    try {
+        const services = initializeServices();
+        const { row, headers, rowIndex } = services.sheet.getActiveRowData(CONFIG.SHEETS.STORY_BANK);
+        const challengeColIndex = headers.indexOf(CONFIG.COLUMNS.STORY_BANK.CHALLENGE);
+        const challenge = row[challengeColIndex];
+        if (!challenge) {
+            DialogService.showAlert('No Challenge text found in this row.');
+            return;
+        }
+        const result = services.achievement.extractSituationAndTasks(challenge);
+        const [situation, task] = result.split('|').map((s) => s.trim());
+        // challengeColIndex is 0-based; getRange col is 1-based (challengeColIndex + 1)
+        // Situation (G) = one right of Challenge → 1-based col = challengeColIndex + 2
+        // Task (H) = one right of Situation → 1-based col = challengeColIndex + 3
+        const sheet = services.sheet.getSheet(CONFIG.SHEETS.STORY_BANK);
+        sheet.getRange(rowIndex, challengeColIndex + 2).setValue(situation !== null && situation !== void 0 ? situation : result);
+        sheet.getRange(rowIndex, challengeColIndex + 3).setValue(task !== null && task !== void 0 ? task : '');
+    }
+    catch (error) {
+        Logger.error('Error in extractSituationAndTasks', error);
+        DialogService.showAlert(`Error extracting situation and tasks: ${error.message}`);
+    }
+}
 __webpack_require__.g.onOpen = onOpen;
 __webpack_require__.g.fetch = fetch;
 __webpack_require__.g.shorten = shorten;
@@ -3130,6 +3178,7 @@ __webpack_require__.g.setupAPIKeys = setupAPIKeys;
 __webpack_require__.g.handleGenerate = handleGenerate;
 __webpack_require__.g.include = include;
 __webpack_require__.g.generateTableOfContents = generateTableOfContents;
+__webpack_require__.g.extractSituationAndTasks = extractSituationAndTasks;
 
 ;// ./src/index.ts
 /**

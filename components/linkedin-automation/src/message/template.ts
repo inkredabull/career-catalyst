@@ -28,10 +28,17 @@ export interface MessageTokens {
 
 /**
  * Replaces {{token}} placeholders in a template string.
+ * Supports optional blocks — {{#token}}...{{/token}} — which are dropped
+ * entirely when the token is empty/undefined, so a sentence built around a
+ * missing value (e.g. condensedSummary) doesn't render with a blank gap.
  * Pure function — no I/O, safe to unit test.
  */
 export function buildMessage(template: string, tokens: MessageTokens): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => tokens[key] ?? '');
+  const withBlocksResolved = template.replace(
+    /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+    (_, key, inner) => (tokens[key] ? inner : '')
+  );
+  return withBlocksResolved.replace(/\{\{(\w+)\}\}/g, (_, key) => tokens[key] ?? '');
 }
 
 /** Parses the company LinkedIn slug from a company page URL. Pure. */

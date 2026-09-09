@@ -6,3 +6,5 @@ export { countTabs, openTab, closeTab, injectScript, sleep } from './chrome/tabs
 export type { ShellRunner, ScriptRunner } from './chrome/tabs.js';
 export { appendCompanyRow } from './sheets/company.js';
 export type { CompanyRowData } from './sheets/company.js';
+export { appendFctoLeadRow, appendFctoLeadRows, fetchExistingLeadUrls } from './sheets/fcto-leads.js';
+export type { FctoLeadRow, FctoLeadStatus } from './sheets/fcto-leads.js';

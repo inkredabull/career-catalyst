@@ -2,14 +2,13 @@ import { execSync } from 'child_process';
 import { writeFileSync, unlinkSync } from 'fs';
 
 export type ShellRunner = (cmd: string, opts?: Record<string, unknown>) => string;
-export type ScriptRunner = (script: string, opts?: Record<string, unknown>) => void;
+export type ScriptRunner = (script: string, opts?: Record<string, unknown>) => string;
 
 const defaultShell: ShellRunner = (cmd, opts) =>
   execSync(cmd, { encoding: 'utf-8', ...opts }) as unknown as string;
 
-const defaultScript: ScriptRunner = (script, opts) => {
-  execSync('osascript', { input: script, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], ...opts });
-};
+const defaultScript: ScriptRunner = (script, opts) =>
+  execSync('osascript', { input: script, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], ...opts }) as unknown as string;
 
 export function countTabs(runner: ShellRunner = defaultShell): number {
   try {
@@ -34,7 +33,7 @@ export function injectScript(
   tabIndex: number,
   javascript: string,
   scriptRunner: ScriptRunner = defaultScript
-): void {
+): string {
   const tmpFile = `/tmp/cc_inject_${Date.now()}.js`;
   writeFileSync(tmpFile, javascript, 'utf-8');
   const appleScript = `
@@ -45,7 +44,7 @@ tell application "Google Chrome"
   end tell
 end tell`;
   try {
-    scriptRunner(appleScript);
+    return scriptRunner(appleScript);
   } finally {
     try { unlinkSync(tmpFile); } catch { /* ignore */ }
   }

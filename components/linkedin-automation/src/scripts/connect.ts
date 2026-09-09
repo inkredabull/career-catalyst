@@ -6,7 +6,7 @@
  * Pure function — no I/O, safe to unit test.
  */
 export function generateConnectScript(message: string): string {
-  return `(async function() {
+  return `(function() {
     const LOG = msg => console.log('[CC] ' + msg);
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const message = ${JSON.stringify(message)};
@@ -14,7 +14,9 @@ export function generateConnectScript(message: string): string {
 
     const isPending = Array.from(document.querySelectorAll('button'))
       .some(b => (b.innerText || '').trim().toLowerCase() === 'pending');
-    if (isPending) { LOG('Skipping — already pending'); return; }
+    if (isPending) { LOG('Skipping — already pending'); return 'PENDING'; }
+
+    (async function() {
 
     const deepQ = sel => {
       let el = document.querySelector(sel);
@@ -118,5 +120,8 @@ export function generateConnectScript(message: string): string {
     } else {
       LOG('ERROR: no textarea — modal may not have opened');
     }
+    })();
+
+    return 'STARTED';
   })();`;
 }

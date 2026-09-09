@@ -37,10 +37,15 @@ describe('closeTab', () => {
 
 describe('injectScript', () => {
   it('passes the AppleScript targeting the correct tab index', () => {
-    const runner = vi.fn();
+    const runner = vi.fn().mockReturnValue('STARTED');
     injectScript(2, 'console.log("hi")', runner);
     const called = runner.mock.calls[0][0] as string;
     expect(called).toContain('tell tab 2 of front window');
+  });
+
+  it('returns the script runner result to the caller', () => {
+    const runner = vi.fn().mockReturnValue('PENDING\n');
+    expect(injectScript(1, 'js', runner)).toBe('PENDING\n');
   });
 
   it('still cleans up tmp file even if runner throws', () => {
