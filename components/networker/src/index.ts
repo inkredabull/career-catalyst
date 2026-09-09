@@ -13,6 +13,12 @@
  */
 
 import 'dotenv/config';
+import dotenv from 'dotenv';
+import { resolve } from 'path';
+// Also load the monorepo root .env (for shared creds like GOOGLE_CLIENT_ID/
+// GOOGLE_REFRESH_TOKEN, used by @inkredabull/career-catalyst-linkedin-automation's
+// sheet-append helpers) without overriding anything networker/.env already set.
+dotenv.config({ path: resolve(import.meta.dirname, '..', '..', '..', '.env') });
 import { Command } from 'commander';
 import { registerDiscover } from './commands/discover.js';
 import { registerSend } from './commands/send.js';

@@ -19,6 +19,7 @@ import { loadAllCachedProfiles, markConnectionSent } from '../cache.js';
 import { openMessageModal, getChromeFrontWindowTabCount } from '../services/linkedin.js';
 import { DiscoveredProfile, ContactPriorityTier } from '../types.js';
 import { BATCH } from '../config.js';
+import { appendFctoLeadRow } from '@inkredabull/career-catalyst-linkedin-automation';
 
 function normalizeTier(input?: string): ContactPriorityTier {
   if (!input || input.toLowerCase() === 'all') return 'NONE';
@@ -124,6 +125,21 @@ export function registerSend(program: Command): void {
         );
         if (sent) console.log(`  Marked ${profile.name} as connection sent`);
         else console.warn(`  Could not mark ${profile.name} as connection sent — cache file not updated`);
+
+        if (outcome !== 'unknown') {
+          try {
+            await appendFctoLeadRow({
+              name: profile.name,
+              liSummary: profile.condensedSummary ?? profile.summary ?? profile.currentTitle ?? '',
+              liUrl: profile.linkedInUrl,
+              status: 'Connection Request',
+              updatedAt: new Date().toISOString().slice(0, 10),
+            });
+          } catch (err) {
+            console.warn(`  Could not append ${profile.name} to fCTO Leads sheet: ${err instanceof Error ? err.message : err}`);
+          }
+        }
+
         if (i < candidates.length - 1) await randomDelay(800, 1500);
       }
 
