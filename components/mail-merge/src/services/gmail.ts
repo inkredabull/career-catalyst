@@ -221,10 +221,12 @@ export const sendViaGmail = (
 
   GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, params);
 
+  const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
+  const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
+
   if (flags.SEND_SMS) {
     const myPhone = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_PHONE) ?? '';
     const cellValue = (row[COLS.CELL] ?? '').trim();
-    const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
 
     Logger.log('SMS Logic - myPhone: "%s", cellValue: "%s", firstName: "%s"', myPhone, cellValue, firstName);
 
@@ -235,22 +237,21 @@ export const sendViaGmail = (
 
     Logger.log('SMS Logic - isSelfOrMissing: %s', isSelfOrMissing);
 
-    if (isSelfOrMissing) {
-      const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
-      if (isSelfEmailVariant(row[COLS.RECIPIENT], myEmail)) {
-        Logger.log('Recipient "%s" is a self-test variant of MY_EMAIL — skipping LinkedIn tab', row[COLS.RECIPIENT]);
-        return null;
-      }
-
-      const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
-      const resolvedTopic = topic ?? draftSubject ?? subjectLine;
-      const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], resolvedTopic);
-      Logger.log('Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
-      return { url: linkedInUrl, message, firstName };
-    } else {
+    if (!isSelfOrMissing) {
       Logger.log('Sending SMS to: %s', cellValue);
       notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, topic ?? draftSubject ?? subjectLine);
     }
+
+    // Queue LinkedIn regardless of whether SMS was sent — they are independent outreach channels.
+    if (isSelfEmailVariant(row[COLS.RECIPIENT], myEmail)) {
+      Logger.log('Recipient "%s" is a self-test variant of MY_EMAIL — skipping LinkedIn tab', row[COLS.RECIPIENT]);
+      return null;
+    }
+    const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
+    const resolvedTopic = topic ?? draftSubject ?? subjectLine;
+    const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], resolvedTopic);
+    Logger.log('Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
+    return { url: linkedInUrl, message, firstName };
   }
   return null;
 };
