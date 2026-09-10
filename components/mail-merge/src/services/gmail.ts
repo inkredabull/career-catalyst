@@ -101,7 +101,7 @@ function randomDelay(min,max){return new Promise(function(r){setTimeout(r, Math.
 
 // ── Warmup draft creation ─────────────────────────────────────────────────────
 
-const WARMUP_TEMPLATE = 'Catching up + a quick ask';
+const WARMUP_TEMPLATE = "Quick Favor - Exploring What's Next";
 
 export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
@@ -155,7 +155,7 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
     Logger.log('Created warmup draft for %s (%s)', displayName, email);
 
     const draftSearchUrl = `https://mail.google.com/mail/u/0/#search/in:drafts+to:${encodeURIComponent(email)}`;
-    draftLines.push(`${displayName} (${email})\n${draftSearchUrl}`);
+    draftLines.push(`${displayName} (${email})\nDraft: ${draftSearchUrl}\nContacts: ${contactUrl}`);
   }
 
   const body = draftLines.join('\n\n');
