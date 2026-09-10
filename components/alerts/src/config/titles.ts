@@ -1,32 +1,60 @@
+type TitleBatch = "previous" | "ai-enablement";
+
+interface TitleDef {
+  title: string;
+  batch: TitleBatch;
+}
+
+const ALL_TITLES: TitleDef[] = [
+  // previous batch — the pre-existing title set
+  { title: "Chief of Staff to the CTO", batch: "previous" },
+  { title: "Head of Engineering Operations", batch: "previous" },
+  { title: "Head of AI Engineering", batch: "previous" },
+  { title: "Head of Technical Strategy", batch: "previous" },
+  { title: "VP Engineering", batch: "previous" },
+  { title: "Head of Engineering", batch: "previous" },
+  { title: "CTO", batch: "previous" },
+  { title: "CPTO", batch: "previous" },
+  { title: "Chief Product & Technology Officer", batch: "previous" },
+  { title: "Director of Engineering", batch: "previous" },
+  { title: "AI Enablement Engineer", batch: "previous" },
+  { title: "Forward Deployed Engineer", batch: "previous" },
+  { title: "Technical Program Manager", batch: "previous" },
+  { title: "Technical Product Manager", batch: "previous" },
+  { title: "Solutions Engineer", batch: "previous" },
+  { title: "Solutions Architect", batch: "previous" },
+  { title: "Field CTO", batch: "previous" },
+  { title: "Developer Relations", batch: "previous" },
+  { title: "Fractional CTO", batch: "previous" },
+  { title: "Head of Product and Technology", batch: "previous" },
+  { title: "VP of Product Engineering", batch: "previous" },
+  { title: "Head of Product Engineering", batch: "previous" },
+  { title: "Director of Product Engineering", batch: "previous" },
+
+  // ai-enablement batch
+  { title: "AI Enablement", batch: "ai-enablement" },
+  { title: "AI Enablement Engineering", batch: "ai-enablement" },
+  { title: "Developer Productivity", batch: "ai-enablement" },
+  { title: "Engineering Effectiveness", batch: "ai-enablement" },
+  { title: "AI Transformation", batch: "ai-enablement" },
+  { title: "AI Center of Excellence", batch: "ai-enablement" },
+  { title: "AI Adoption", batch: "ai-enablement" },
+  { title: "AI Delivery Engineer", batch: "ai-enablement" },
+];
+
 /**
- * Search queries sent to LinkedIn. Set a title's value to false to disable it
- * without removing it — makes it easy to re-enable without losing the entry.
+ * Flip a whole batch of titles on/off at once instead of editing individual
+ * entries — set a batch to `true` to activate every title tagged with it.
  */
-export const SEARCH_TITLES: Record<string, boolean> = {
-  "Chief of Staff to the CTO": true,
-  "Head of Engineering Operations": true,
-  "Head of AI Engineering": false,
-  "Head of Technical Strategy": false,
-  "VP Engineering": true,
-  "Head of Engineering": false,
-  CTO: true,
-  CPTO: false,
-  "Chief Product & Technology Officer": true,
-  "Director of Engineering": true,
-  "AI Enablement Engineer": false,
-  "Forward Deployed Engineer": false,
-  "Technical Program Manager": true,
-  "Technical Product Manager": false,
-  "Solutions Engineer": false,
-  "Solutions Architect": false,
-  "Field CTO": false,
-  "Developer Relations": false,
-  "Fractional CTO": true,
-  "Head of Product and Technology": true,
-  "VP of Product Engineering": true,
-  "Head of Product Engineering": true,
-  "Director of Product Engineering": true,
+const ACTIVE_BATCHES: Record<TitleBatch, boolean> = {
+  previous: false,
+  "ai-enablement": true,
 };
+
+/** Search queries sent to LinkedIn/Google, derived from ALL_TITLES + ACTIVE_BATCHES above. */
+export const SEARCH_TITLES: Record<string, boolean> = Object.fromEntries(
+  ALL_TITLES.map(({ title, batch }) => [title, ACTIVE_BATCHES[batch]]),
+);
 
 /**
  * Result title must match at least one of these to be included.
@@ -52,12 +80,18 @@ export const INCLUDE_PATTERNS: RegExp[] = [
   /\bDirector\b.*(engineer|tech|platform|ai)/i,
   // Technical Program Manager, Technical Product Manager
   /\b(Technical|AI)\s+(Program|Product)\s+Manager\b/i,
-  // Solutions Engineer, Solutions Architect, Forward Deployed Engineer, AI Enablement Engineer
-  /\b(Solutions|Forward.Deployed|AI.Enablement)\s+(Engineer|Architect)\b/i,
+  // Solutions Engineer, Solutions Architect, Forward Deployed Engineer, AI Enablement Engineer, AI Delivery Engineer
+  /\b(Solutions|Forward.Deployed|AI.Enablement|AI.Delivery)\s+(Engineer|Architect)\b/i,
   // Developer Relations
   /\bDeveloper\s+Relations\b/i,
   // Chief of Staff (CTO\b also catches "Chief of Staff to the CTO", belt-and-suspenders)
   /\bChief\s+of\s+Staff\b/i,
+  // AI Enablement, AI Enablement Engineering, AI Transformation, AI Adoption
+  /\bAI\s+(Enablement|Transformation|Adoption)\b/i,
+  // AI Center of Excellence
+  /\bAI\s+Center\s+of\s+Excellence\b/i,
+  // Developer Productivity, Engineering Effectiveness
+  /\b(Developer\s+Productivity|Engineering\s+Effectiveness)\b/i,
 ];
 
 /**

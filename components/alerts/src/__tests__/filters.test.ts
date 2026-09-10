@@ -41,6 +41,15 @@ describe("titlePassesPatterns — include patterns (positive allowlist)", () => 
     "Developer Relations",
     // Chief of Staff (standalone)
     "Chief of Staff",
+    // AI enablement family
+    "Head of AI Enablement",
+    "AI Enablement Engineering Lead",
+    "Developer Productivity Engineer",
+    "Engineering Effectiveness Manager",
+    "Director of AI Transformation",
+    "AI Center of Excellence Lead",
+    "Head of AI Adoption",
+    "AI Delivery Engineer",
   ];
 
   test.each(shouldPass)("accepts: %s", (title) => {
