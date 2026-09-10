@@ -1663,16 +1663,35 @@ app.post('/append-mutual-connections', async (req, res) => {
       '',                    // Recipient
       '',                    // Cell
       r.linkedInUrl || '',
-      ''                     // Lookup (formula column — leave for the sheet to fill in)
+      ''                     // Lookup — filled in below once row number is known
     ]);
 
-    await sheets.spreadsheets.values.append({
+    const appendResp = await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: `${sheetName}!A1`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values }
     });
+
+    // Inject Google Contacts search formula into the Lookup column (K) for each appended row.
+    // updatedRange looks like "Sheet1!A5:K7" — extract the first row number from it.
+    const updatedRange = appendResp.data.updates?.updatedRange || '';
+    const firstRowMatch = updatedRange.match(/(\d+):/);
+    if (firstRowMatch) {
+      const firstRow = parseInt(firstRowMatch[1], 10);
+      const lookupValues = rows.map((_, i) => {
+        const rowNum = firstRow + i;
+        return [`=CONCAT("https://contacts.google.com/search/",SUBSTITUTE(A${rowNum}, " ", "+"))`];
+      });
+      const lastRow = firstRow + rows.length - 1;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${sheetName}!K${firstRow}:K${lastRow}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: lookupValues }
+      });
+    }
 
     console.log(`[append-mutual-connections] Appended ${rows.length} row(s) to "${sheetName}"`);
     res.json({ success: true, appended: rows.length });
