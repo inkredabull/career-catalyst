@@ -987,7 +987,7 @@ const MAIL_MERGE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1PpJw3tjPnw
 async function createMailMergeReminder(fullName, profileUrl) {
   const today = new Date().toISOString().slice(0, 10);
   const reminderData = {
-    title: `Add to Mail Merge: ${fullName}`,
+    title: `Inquire about opportunities with: ${fullName}`,
     notes: `Added ${fullName} to mail merge sheet.\n\nLinkedIn: ${profileUrl}\n\nSpreadsheet: ${MAIL_MERGE_SHEET_URL}`,
     priority: 5,
     dueDate: today,
