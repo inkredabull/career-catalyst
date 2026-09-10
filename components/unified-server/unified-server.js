@@ -1650,19 +1650,20 @@ app.post('/append-mutual-connections', async (req, res) => {
     });
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Column order: Full Name | PersonName | PersonURL | Lookup | Zeitgeisty | Email Sent | Recipient | Cell | LinkedIn | C | JobID
+    // Column order (verified against the sheet's actual header row):
+    // Full Name | PersonName | PersonURL | Zeitgeisty | Company | Email Sent | Recent | Recipient | Cell | LinkedIn | Lookup
     const values = rows.map(r => [
       r.fullName    || '',
       r.personName  || '',
       r.personUrl   || '',
-      '',                    // Lookup
       '',                    // Zeitgeisty
+      '',                    // Company
       '',                    // Email Sent
+      '',                    // Recent
       '',                    // Recipient
       '',                    // Cell
       r.linkedInUrl || '',
-      '',                    // C
-      r.jobId       || ''
+      ''                     // Lookup (formula column — leave for the sheet to fill in)
     ]);
 
     await sheets.spreadsheets.values.append({
