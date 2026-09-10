@@ -209,23 +209,26 @@ function getProfilePersonName() {
       }
     }
 
-    // Broad h1/h2 scan: find shortest element whose text looks like a person's name
-    // (2+ words, not a nav/title label, under 60 chars)
-    const nameRe = /^[A-ZÀ-Ö][a-zA-ZÀ-öø-ÿ'\-]+(?: [A-ZÀ-Ö][a-zA-ZÀ-öø-ÿ'\-]+)+$/;
-    for (const el of document.querySelectorAll('h1, h2')) {
-      const text = (el.innerText || '').trim();
-      if (text.length > 0 && text.length < 60 && nameRe.test(text)) {
-        return text;
+    // document.title is set reliably by LinkedIn to "Name | LinkedIn" / "Name - LinkedIn"
+    // — try this before the broad h1/h2 scan below, which can misfire on sidebar widgets
+    // (e.g. an "Ad Options" h2 in a promoted-content card).
+    const title = document.title;
+    if (title) {
+      const nameMatch = title.match(/^(.+?)\s*[\|\-]\s*LinkedIn/);
+      if (nameMatch && nameMatch[1].trim().length > 0) {
+        return nameMatch[1].trim();
       }
     }
 
-    // Fallback: try to extract from document title
-    const title = document.title;
-    if (title && !title.includes('LinkedIn')) {
-      // Title format is usually "Name | LinkedIn" or "Name - LinkedIn"
-      const nameMatch = title.match(/^(.+?)\s*[\|\-]\s*LinkedIn/);
-      if (nameMatch) {
-        return nameMatch[1].trim();
+    // Broad h1/h2 scan: find shortest element whose text looks like a person's name
+    // (2+ words, not a nav/title label, under 60 chars). Known non-name UI labels are
+    // excluded explicitly since they can otherwise pass the name-shape regex below.
+    const NON_NAME_LABELS = new Set(['Ad Options', 'People Also Viewed', 'People You May Know']);
+    const nameRe = /^[A-ZÀ-Ö][a-zA-ZÀ-öø-ÿ'\-]+(?: [A-ZÀ-Ö][a-zA-ZÀ-öø-ÿ'\-]+)+$/;
+    for (const el of document.querySelectorAll('h1, h2')) {
+      const text = (el.innerText || '').trim();
+      if (text.length > 0 && text.length < 60 && nameRe.test(text) && !NON_NAME_LABELS.has(text)) {
+        return text;
       }
     }
 
