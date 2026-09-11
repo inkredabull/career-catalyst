@@ -3,6 +3,12 @@ export type TitleBatch = "previous" | "ai-enablement";
 interface TitleDef {
   title: string;
   batch: TitleBatch;
+  /**
+   * Set false to drop just this query while leaving its batch active. Kept as
+   * an entry rather than deleted so the reasoning survives and re-enabling is
+   * a one-word edit.
+   */
+  enabled?: boolean;
 }
 
 const ALL_TITLES: TitleDef[] = [
@@ -37,7 +43,11 @@ const ALL_TITLES: TitleDef[] = [
   { title: "Developer Productivity", batch: "ai-enablement" },
   { title: "Engineering Effectiveness", batch: "ai-enablement" },
   { title: "AI Transformation", batch: "ai-enablement" },
-  { title: "AI Center of Excellence", batch: "ai-enablement" },
+  // LinkedIn's full-text index returns an empty response for this phrase —
+  // "1 included → 0 job cards" on both geos, every run. Too specific to match
+  // anything as written. The include pattern stays on, so the role still
+  // surfaces if an ATS board or discovery search turns one up.
+  { title: "AI Center of Excellence", batch: "ai-enablement", enabled: false },
   { title: "AI Adoption", batch: "ai-enablement" },
   { title: "AI Delivery Engineer", batch: "ai-enablement" },
 ];
@@ -51,9 +61,15 @@ export const ACTIVE_BATCHES: Record<TitleBatch, boolean> = {
   "ai-enablement": true,
 };
 
-/** Search queries sent to LinkedIn/Google, derived from ALL_TITLES + ACTIVE_BATCHES above. */
+/**
+ * Search queries sent to LinkedIn/Exa, derived from ALL_TITLES + ACTIVE_BATCHES.
+ * A title runs when its batch is active and it is not individually disabled.
+ */
 export const SEARCH_TITLES: Record<string, boolean> = Object.fromEntries(
-  ALL_TITLES.map(({ title, batch }) => [title, ACTIVE_BATCHES[batch]]),
+  ALL_TITLES.map(({ title, batch, enabled }) => [
+    title,
+    ACTIVE_BATCHES[batch] && enabled !== false,
+  ]),
 );
 
 /**
