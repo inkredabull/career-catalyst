@@ -17,7 +17,7 @@ import {
   JobResult,
   SearchResults,
 } from "./linkedin";
-import { fetchGoogleResults } from "./google";
+import { fetchDiscoveryResults, shouldRunDiscovery } from "./discovery";
 import { fetchAtsResults } from "./ats";
 import { log, flushLogs } from "./utils/logger";
 import { withConcurrency } from "./utils/concurrency";
@@ -181,7 +181,11 @@ export async function getResults(): Promise<SearchResults> {
   // parsed out of a page title, so they win the shallow merge and seed
   // deduplicateByCompanyTitle's first pass with the clean spelling.
   results = mergeResults(results, await fetchAtsResults(timeFrame));
-  results = mergeResults(results, await fetchGoogleResults(timeFrame));
+  if (shouldRunDiscovery()) {
+    results = mergeResults(results, await fetchDiscoveryResults());
+  } else {
+    log("INFO", "Skipping discovery this run (Exa budget — runs every 8h)");
+  }
   results = mergeResults(results, await getTopApplicantResults());
   results = deduplicateByCompanyTitle(results);
   return applyStopList(results);
@@ -295,9 +299,8 @@ export async function getOpenReqs(webAppUrl: string): Promise<void> {
   log("INFO", "Done.");
 }
 
-export async function runGoogle(): Promise<void> {
-  const timeFrame = process.env[ENV.SEARCH_TIME_FRAME] ?? TIME_FRAME;
-  const results = await applyStopList(await fetchGoogleResults(timeFrame));
+export async function runDiscovery(): Promise<void> {
+  const results = await applyStopList(await fetchDiscoveryResults());
   const webAppUrl = process.env["WEB_APP_URL"] ?? "";
   await notify(results, webAppUrl);
 }

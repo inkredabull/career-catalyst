@@ -1,3 +1,7 @@
+import { normalizeWhitespace } from "../utils/text";
+
+export { normalizeWhitespace };
+
 /** A job posting normalized out of one of the ATS board APIs. */
 export interface AtsJob {
   /** The ATS's own id, used for intra-board dedup. */
@@ -14,22 +18,6 @@ export interface AtsJob {
    * when the provider exposes no requisition id.
    */
   dedupKey: string;
-}
-
-/**
- * Collapse the whitespace ATS boards actually emit.
- *
- * Real board titles contain U+00A0 — Vercel/Greenhouse returns a trailing one
- * on "Forward-Deployed Engineer". JS \s does match it, so the title
- * filters survive it either way, but deduplicateByCompanyTitle keys on the raw
- * lowercased string — an nbsp variant would not dedupe against the ordinary
- * space variant, and it renders oddly in the digest.
- */
-export function normalizeWhitespace(value: string): string {
-  return value
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 /** Narrow an unknown JSON value to an array of plain objects. */

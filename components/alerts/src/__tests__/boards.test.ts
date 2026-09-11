@@ -45,13 +45,13 @@ describe("geoLabel routes every label the codebase emits", () => {
     },
   );
 
-  // Mirrors the labels in GOOGLE_SEARCHES. Kept as literals rather than
+  // Mirrors the labels in DISCOVERY_SEARCHES. Kept as literals rather than
   // imported so a rename has to be made deliberately in both places.
   const searchLabels: [string, string][] = [
     ["Ashby/SF", SF],
     ["Wellfound/SF", SF],
-    ["Indeed/SF", SF],
     ["BuiltInSF/SF", SF],
+    ["Web, US", US],
     ["Greenhouse/US", US],
     ["Lever/US", US],
     ["Levels/US", US],
@@ -68,6 +68,13 @@ describe("geoLabel routes every label the codebase emits", () => {
 
   it("falls back to Other for an unrecognised label", () => {
     expect(geoLabel("Something/Unmapped")).toBe("Other");
+  });
+
+  it("would have caught the old Web/US label falling into Other", () => {
+    // Lowercased, "web/us" contains "/us" but geoLabel looks for ", us".
+    // This is the bug the slot rename fixes; pinned so it cannot come back.
+    expect(geoLabel("Web/US")).toBe("Other");
+    expect(geoLabel("Web, US")).toBe(US);
   });
 
   it("does not drop a target into Other when the name is unknown", () => {

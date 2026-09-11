@@ -1,6 +1,6 @@
 # career-catalyst-alerts
 
-Vercel-hosted job alert system that searches LinkedIn, target companies' ATS boards, and Google (via Serper) for new job postings, scores each one with Claude AI, and emails a digest using Resend.
+Vercel-hosted job alert system that searches LinkedIn, target companies' ATS boards, and the open web (via Exa) for new job postings, scores each one with Claude AI, and emails a digest using Resend.
 
 Runs on a Vercel cron schedule (every 4 hours). No manual intervention required once deployed.
 
@@ -16,7 +16,7 @@ Vercel Cron (every 4h)
         │
         ├─── LinkedIn Voyager API  ─┐
         ├─── ATS board APIs        ─┼─► merge & de-dup by job ID
-        ├─── Google/Serper API     ─┤
+        ├─── Exa discovery (8h)    ─┤
         └─── LinkedIn Top Applicant─┘
                    │
                    ▼
@@ -48,13 +48,21 @@ Vercel Cron (every 4h)
 | LinkedIn SF/US | LinkedIn Voyager API | SF Bay Area + US Remote |
 | Top Applicant | LinkedIn Top Applicant feed | US |
 | Target/{Company} | The company's own ATS board API | US / Bay Area |
-| Ashby/SF | Serper `site:jobs.ashbyhq.com` | San Francisco |
-| Wellfound/SF | Serper `site:wellfound.com` | San Francisco |
-| Indeed/SF | Serper `site:indeed.com` | SF Bay Area / Remote |
-| Greenhouse/US | Serper `site:boards.greenhouse.io` | US |
-| Lever/US | Serper `site:jobs.lever.co` | US |
-| BuiltInSF/SF | Serper `site:builtinsf.com/jobs` | San Francisco |
-| Web/US | Serper broad web search | US |
+| Ashby/SF | Exa `jobs.ashbyhq.com` | San Francisco |
+| Wellfound/SF | Exa `wellfound.com` | San Francisco |
+| BuiltInSF/SF | Exa `builtinsf.com` (path `/job/`) | San Francisco |
+| Greenhouse/US | Exa `job-boards.greenhouse.io` | US |
+| Lever/US | Exa `jobs.lever.co` | US |
+| Levels/US | Exa `levels.fyi` (path `/jobs`) | US |
+| YC/US | Exa `ycombinator.com` (path `/companies/`) | US |
+| Web, US | Exa broad web search | US |
+
+The ATS layer runs on every cron tick because board APIs are free. The Exa
+layer runs every 8h (3 of the 6 ticks) — roughly $5/month against Exa's $10
+monthly free credit. A per-run cost ceiling stops the run rather than letting
+it silently exhaust the balance, which is how the previous Serper integration
+failed. Indeed was dropped: Exa only indexes its search-listing pages, not
+individual postings.
 
 #### Watching a specific company
 
@@ -92,7 +100,8 @@ Each entry includes block buttons (👎 company / 👎 title) that hit `/api/blo
 | Runtime | Vercel Functions (Node.js) |
 | Schedule | Vercel Cron |
 | LinkedIn data | LinkedIn Voyager API (session cookie auth) |
-| Google search | Serper API |
+| Discovery search | Exa API |
+| Company job boards | Greenhouse / Lever / Ashby public APIs |
 | JD fetching | Jina Reader + ScrapingBee fallback |
 | AI scoring | Anthropic Claude Haiku (`claude-haiku-4-5`) |
 | Storage | Google Cloud Storage (seen.json, stop-lists, score blobs) |
@@ -124,7 +133,8 @@ src/
 ├── clock.ts             # pause() with jitter; time-frame → cutoff helpers
 ├── filters.ts           # titlePassesPatterns() — regex pattern matching
 ├── linkedin.ts          # Voyager API calls, Top Applicant feed, result extractor
-├── google.ts            # Serper API calls, title parser, GOOGLE_SEARCHES list
+├── discovery.ts         # Exa search slots, page-title parser, cost ceiling
+├── utils/text.ts        # normalizeWhitespace() — collapses U+00A0 from sources
 ├── scoring.ts           # Claude scoring: fetchJD (Jina+ScrapingBee), scoreJob()
 ├── seen.ts              # GCS read/write: seen.json, stop-lists, score blobs
 ├── notify.ts            # Email builder and Resend send: formatEntry(), notify()
@@ -144,7 +154,7 @@ api/
 | `MY_EMAIL` | Digest recipient address |
 | `LI_COOKIE` | LinkedIn session cookie (from browser DevTools) |
 | `LI_CSRF_TOKEN` | LinkedIn CSRF token (`ajax:...`) |
-| `SERPER_API_KEY` | Serper API key for Google searches |
+| `EXA_API_KEY` | Exa API key for discovery searches |
 | `ANTHROPIC_API_KEY` | Anthropic API key for Claude scoring |
 | `SCRAPINGBEE_API_KEY` | ScrapingBee API key (JD fetch fallback) |
 | `RESEND_API_KEY` | Resend API key for email delivery |
@@ -185,7 +195,9 @@ To run a one-off cron locally, set env vars in `.env.local` and hit the cron end
 
 **Add/remove job titles** — edit `SEARCH_TITLES` in [src/config/titles.ts](src/config/titles.ts) (set `true`/`false`)
 
-**Add a search source** — append to `GOOGLE_SEARCHES` in [src/google.ts](src/google.ts); add the site name to `NOISE_SEGMENTS`; add a geo routing clause in `geoLabel()` in [src/notify.ts](src/notify.ts)
+**Watch a specific company** — append to `COMPANY_TARGETS` in [src/config/boards.ts](src/config/boards.ts). Free and unmetered; verify the board token live first.
+
+**Add a discovery source** — append to `DISCOVERY_SEARCHES` in [src/discovery.ts](src/discovery.ts); add the site name to `NOISE_SEGMENTS` so it isn't mistaken for the company; add a geo routing clause in `geoLabel()` in [src/notify.ts](src/notify.ts) and a case in [src/\_\_tests\_\_/boards.test.ts](src/__tests__/boards.test.ts), or the slot's jobs land silently in "Other". Each slot costs ~$0.007 per discovery run.
 
 **Change time window** — set `SEARCH_TIME_FRAME` env var or change `TIME_FRAME` in `constants.ts`
 
