@@ -1,4 +1,4 @@
-import { requireEnv, ENV } from "./config/settings";
+import { ENV } from "./config/settings";
 import { SEARCH_TITLES } from "./config/titles";
 import { titlePassesPatterns } from "./filters";
 import { SearchResults } from "./linkedin";
@@ -295,7 +295,15 @@ export function buildExaBody(
 }
 
 export async function fetchDiscoveryResults(): Promise<SearchResults> {
-  const apiKey = requireEnv(ENV.EXA_API_KEY);
+  // Degrade rather than throw. getResults() calls this inline, so a missing key
+  // would otherwise take down the whole digest — including the free ATS and
+  // LinkedIn sources, which need nothing from Exa.
+  const apiKey = process.env[ENV.EXA_API_KEY];
+  if (!apiKey) {
+    log("WARN", "%s not set — skipping discovery", ENV.EXA_API_KEY);
+    return {};
+  }
+
   const enabledTitles = Object.entries(SEARCH_TITLES)
     .filter(([, enabled]) => enabled)
     .map(([title]) => title);
