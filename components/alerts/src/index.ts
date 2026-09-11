@@ -14,7 +14,6 @@ import {
   extractInfo,
   getSearchToPerform,
   SearchFilter,
-  JobResult,
   SearchResults,
 } from "./linkedin";
 import { fetchDiscoveryResults, shouldRunDiscovery } from "./discovery";
@@ -27,43 +26,40 @@ import {
   filterUnseen,
   markAsSeen,
   loadStopLists,
+  matchingStopEntries,
   saveScore,
   purgeOldScores,
 } from "./seen";
 import { notify } from "./notify";
 import { scoreJob } from "./scoring";
 
-function isBlocked(
-  result: JobResult,
-  companies: string[],
-  titles: string[],
-): boolean {
-  const co = result.company.toLowerCase();
-  const ti = result.title.toLowerCase();
-  return (
-    companies.some((c) => co.includes(c.toLowerCase().trim())) ||
-    titles.some((t) => ti.includes(t.toLowerCase().trim()))
-  );
-}
-
 async function applyStopList(results: SearchResults): Promise<SearchResults> {
-  const { companies: blockedCos, titles: blockedTitles } =
-    await loadStopLists();
+  const lists = await loadStopLists();
   const totalBefore = Object.keys(results).length;
 
-  if (blockedCos.length || blockedTitles.length) {
+  if (lists.companies.length || lists.titles.length) {
     for (const id of Object.keys(results)) {
       const r = results[id];
-      if (isBlocked(r, blockedCos, blockedTitles)) {
-        log(
-          "DEBUG",
-          "Excluded (stop list): [%s] %s — %s",
-          r.search,
-          r.company,
-          r.title,
-        );
-        delete results[id];
-      }
+      const hits = matchingStopEntries(lists, r.company, r.title);
+      if (hits.length === 0) continue;
+
+      // Everything reaching here already passed the active title patterns, so
+      // an exclusion is always a role the current batch asked for. Company
+      // hits are almost always intentional (agency reposts); a title hit is
+      // the one that quietly outlives the batch it was added for — entries are
+      // substrings, so "Head of AI" swallows "Head of AI Enablement" — so name
+      // the culprit and say it louder.
+      const byTitle = hits.filter((h) => h.type === "title");
+      log(
+        byTitle.length > 0 ? "INFO" : "DEBUG",
+        "Excluded (stop list %s %s): [%s] %s — %s",
+        hits[0].type,
+        `"${hits[0].value}"`,
+        r.search,
+        r.company,
+        r.title,
+      );
+      delete results[id];
     }
   }
 
