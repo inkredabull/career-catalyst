@@ -1,5 +1,5 @@
 import { titlePassesPatterns } from "../filters";
-import { includePatternsFor } from "../config/titles";
+import { allIncludePatterns, includePatternsFor } from "../config/titles";
 
 /** Every batch on — for asserting a pattern works regardless of what is active. */
 const ALL = includePatternsFor({ previous: true, "ai-enablement": true });
@@ -161,6 +161,23 @@ describe("batch switching narrows every source, not just the searches", () => {
 
   test.each(execRoles)("previous batch still accepts: %s", (title) => {
     expect(titlePassesPatterns(title, ALL)).toBe(true);
+  });
+
+  it("allIncludePatterns keeps exec roles the active batch rejects", () => {
+    // Top Applicant is matched to the whole profile rather than to a query,
+    // so it runs against every pattern. Narrowing it to the active batch took
+    // it from ~35 results a run to zero.
+    const all = allIncludePatterns();
+    for (const title of execRoles) {
+      expect(titlePassesPatterns(title, AI)).toBe(false);
+      expect(titlePassesPatterns(title, all)).toBe(true);
+    }
+  });
+
+  it("allIncludePatterns is a superset of any single batch", () => {
+    const all = allIncludePatterns();
+    expect(all.length).toBeGreaterThan(AI.length);
+    expect(all.length).toBe(ALL.length);
   });
 
   it("rejects everything when no batch is active", () => {

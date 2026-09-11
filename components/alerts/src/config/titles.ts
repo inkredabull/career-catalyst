@@ -149,6 +149,18 @@ export function includePatternsFor(
   );
 }
 
+/**
+ * Every pattern, whatever the active batch.
+ *
+ * For sources that are matched to the candidate rather than to a query —
+ * LinkedIn's Top Applicant feed — where narrowing to the current batch throws
+ * away the whole point of the source. Under the ai-enablement batch alone it
+ * went from ~35 results a run to zero.
+ */
+export function allIncludePatterns(): RegExp[] {
+  return ALL_INCLUDE_PATTERNS.map((p) => p.pattern);
+}
+
 export const INCLUDE_PATTERNS: RegExp[] = includePatternsFor(ACTIVE_BATCHES);
 
 /**

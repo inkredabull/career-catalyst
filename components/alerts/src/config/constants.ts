@@ -19,9 +19,16 @@ export const GEOS: Record<string, string> = {
 };
 
 export const ONE_WEEK = "r604800";
+export const THREE_DAYS = "r259200";
 export const ONE_DAY = "r86400";
 export const EIGHT_HOURS = "r28800";
-export const TIME_FRAME = ONE_DAY;
+/**
+ * A single day is too narrow for a niche title set — six differently-phrased
+ * AI-enablement searches returned the same two postings. Widening the window
+ * costs nothing in noise: seen.ts dedupes on job id and company+title, so a
+ * posting already surfaced is not re-notified when it appears again.
+ */
+export const TIME_FRAME = THREE_DAYS;
 
 export const SF_FILTER = {
   origin: "JOB_SEARCH_PAGE_JOB_FILTER",

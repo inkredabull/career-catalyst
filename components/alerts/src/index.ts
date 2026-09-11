@@ -6,7 +6,7 @@ import {
   STRONG_FIT_MAX_APPLICANTS,
   APPLICANT_SATURATION_THRESHOLD,
 } from "./config/constants";
-import { SEARCH_TITLES } from "./config/titles";
+import { SEARCH_TITLES, allIncludePatterns } from "./config/titles";
 import { pause } from "./clock";
 import {
   getSearchResultsFromLinkedin,
@@ -137,7 +137,16 @@ async function getTopApplicantResults(): Promise<SearchResults> {
   for (const page of pages) {
     results = mergeResults(
       results,
-      extractInfo(page, "Top Applicant", "LinkedIn (Top Applicant)"),
+      // Deliberately every batch, not just the active one. This feed is
+      // LinkedIn matching the whole profile rather than answering a query, so
+      // narrowing it to the current batch discards what makes it worth having
+      // — it returned zero for a full run under ai-enablement alone.
+      extractInfo(
+        page,
+        "Top Applicant",
+        "LinkedIn (Top Applicant)",
+        allIncludePatterns(),
+      ),
     );
   }
   await pause(2500);

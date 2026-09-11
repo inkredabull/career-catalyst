@@ -1,0 +1,34 @@
+import { TIME_FRAME, THREE_DAYS, ONE_DAY, ONE_WEEK } from "../config/constants";
+import { timeFrameToSeconds, timeFrameToCutoffMs } from "../clock";
+
+describe("TIME_FRAME", () => {
+  // timeFrameToSeconds falls back to 24h on anything unparseable, so a typo in
+  // the constant would silently narrow every search back to a single day
+  // instead of failing. Pin the parse, not just the string.
+  it("parses to a real duration rather than hitting the 24h fallback", () => {
+    const seconds = timeFrameToSeconds(TIME_FRAME);
+    expect(seconds).toBeGreaterThan(0);
+    expect(seconds).not.toBe(timeFrameToSeconds("garbage"));
+  });
+
+  it("is the three-day window", () => {
+    expect(TIME_FRAME).toBe(THREE_DAYS);
+    expect(timeFrameToSeconds(TIME_FRAME)).toBe(3 * 24 * 60 * 60);
+  });
+
+  it("sits between the one-day and one-week presets", () => {
+    expect(timeFrameToSeconds(ONE_DAY)).toBeLessThan(
+      timeFrameToSeconds(TIME_FRAME),
+    );
+    expect(timeFrameToSeconds(TIME_FRAME)).toBeLessThan(
+      timeFrameToSeconds(ONE_WEEK),
+    );
+  });
+
+  it("produces a cutoff three days back", () => {
+    const now = Date.UTC(2026, 8, 10, 12, 0, 0);
+    expect(timeFrameToCutoffMs(TIME_FRAME, now)).toBe(
+      now - 3 * 24 * 60 * 60 * 1000,
+    );
+  });
+});

@@ -77,6 +77,8 @@ export function extractInfo(
   data: Record<string, unknown>,
   search: string,
   source?: string,
+  /** Defaults to the active batch's patterns; pass a set to widen or narrow. */
+  include?: RegExp[],
 ): SearchResults {
   const hashOfResults: SearchResults = {};
   const included = (data as Record<string, unknown[]>).included;
@@ -105,7 +107,7 @@ export function extractInfo(
         noTitle++;
         return;
       }
-      if (!titlePassesPatterns(title)) {
+      if (!titlePassesPatterns(title, include)) {
         patternFiltered++;
         return;
       }
