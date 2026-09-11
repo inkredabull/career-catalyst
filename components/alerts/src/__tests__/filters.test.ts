@@ -10,6 +10,9 @@ describe("titlePassesPatterns — include patterns (positive allowlist)", () => 
     "Chief of Staff to the CTO",
     "Chief Technology Officer",
     "Chief Technical Officer",
+    // spelled-out CPTO — an enabled SEARCH_TITLES entry that used to be rejected
+    "Chief Product & Technology Officer",
+    "Chief Product and Technology Officer",
     // VP family
     "VP Engineering",
     "VP of Engineering",
@@ -28,6 +31,9 @@ describe("titlePassesPatterns — include patterns (positive allowlist)", () => 
     "Director of Product Engineering",
     "Senior Director of Engineering",
     "Director, Product Engineering",
+    // real ATS titles — guards against over-tightening the "AI" boundary
+    "Director of Engineering, Safety",
+    "Director, Forward Deployed Engineering",
     // Technical managers
     "Technical Program Manager",
     "Technical Product Manager",
@@ -90,6 +96,12 @@ describe("titlePassesPatterns — false positives blocked by include allowlist",
     "Regional Sales Manager",
     "Director of Clinical Operations",
     "Chief Medical Officer",
+    // real ATS titles that matched the old unbounded "ai" alternative:
+    // Aff(ai)rs, Camp(ai)gns, Ch(ai)n, Ret(ai)l
+    "Director, Government Affairs & Public Policy",
+    "Creative Director, Copy & Campaigns",
+    "Director, Infrastructure Supply Chain Accounting",
+    "Enterprise Sales Director - Majors, Retail",
   ];
 
   test.each(shouldFail)("rejects noise: %s", (title) => {

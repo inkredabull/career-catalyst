@@ -68,16 +68,21 @@ export const INCLUDE_PATTERNS: RegExp[] = [
   /\bCTO\b/i,
   // CPTO — separate from CTO because the letters C-P-T-O don't contain the substring "CTO"
   /\bCPTO\b/i,
-  // full spelling LinkedIn sometimes returns instead of the acronym
-  /Chief\s+(Technology|Technical)\s+Officer/i,
+  // full spelling LinkedIn sometimes returns instead of the acronym.
+  // Tolerates words between "Chief" and "Officer" so the spelled-out CPTO
+  // ("Chief Product & Technology Officer") matches. The [\w&,\s] class excludes
+  // separators like "-" and "|", so it can't leap across two adjacent titles.
+  /\bChief\b[\w&,\s]*\b(Technology|Technical)\b[\w&,\s]*\bOfficer\b/i,
   // VP Engineering, VP of Product Engineering, Vice President Engineering, etc.
-  // No trailing \b on the second group — "engineer" must prefix-match "Engineering"
-  /\b(VP|V\.P\.|Vice\s+President)\b.*(engineer|product|tech|platform|ai)/i,
+  // No trailing \b on the second group — "engineer" must prefix-match "Engineering".
+  // "AI" is bounded: an unbounded "ai" matches Affairs, Campaigns, Chain, Retail.
+  /\b(VP|V\.P\.|Vice\s+President)\b.*(engineer|product|tech|platform|\bAI\b)/i,
   // Head of Engineering, Head of AI Engineering, Head of Technical Strategy,
   // Head of Engineering Operations, Head of Product and Technology
   /\bHead\s+of\s+(engineer|ai|tech|product|platform|operat)/i,
   // Director of Engineering, Director of Product Engineering, Senior Director of Engineering, etc.
-  /\bDirector\b.*(engineer|tech|platform|ai)/i,
+  // "AI" bounded for the same reason as the VP pattern above.
+  /\bDirector\b.*(engineer|tech|platform|\bAI\b)/i,
   // Technical Program Manager, Technical Product Manager
   /\b(Technical|AI)\s+(Program|Product)\s+Manager\b/i,
   // Solutions Engineer, Solutions Architect, Forward Deployed Engineer, AI Enablement Engineer, AI Delivery Engineer
