@@ -81,12 +81,16 @@ export function atsJobToResult(job: AtsJob, target: CompanyTarget): JobResult {
  * both London and San Francisco is judged on its combined location rather than
  * on whichever copy happened to come first.
  */
-export function selectFreshJobs(jobs: AtsJob[], cutoffMs: number): AtsJob[] {
+export function selectFreshJobs(
+  jobs: AtsJob[],
+  cutoffMs: number,
+  include?: RegExp[],
+): AtsJob[] {
   const fresh = jobs.filter(
     (j) => j.publishedAtMs > 0 && j.publishedAtMs >= cutoffMs,
   );
   return dedupeByRequisition(fresh)
-    .filter((j) => titlePassesPatterns(j.title))
+    .filter((j) => titlePassesPatterns(j.title, include))
     .filter((j) => isUsOrBayArea(j.location));
 }
 

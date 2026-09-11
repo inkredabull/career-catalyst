@@ -1,4 +1,10 @@
 import { titlePassesPatterns } from "../filters";
+import { includePatternsFor } from "../config/titles";
+
+/** Every batch on — for asserting a pattern works regardless of what is active. */
+const ALL = includePatternsFor({ previous: true, "ai-enablement": true });
+/** Only the batch that is actually active today. */
+const AI = includePatternsFor({ previous: false, "ai-enablement": true });
 
 describe("titlePassesPatterns — include patterns (positive allowlist)", () => {
   const shouldPass = [
@@ -59,7 +65,7 @@ describe("titlePassesPatterns — include patterns (positive allowlist)", () => 
   ];
 
   test.each(shouldPass)("accepts: %s", (title) => {
-    expect(titlePassesPatterns(title)).toBe(true);
+    expect(titlePassesPatterns(title, ALL)).toBe(true);
   });
 });
 
@@ -81,7 +87,7 @@ describe("titlePassesPatterns — exclude patterns (explicit blocklist)", () => 
   ];
 
   test.each(shouldFail)("rejects via exclude: %s", (title) => {
-    expect(titlePassesPatterns(title)).toBe(false);
+    expect(titlePassesPatterns(title, ALL)).toBe(false);
   });
 });
 
@@ -107,6 +113,65 @@ describe("titlePassesPatterns — false positives blocked by include allowlist",
   ];
 
   test.each(shouldFail)("rejects noise: %s", (title) => {
-    expect(titlePassesPatterns(title)).toBe(false);
+    expect(titlePassesPatterns(title, ALL)).toBe(false);
+  });
+});
+
+describe("batch switching narrows every source, not just the searches", () => {
+  // The ATS boards and Top Applicant take no keyword — these patterns are the
+  // only thing standing between them and the digest. If a switched-off batch's
+  // patterns stayed active, those two sources would keep delivering the old
+  // batch's roles no matter what SEARCH_TITLES said.
+
+  const aiEnablementRoles = [
+    "Head of AI Enablement",
+    "AI Enablement Engineer",
+    "AI Enablement Engineering Lead",
+    "Developer Productivity Engineer",
+    "Engineering Effectiveness Manager",
+    "Director of AI Transformation",
+    "AI Center of Excellence Lead",
+    "Head of AI Adoption",
+    "AI Delivery Engineer",
+  ];
+
+  const execRoles = [
+    "VP of Engineering",
+    "CTO",
+    "Chief Technology Officer",
+    "Director of Engineering",
+    "Head of Engineering",
+    "Technical Program Manager",
+    "Solutions Architect",
+    "Forward Deployed Engineer",
+    "Chief of Staff",
+    "Developer Relations",
+  ];
+
+  test.each(aiEnablementRoles)("ai-enablement accepts: %s", (title) => {
+    expect(titlePassesPatterns(title, AI)).toBe(true);
+  });
+
+  test.each(execRoles)(
+    "ai-enablement rejects previous-batch role: %s",
+    (title) => {
+      expect(titlePassesPatterns(title, AI)).toBe(false);
+    },
+  );
+
+  test.each(execRoles)("previous batch still accepts: %s", (title) => {
+    expect(titlePassesPatterns(title, ALL)).toBe(true);
+  });
+
+  it("rejects everything when no batch is active", () => {
+    const none = includePatternsFor({
+      previous: false,
+      "ai-enablement": false,
+    });
+    expect(none).toEqual([]);
+    // An empty allowlist must not mean "allow all" — that would flood the
+    // digest with every posting on every watched board.
+    expect(titlePassesPatterns("VP of Engineering", none)).toBe(false);
+    expect(titlePassesPatterns("Head of AI Enablement", none)).toBe(false);
   });
 });

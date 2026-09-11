@@ -1,4 +1,4 @@
-type TitleBatch = "previous" | "ai-enablement";
+export type TitleBatch = "previous" | "ai-enablement";
 
 interface TitleDef {
   title: string;
@@ -46,7 +46,7 @@ const ALL_TITLES: TitleDef[] = [
  * Flip a whole batch of titles on/off at once instead of editing individual
  * entries — set a batch to `true` to activate every title tagged with it.
  */
-const ACTIVE_BATCHES: Record<TitleBatch, boolean> = {
+export const ACTIVE_BATCHES: Record<TitleBatch, boolean> = {
   previous: false,
   "ai-enablement": true,
 };
@@ -57,47 +57,99 @@ export const SEARCH_TITLES: Record<string, boolean> = Object.fromEntries(
 );
 
 /**
- * Result title must match at least one of these to be included.
+ * Result title must match at least one active pattern to be included.
+ *
  * LinkedIn `keywords` is full-text search — it returns jobs where the term
  * appears anywhere in the posting, not just the title. These patterns act as
  * a positive allowlist so noise (e.g. "Business Development Director") is
  * rejected even when LinkedIn surfaces it for a "CPTO" keyword search.
+ *
+ * They are batched alongside the titles because they are the ONLY filter on
+ * the sources that take no keyword: the ATS boards and LinkedIn's Top Applicant
+ * feed. Switching batches without switching these would narrow the keyword
+ * searches while those two kept pouring the old batch's roles into the digest.
  */
-export const INCLUDE_PATTERNS: RegExp[] = [
+const ALL_INCLUDE_PATTERNS: { batch: TitleBatch; pattern: RegExp }[] = [
+  // --- previous: exec / engineering leadership ---------------------------
   // CTO, Field CTO, Fractional CTO, "Chief of Staff to the CTO"
-  /\bCTO\b/i,
-  // CPTO — separate from CTO because the letters C-P-T-O don't contain the substring "CTO"
-  /\bCPTO\b/i,
+  { batch: "previous", pattern: /\bCTO\b/i },
+  // CPTO — separate from CTO because the letters C-P-T-O don't contain "CTO"
+  { batch: "previous", pattern: /\bCPTO\b/i },
   // full spelling LinkedIn sometimes returns instead of the acronym.
   // Tolerates words between "Chief" and "Officer" so the spelled-out CPTO
   // ("Chief Product & Technology Officer") matches. The [\w&,\s] class excludes
   // separators like "-" and "|", so it can't leap across two adjacent titles.
-  /\bChief\b[\w&,\s]*\b(Technology|Technical)\b[\w&,\s]*\bOfficer\b/i,
+  {
+    batch: "previous",
+    pattern:
+      /\bChief\b[\w&,\s]*\b(Technology|Technical)\b[\w&,\s]*\bOfficer\b/i,
+  },
   // VP Engineering, VP of Product Engineering, Vice President Engineering, etc.
   // No trailing \b on the second group — "engineer" must prefix-match "Engineering".
   // "AI" is bounded: an unbounded "ai" matches Affairs, Campaigns, Chain, Retail.
-  /\b(VP|V\.P\.|Vice\s+President)\b.*(engineer|product|tech|platform|\bAI\b)/i,
+  {
+    batch: "previous",
+    pattern:
+      /\b(VP|V\.P\.|Vice\s+President)\b.*(engineer|product|tech|platform|\bAI\b)/i,
+  },
   // Head of Engineering, Head of AI Engineering, Head of Technical Strategy,
   // Head of Engineering Operations, Head of Product and Technology
-  /\bHead\s+of\s+(engineer|ai|tech|product|platform|operat)/i,
-  // Director of Engineering, Director of Product Engineering, Senior Director of Engineering, etc.
+  {
+    batch: "previous",
+    pattern: /\bHead\s+of\s+(engineer|ai|tech|product|platform|operat)/i,
+  },
+  // Director of Engineering, Director of Product Engineering, etc.
   // "AI" bounded for the same reason as the VP pattern above.
-  /\bDirector\b.*(engineer|tech|platform|\bAI\b)/i,
+  {
+    batch: "previous",
+    pattern: /\bDirector\b.*(engineer|tech|platform|\bAI\b)/i,
+  },
   // Technical Program Manager, Technical Product Manager
-  /\b(Technical|AI)\s+(Program|Product)\s+Manager\b/i,
-  // Solutions Engineer, Solutions Architect, Forward Deployed Engineer, AI Enablement Engineer, AI Delivery Engineer
-  /\b(Solutions|Forward.Deployed|AI.Enablement|AI.Delivery)\s+(Engineer|Architect)\b/i,
+  {
+    batch: "previous",
+    pattern: /\b(Technical|AI)\s+(Program|Product)\s+Manager\b/i,
+  },
+  // Solutions Engineer, Solutions Architect, Forward Deployed Engineer
+  {
+    batch: "previous",
+    pattern: /\b(Solutions|Forward.Deployed)\s+(Engineer|Architect)\b/i,
+  },
   // Developer Relations
-  /\bDeveloper\s+Relations\b/i,
-  // Chief of Staff (CTO\b also catches "Chief of Staff to the CTO", belt-and-suspenders)
-  /\bChief\s+of\s+Staff\b/i,
+  { batch: "previous", pattern: /\bDeveloper\s+Relations\b/i },
+  // Chief of Staff (\bCTO\b also catches "Chief of Staff to the CTO")
+  { batch: "previous", pattern: /\bChief\s+of\s+Staff\b/i },
+
+  // --- ai-enablement ------------------------------------------------------
   // AI Enablement, AI Enablement Engineering, AI Transformation, AI Adoption
-  /\bAI\s+(Enablement|Transformation|Adoption)\b/i,
+  {
+    batch: "ai-enablement",
+    pattern: /\bAI\s+(Enablement|Transformation|Adoption)\b/i,
+  },
   // AI Center of Excellence
-  /\bAI\s+Center\s+of\s+Excellence\b/i,
+  { batch: "ai-enablement", pattern: /\bAI\s+Center\s+of\s+Excellence\b/i },
   // Developer Productivity, Engineering Effectiveness
-  /\b(Developer\s+Productivity|Engineering\s+Effectiveness)\b/i,
+  {
+    batch: "ai-enablement",
+    pattern: /\b(Developer\s+Productivity|Engineering\s+Effectiveness)\b/i,
+  },
+  // AI Enablement Engineer, AI Delivery Engineer — the enablement half of the
+  // Solutions/Forward-Deployed family above.
+  {
+    batch: "ai-enablement",
+    pattern: /\b(AI.Enablement|AI.Delivery)\s+(Engineer|Architect)\b/i,
+  },
 ];
+
+/** The include patterns belonging to the given set of active batches. */
+export function includePatternsFor(
+  active: Record<TitleBatch, boolean>,
+): RegExp[] {
+  return ALL_INCLUDE_PATTERNS.filter((p) => active[p.batch]).map(
+    (p) => p.pattern,
+  );
+}
+
+export const INCLUDE_PATTERNS: RegExp[] = includePatternsFor(ACTIVE_BATCHES);
 
 /**
  * Result title matching any of these is always rejected,

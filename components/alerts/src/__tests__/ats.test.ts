@@ -4,6 +4,7 @@ import { normalizeAshby } from "../ats/ashby";
 import { atsJobToResult, dedupeByRequisition, selectFreshJobs } from "../ats";
 import { AtsJob } from "../ats/types";
 import { CompanyTarget } from "../config/boards";
+import { includePatternsFor } from "../config/titles";
 
 import greenhouseFixture from "./fixtures/greenhouse.json";
 import leverFixture from "./fixtures/lever.json";
@@ -220,21 +221,26 @@ describe("dedupeByRequisition", () => {
 
 describe("selectFreshJobs", () => {
   const CUTOFF = 1_000_000;
+  // Pinned rather than taken from ACTIVE_BATCHES so these stay meaningful
+  // whichever title batch is switched on.
+  const ALL = includePatternsFor({ previous: true, "ai-enablement": true });
 
   it("keeps a job published exactly at the cutoff", () => {
     expect(
-      selectFreshJobs([job({ publishedAtMs: CUTOFF })], CUTOFF),
+      selectFreshJobs([job({ publishedAtMs: CUTOFF })], CUTOFF, ALL),
     ).toHaveLength(1);
   });
 
   it("drops a job published before the cutoff", () => {
     expect(
-      selectFreshJobs([job({ publishedAtMs: CUTOFF - 1 })], CUTOFF),
+      selectFreshJobs([job({ publishedAtMs: CUTOFF - 1 })], CUTOFF, ALL),
     ).toEqual([]);
   });
 
   it("drops jobs with no parseable publish date", () => {
-    expect(selectFreshJobs([job({ publishedAtMs: 0 })], CUTOFF)).toEqual([]);
+    expect(selectFreshJobs([job({ publishedAtMs: 0 })], CUTOFF, ALL)).toEqual(
+      [],
+    );
   });
 
   it("applies the title allowlist", () => {
@@ -243,12 +249,33 @@ describe("selectFreshJobs", () => {
       selectFreshJobs(
         [job({ ...fresh, title: "Regional Sales Manager" })],
         CUTOFF,
+        ALL,
       ),
     ).toEqual([]);
     expect(
       selectFreshJobs(
         [job({ ...fresh, title: "Head of Engineering" })],
         CUTOFF,
+        ALL,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("honours the active batch — exec roles drop when only ai-enablement is on", () => {
+    const ai = includePatternsFor({ previous: false, "ai-enablement": true });
+    const fresh = { publishedAtMs: CUTOFF + 1 };
+    expect(
+      selectFreshJobs(
+        [job({ ...fresh, title: "VP of Engineering" })],
+        CUTOFF,
+        ai,
+      ),
+    ).toEqual([]);
+    expect(
+      selectFreshJobs(
+        [job({ ...fresh, title: "Head of AI Enablement" })],
+        CUTOFF,
+        ai,
       ),
     ).toHaveLength(1);
   });
