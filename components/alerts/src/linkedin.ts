@@ -26,7 +26,7 @@ export interface JobResult {
 
 export type SearchResults = Record<string, JobResult>;
 
-function buildLiHeaders(
+export function buildLiHeaders(
   cookie: string,
   csrfToken: string,
   referer: string,

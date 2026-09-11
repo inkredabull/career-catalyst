@@ -154,6 +154,8 @@ export async function notify(
         "</ul></details>"
       : "";
 
+  const stopListHtml = `<div style="font-size:12px;color:#9ca3af;margin-top:16px"><a href="${webAppUrl.replace(/\/$/, "")}/api/block?list=1" style="color:#9ca3af">Review stop lists</a></div>`;
+
   const logsHtml =
     logs && logs.length > 0
       ? `<details style="margin-top:20px"><summary style="font-size:12px;color:#9ca3af;cursor:pointer">Run log (${logs.length} lines)</summary><pre style="font-size:11px;color:#6b7280;white-space:pre-wrap;margin-top:8px">${logs.join("\n")}</pre></details>`
@@ -164,6 +166,7 @@ export async function notify(
     to: email,
     subject: `Jobs for ${new Date().toLocaleString("en-US", { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Los_Angeles" })}`,
     text: textSections.join("\n\n") + durationFooter,
-    html: htmlSections.join("") + durationHtml + passHtml + logsHtml,
+    html:
+      htmlSections.join("") + durationHtml + passHtml + stopListHtml + logsHtml,
   });
 }

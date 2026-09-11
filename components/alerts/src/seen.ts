@@ -134,6 +134,51 @@ export async function addToStopList(
   await writeGCS(STOP_LISTS_PATH, current);
 }
 
+/**
+ * Remove an entry from a stop list. Returns false when nothing matched.
+ *
+ * The counterpart to addToStopList. Without it the only way to undo a block is
+ * to hand-edit a GCS blob, so entries added for one job search silently keep
+ * filtering results long after the target has moved on.
+ */
+export async function removeFromStopList(
+  type: "company" | "title",
+  value: string,
+): Promise<boolean> {
+  const current = await loadStopLists();
+  const lst = type === "company" ? current.companies : current.titles;
+  const idx = lst.findIndex(
+    (s) => s.toLowerCase().trim() === value.toLowerCase().trim(),
+  );
+  if (idx === -1) return false;
+  lst.splice(idx, 1);
+  await writeGCS(STOP_LISTS_PATH, current);
+  return true;
+}
+
+/**
+ * The stop-list entries that would exclude a given company/title pair.
+ *
+ * Mirrors the substring matching in index.ts isBlocked(), so the UI can explain
+ * *which* entry is responsible rather than just that something matched.
+ */
+export function matchingStopEntries(
+  lists: { companies: string[]; titles: string[] },
+  company: string,
+  title: string,
+): { type: "company" | "title"; value: string }[] {
+  const co = company.toLowerCase();
+  const ti = title.toLowerCase();
+  return [
+    ...lists.companies
+      .filter((c) => co.includes(c.toLowerCase().trim()))
+      .map((value) => ({ type: "company" as const, value })),
+    ...lists.titles
+      .filter((t) => ti.includes(t.toLowerCase().trim()))
+      .map((value) => ({ type: "title" as const, value })),
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Scores
 // ---------------------------------------------------------------------------

@@ -12,7 +12,6 @@ export const ENV = {
   LOG_LEVEL: "LOG_LEVEL",
   NGROK_TUNNEL_URL: "NGROK_TUNNEL_URL",
   GCS_BUCKET: "GCS_BUCKET",
-  SCRAPINGBEE_API_KEY: "SCRAPINGBEE_API_KEY",
 } as const;
 
 /** Read a required env var — throws with a clear message if not set. */

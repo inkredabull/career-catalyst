@@ -26,7 +26,7 @@ Vercel Cron (every 4h)
             applyStopList() ◄── GCS: stop-lists.json
                    │
                    ▼
-            scoreJob() ──► Jina Reader → ScrapingBee (fallback)
+            scoreJob() ──► LinkedIn: Voyager API / else: Jina Reader
                            Claude Sonnet (14-dimension rubric)
                            GCS: score blobs (id → reasoning)
                    │
@@ -80,7 +80,7 @@ a board API returns a company's entire global req list.
 
 Each new job is scored by Claude Sonnet against a 14-dimension rubric (skills alignment, compensation, remote-friendliness, culture, etc.). The score and reasoning are saved to GCS so the email's "Why?" links serve them on demand via `/api/score`.
 
-JD text is fetched via **Jina Reader** (`r.jina.ai`) with **ScrapingBee** as an automatic fallback when LinkedIn blocks the Jina request.
+JD text for LinkedIn postings comes from the **Voyager API**, reusing the session cookie the search already needs. LinkedIn blocks Jina at the site level and a paid Reader key does not change that, so the alternative was a third-party scraper — whose free tier is a fixed credit pool, after which every score silently degrades to title-only. Everything else (ATS boards, discovery results) is fetched via **Jina Reader** (`r.jina.ai`).
 
 ### Email digest
 
@@ -102,7 +102,7 @@ Each entry includes block buttons (👎 company / 👎 title) that hit `/api/blo
 | LinkedIn data | LinkedIn Voyager API (session cookie auth) |
 | Discovery search | Exa API |
 | Company job boards | Greenhouse / Lever / Ashby public APIs |
-| JD fetching | Jina Reader + ScrapingBee fallback |
+| JD fetching | LinkedIn Voyager API + Jina Reader |
 | AI scoring | Anthropic Claude Haiku (`claude-haiku-4-5`) |
 | Storage | Google Cloud Storage (seen.json, stop-lists, score blobs) |
 | Email | Resend |
@@ -135,7 +135,7 @@ src/
 ├── linkedin.ts          # Voyager API calls, Top Applicant feed, result extractor
 ├── discovery.ts         # Exa search slots, page-title parser, cost ceiling
 ├── utils/text.ts        # normalizeWhitespace() — collapses U+00A0 from sources
-├── scoring.ts           # Claude scoring: fetchJD (Jina+ScrapingBee), scoreJob()
+├── scoring.ts           # Claude scoring: fetchJD (Voyager/Jina), scoreJob()
 ├── seen.ts              # GCS read/write: seen.json, stop-lists, score blobs
 ├── notify.ts            # Email builder and Resend send: formatEntry(), notify()
 └── index.ts             # Orchestration: getResults(), getOpenReqs()
@@ -156,7 +156,6 @@ api/
 | `LI_CSRF_TOKEN` | LinkedIn CSRF token (`ajax:...`) |
 | `EXA_API_KEY` | Exa API key for discovery searches |
 | `ANTHROPIC_API_KEY` | Anthropic API key for Claude scoring |
-| `SCRAPINGBEE_API_KEY` | ScrapingBee API key (JD fetch fallback) |
 | `RESEND_API_KEY` | Resend API key for email delivery |
 | `GCS_BUCKET` | GCS bucket name for seen/stop-list/score storage |
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | GCS service account JSON (stringified) |

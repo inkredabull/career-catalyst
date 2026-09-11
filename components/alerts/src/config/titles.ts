@@ -17,7 +17,6 @@ const ALL_TITLES: TitleDef[] = [
   { title: "CPTO", batch: "previous" },
   { title: "Chief Product & Technology Officer", batch: "previous" },
   { title: "Director of Engineering", batch: "previous" },
-  { title: "AI Enablement Engineer", batch: "previous" },
   { title: "Forward Deployed Engineer", batch: "previous" },
   { title: "Technical Program Manager", batch: "previous" },
   { title: "Technical Product Manager", batch: "previous" },
@@ -33,6 +32,7 @@ const ALL_TITLES: TitleDef[] = [
 
   // ai-enablement batch
   { title: "AI Enablement", batch: "ai-enablement" },
+  { title: "AI Enablement Engineer", batch: "ai-enablement" },
   { title: "AI Enablement Engineering", batch: "ai-enablement" },
   { title: "Developer Productivity", batch: "ai-enablement" },
   { title: "Engineering Effectiveness", batch: "ai-enablement" },

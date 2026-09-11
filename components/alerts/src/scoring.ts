@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ENV } from "./config/settings";
-import { JobResult } from "./linkedin";
+import { JobResult, buildLiHeaders } from "./linkedin";
 import { log } from "./utils/logger";
 
 // ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ Judgment labels (pick exactly one):
 `.trim();
 
 // ---------------------------------------------------------------------------
-// JD fetch — Jina Reader with ScrapingBee fallback
+// JD fetch — Voyager for LinkedIn, Jina Reader for everything else
 // ---------------------------------------------------------------------------
 
 async function fetchViaJina(url: string): Promise<string> {
@@ -58,56 +58,86 @@ async function fetchViaJina(url: string): Promise<string> {
   log("DEBUG", "Jina HTTP %s for %s", res.status, url.slice(0, 80));
   if (!res.ok) return "";
   const text = await res.text();
-  // Treat DDoS/block responses as empty so we fall through to ScrapingBee
+  // Treat DDoS/block responses as empty so the caller sees no JD
   if (
     text.toLowerCase().includes("ddos") ||
     text.toLowerCase().includes("blocked") ||
     text.length < 200
   ) {
-    log("DEBUG", "Jina returned suspected block page, will try fallback");
+    log("DEBUG", "Jina returned suspected block page for %s", url.slice(0, 80));
     return "";
   }
   return text.slice(0, 12_000);
 }
 
-async function fetchViaScrapingBee(url: string): Promise<string> {
-  const apiKey = process.env[ENV.SCRAPINGBEE_API_KEY];
-  if (!apiKey) return "";
+/** The numeric posting id out of a canonical LinkedIn job URL, if present. */
+export function linkedInJobId(url: string): string | null {
+  const m = url.match(/\/jobs\/view\/(\d+)/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Decoration schema for the full job posting, including its description.
+ *
+ * LinkedIn bumps these suffixes periodically. If the log starts showing
+ * "Voyager JD HTTP 400/404" for every job, open a posting in the browser with
+ * DevTools → Network, filter for `voyager/api/jobs/jobPostings`, and copy the
+ * current decorationId from the request URL.
+ */
+const JD_DECORATION_ID =
+  "com.linkedin.voyager.deco.jobs.web.shared.WebFullJobPosting-65";
+
+/**
+ * Fetch a LinkedIn job description through the same authenticated Voyager API
+ * the search already uses.
+ *
+ * LinkedIn blocks Jina at the site level, and a paid Reader key does not change
+ * that, so a third-party scraper was the only other option — and the free tier
+ * of one is a fixed number of credits, after which every score silently
+ * degrades to title-only. We are already authenticated here, so this costs
+ * nothing and does not run out.
+ */
+async function fetchViaVoyager(url: string): Promise<string> {
+  const jobId = linkedInJobId(url);
+  if (!jobId) return "";
+
+  const cookie = process.env[ENV.LI_COOKIE];
+  const csrfToken = process.env[ENV.LI_CSRF_TOKEN];
+  if (!cookie || !csrfToken) return "";
+
   try {
-    const params = new URLSearchParams({
-      api_key: apiKey,
-      url,
-      render_js: "false",
-      extract_rules: JSON.stringify({ body: "body" }),
+    const endpoint =
+      `https://www.linkedin.com/voyager/api/jobs/jobPostings/${jobId}` +
+      `?decorationId=${JD_DECORATION_ID}`;
+    const res = await fetch(endpoint, {
+      headers: buildLiHeaders(
+        cookie,
+        csrfToken,
+        `https://www.linkedin.com/jobs/view/${jobId}`,
+      ),
+      signal: AbortSignal.timeout(10_000),
     });
-    const res = await fetch(`https://app.scrapingbee.com/api/v1?${params}`, {
-      signal: AbortSignal.timeout(12_000),
-    });
-    log("DEBUG", "ScrapingBee HTTP %s for %s", res.status, url.slice(0, 80));
+    log("DEBUG", "Voyager JD HTTP %s for job %s", res.status, jobId);
     if (!res.ok) return "";
-    const text = await res.text();
+
+    const data = (await res.json()) as {
+      description?: { text?: string };
+      data?: { description?: { text?: string } };
+    };
+    // The normalized+json accept header can nest the posting under `data`.
+    const text = data.description?.text ?? data.data?.description?.text ?? "";
     return text.slice(0, 12_000);
   } catch (err) {
-    log("DEBUG", "ScrapingBee failed: %s", (err as Error).message);
+    log("DEBUG", "Voyager JD failed for %s: %s", jobId, (err as Error).message);
     return "";
   }
 }
 
 async function fetchJD(url: string): Promise<string> {
   try {
-    // LinkedIn consistently blocks Jina — skip straight to ScrapingBee
-    if (!url.includes("linkedin.com")) {
-      const jina = await fetchViaJina(url);
-      if (jina) return jina;
-      log("DEBUG", "Falling back to ScrapingBee for %s", url.slice(0, 80));
-    } else {
-      log(
-        "DEBUG",
-        "LinkedIn URL — using ScrapingBee directly for %s",
-        url.slice(0, 80),
-      );
-    }
-    return await fetchViaScrapingBee(url);
+    // LinkedIn blocks Jina outright, so use the authenticated API instead.
+    if (url.includes("linkedin.com")) return await fetchViaVoyager(url);
+    return await fetchViaJina(url);
   } catch {
     return "";
   }

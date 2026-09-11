@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { addToStopList } from "../src/seen";
+import { addToStopList, loadStopLists, removeFromStopList } from "../src/seen";
 
 function escapeHtml(s: string): string {
   return s
@@ -11,6 +11,46 @@ function escapeHtml(s: string): string {
 
 function isValidType(t: unknown): t is "company" | "title" {
   return t === "company" || t === "title";
+}
+
+function renderSection(type: "company" | "title", entries: string[]): string {
+  if (entries.length === 0)
+    return `<h3>${type} (0)</h3><p style="color:#6b7280">Nothing blocked.</p>`;
+  const rows = [...entries]
+    .sort((a, b) => a.localeCompare(b))
+    .map(
+      (value) => `<li style="margin-bottom:6px">
+      <form method="POST" style="display:inline">
+        <input type="hidden" name="type" value="${type}" />
+        <input type="hidden" name="value" value="${escapeHtml(value)}" />
+        <input type="hidden" name="action" value="remove" />
+        <button type="submit" title="Remove"
+                style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:14px;padding:0 6px 0 0">✕</button>
+      </form>
+      <code>${escapeHtml(value)}</code>
+    </li>`,
+    )
+    .join("");
+  return `<h3>${type} (${entries.length})</h3><ul style="list-style:none;padding-left:0">${rows}</ul>`;
+}
+
+async function renderStopLists(): Promise<string> {
+  const { companies, titles } = await loadStopLists();
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stop lists</title></head>
+<body style="font-family:sans-serif;max-width:560px;margin:40px auto;padding:0 16px">
+  <h2>Stop lists</h2>
+  <p style="color:#6b7280;font-size:14px">
+    Matching is case-insensitive substring, so <code>engineering</code> blocks
+    every title containing it. Worth a review whenever the roles you are
+    targeting change.
+  </p>
+  ${renderSection("company", companies)}
+  ${renderSection("title", titles)}
+</body>
+</html>`;
 }
 
 async function parseFormBody(
@@ -33,6 +73,13 @@ export default async function handler(
   res.setHeader("Content-Type", "text/html");
 
   if (req.method === "GET") {
+    // The stop lists live in a GCS blob, so this is the only way to see what
+    // is actually being filtered. Linked from the digest footer.
+    if (req.query["list"] !== undefined) {
+      res.status(200).send(await renderStopLists());
+      return;
+    }
+
     const type = req.query["type"] as string | undefined;
     const value = req.query["value"] as string | undefined;
 
@@ -73,6 +120,24 @@ export default async function handler(
 
     if (!isValidType(type) || !trimmed) {
       res.status(400).send("<p>Missing or invalid parameters.</p>");
+      return;
+    }
+
+    if (body["action"] === "remove") {
+      const removed = await removeFromStopList(type, trimmed);
+      res.status(200).send(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>${removed ? "Unblocked" : "Not found"}</title></head>
+<body style="font-family:sans-serif;max-width:560px;margin:40px auto;padding:0 16px">
+  <h2>${removed ? "✅ Unblocked" : "⚠️ Not found"}</h2>
+  <p><strong>${escapeHtml(trimmed)}</strong> ${
+    removed
+      ? `removed from the ${escapeHtml(type)} stop list.`
+      : `was not in the ${escapeHtml(type)} stop list.`
+  }</p>
+  <p><a href="?list=1">← Back to stop lists</a></p>
+</body>
+</html>`);
       return;
     }
 
