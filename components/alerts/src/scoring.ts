@@ -152,6 +152,59 @@ export interface ScoreResult {
   reasoning: string;
 }
 
+type Judgment = "🟢" | "🟡" | "🔴";
+
+const SCORING_MODEL = "claude-haiku-4-5-20251001";
+
+/**
+ * Pull the verdict label out of a scoring response.
+ *
+ * Anchored on the word "Verdict" first, because the emoji also appear inline
+ * in the rubric's own dimension notes — matching the bare emoji anywhere would
+ * happily return the first red flag mentioned in the reasoning.
+ */
+export function parseVerdict(text: string): Judgment | null {
+  const anchored = text.match(/Verdict[\s\S]{0,100}?(🟢|🟡|🔴)/i);
+  if (anchored) return anchored[1] as Judgment;
+
+  // Fall back to a label on its own line near the end, which is where a
+  // correctly-formatted answer puts it even if the word is missing.
+  const trailing = text.slice(-200).match(/(🟢|🟡|🔴)(?![\s\S]*(?:🟢|🟡|🔴))/);
+  return trailing ? (trailing[1] as Judgment) : null;
+}
+
+/** Ask for just the label when the first pass didn't produce one. */
+async function retryVerdict(
+  client: Anthropic,
+  assessment: string,
+): Promise<Judgment | null> {
+  try {
+    const res = await client.messages.create({
+      model: SCORING_MODEL,
+      max_tokens: 8,
+      system:
+        "Reply with exactly one character and nothing else: 🟢, 🟡, or 🔴.",
+      messages: [
+        {
+          role: "user",
+          content:
+            `Assessment of a job posting:\n\n${assessment.slice(-4000)}\n\n` +
+            "Give the verdict: 🟢 strong fit, 🟡 conditional fit, 🔴 pass.",
+        },
+      ],
+    });
+    const text = res.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+    const m = text.match(/(🟢|🟡|🔴)/);
+    return m ? (m[1] as Judgment) : null;
+  } catch (err) {
+    log("DEBUG", "Verdict retry failed: %s", (err as Error).message);
+    return null;
+  }
+}
+
 export async function scoreJob(job: JobResult): Promise<ScoreResult> {
   const apiKey = process.env[ENV.ANTHROPIC_API_KEY];
   if (!apiKey) {
@@ -184,7 +237,7 @@ Verdict: 🔴`,
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: SCORING_MODEL,
       max_tokens: 2500,
       system:
         "You are a job scoring assistant for a VP Engineering / CTO candidate. Score each dimension and end with the verdict.",
@@ -196,27 +249,39 @@ Verdict: 🔴`,
       .map((b) => b.text)
       .join("");
 
-    const verdictMatch = text.match(/Verdict[\s\S]{0,100}?(🟢|🟡|🔴)/i);
-    let verdict: ScoreResult["verdict"] = "?";
-    if (verdictMatch) {
-      verdict = verdictMatch[1] as ScoreResult["verdict"];
-    } else {
+    let verdict = parseVerdict(text);
+
+    if (!verdict) {
+      // The model sometimes trails off into a hedge ("...with a definitive
+      // verdict.") instead of emitting the label. The assessment above it is
+      // usually fine, so ask a second time for nothing but the label rather
+      // than throwing the whole scoring away as "?".
       const verdictIdx = text.toLowerCase().lastIndexOf("verdict");
       const context =
         verdictIdx >= 0
           ? text.slice(Math.max(0, verdictIdx - 20), verdictIdx + 150)
           : text.slice(-300);
       log(
-        "WARN",
-        'Could not parse verdict for %s — %s (len=%s): "%s"',
+        "DEBUG",
+        'No verdict in first pass for %s — %s (len=%s): "%s"',
         job.company,
         job.title,
         text.length,
         context,
       );
+      verdict = await retryVerdict(client, text);
+      if (!verdict) {
+        log(
+          "WARN",
+          "Could not parse verdict for %s — %s even after retry (len=%s)",
+          job.company,
+          job.title,
+          text.length,
+        );
+      }
     }
 
-    return { verdict, reasoning: text };
+    return { verdict: verdict ?? "?", reasoning: text };
   } catch (err) {
     log(
       "WARN",

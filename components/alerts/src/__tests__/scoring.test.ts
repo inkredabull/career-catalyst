@@ -1,5 +1,43 @@
-import { linkedInJobId } from "../scoring";
+import { linkedInJobId, parseVerdict } from "../scoring";
 import { matchingStopEntries } from "../seen";
+
+describe("parseVerdict", () => {
+  it("reads the standard trailing label", () => {
+    expect(parseVerdict("1. Skills: 4 — good\n\nVerdict: 🟢")).toBe("🟢");
+  });
+
+  it("tolerates markdown around the label", () => {
+    expect(parseVerdict("...\n\n**Verdict:** 🟡")).toBe("🟡");
+  });
+
+  it("prefers the anchored label over emoji used inline in the reasoning", () => {
+    // The rubric itself describes 🔴 as a red flag, so an unanchored search
+    // would return the first mention rather than the actual conclusion.
+    const text = [
+      "5. Company Culture: 2 — 🔴 red flag on in-office policy",
+      "6. Lifestyle: 3 — 🟡 ambiguous on remote",
+      "",
+      "Verdict: 🟢",
+    ].join("\n");
+    expect(parseVerdict(text)).toBe("🟢");
+  });
+
+  it("falls back to a bare trailing label when the word is missing", () => {
+    expect(parseVerdict("1. Skills: 4 — strong\n\n🟡")).toBe("🟡");
+  });
+
+  it("returns null when the model hedges instead of concluding", () => {
+    // Verbatim tail of the response that produced a "?" in production.
+    const text =
+      "There is not enough information in this posting to conclude this " +
+      "with a definitive verdict.**";
+    expect(parseVerdict(text)).toBeNull();
+  });
+
+  it("returns null for an empty response", () => {
+    expect(parseVerdict("")).toBeNull();
+  });
+});
 
 describe("linkedInJobId", () => {
   it("extracts the id from a canonical job URL", () => {
