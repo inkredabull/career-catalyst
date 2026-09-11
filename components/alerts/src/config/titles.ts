@@ -114,4 +114,7 @@ export const EXCLUDE_PATTERNS: RegExp[] = [
   /\bexecutive director\b/i,
   /\bdirector of research\b/i,
   /\bhead of it\b/i,
+  // "Director, Technical Revenue Accounting" clears the Director pattern on
+  // the word "Technical". Finance roles never want to be in this digest.
+  /\baccounting\b/i,
 ];

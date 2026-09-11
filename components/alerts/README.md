@@ -1,6 +1,6 @@
 # career-catalyst-alerts
 
-Vercel-hosted job alert system that searches LinkedIn and Google (via Serper) for new job postings, scores each one with Claude AI, and emails a digest using Resend.
+Vercel-hosted job alert system that searches LinkedIn, target companies' ATS boards, and Google (via Serper) for new job postings, scores each one with Claude AI, and emails a digest using Resend.
 
 Runs on a Vercel cron schedule (every 4 hours). No manual intervention required once deployed.
 
@@ -15,7 +15,8 @@ Vercel Cron (every 4h)
    getOpenReqs()
         │
         ├─── LinkedIn Voyager API  ─┐
-        ├─── Google/Serper API     ─┼─► merge & de-dup by job ID
+        ├─── ATS board APIs        ─┼─► merge & de-dup by job ID
+        ├─── Google/Serper API     ─┤
         └─── LinkedIn Top Applicant─┘
                    │
                    ▼
@@ -46,14 +47,26 @@ Vercel Cron (every 4h)
 |---|---|---|
 | LinkedIn SF/US | LinkedIn Voyager API | SF Bay Area + US Remote |
 | Top Applicant | LinkedIn Top Applicant feed | US |
+| Target/{Company} | The company's own ATS board API | US / Bay Area |
 | Ashby/SF | Serper `site:jobs.ashbyhq.com` | San Francisco |
 | Wellfound/SF | Serper `site:wellfound.com` | San Francisco |
 | Indeed/SF | Serper `site:indeed.com` | SF Bay Area / Remote |
-| Anthropic/SF | Serper `site:anthropic.com/jobs` | San Francisco |
 | Greenhouse/US | Serper `site:boards.greenhouse.io` | US |
 | Lever/US | Serper `site:jobs.lever.co` | US |
 | BuiltInSF/SF | Serper `site:builtinsf.com/jobs` | San Francisco |
 | Web/US | Serper broad web search | US |
+
+#### Watching a specific company
+
+Add it to `COMPANY_TARGETS` in `src/config/boards.ts`. Those entries are polled
+straight from the company's ATS (Greenhouse, Lever, or Ashby), which is free and
+unmetered — so unlike a search slot, each extra company costs nothing per run —
+and returns a real title, location and publish date instead of a parsed page
+title. Verify the board token responds before committing it; companies migrate
+between ATS vendors without changing their careers URL.
+
+ATS results are filtered to US/Bay Area locations (`src/ats/location.ts`), since
+a board API returns a company's entire global req list.
 
 ### Scoring
 
@@ -96,10 +109,19 @@ src/
 ├── config/
 │   ├── settings.ts      # ENV key constants, requireEnv helper
 │   ├── constants.ts     # Geo IDs, LinkedIn filters, time frames, thresholds
+│   ├── boards.ts        # COMPANY_TARGETS — companies polled via their ATS
 │   └── titles.ts        # Job title search list (enabled/disabled map)
+├── ats/
+│   ├── index.ts         # fetchAtsResults() — polls every COMPANY_TARGETS board
+│   ├── greenhouse.ts    # Greenhouse board API → AtsJob[] (pure)
+│   ├── lever.ts         # Lever postings API → AtsJob[] (pure)
+│   ├── ashby.ts         # Ashby posting API → AtsJob[] (pure)
+│   ├── location.ts      # isUsOrBayArea() — geo allowlist for board results
+│   └── types.ts         # AtsJob plus JSON-narrowing helpers
 ├── utils/
-│   └── logger.ts        # Level-based logger; verbosity via LOG_LEVEL env var
-├── clock.ts             # pause() with jitter to avoid rate limits
+│   ├── logger.ts        # Level-based logger; verbosity via LOG_LEVEL env var
+│   └── concurrency.ts   # withConcurrency() worker pool
+├── clock.ts             # pause() with jitter; time-frame → cutoff helpers
 ├── filters.ts           # titlePassesPatterns() — regex pattern matching
 ├── linkedin.ts          # Voyager API calls, Top Applicant feed, result extractor
 ├── google.ts            # Serper API calls, title parser, GOOGLE_SEARCHES list

@@ -18,7 +18,9 @@ import {
   SearchResults,
 } from "./linkedin";
 import { fetchGoogleResults } from "./google";
+import { fetchAtsResults } from "./ats";
 import { log, flushLogs } from "./utils/logger";
+import { withConcurrency } from "./utils/concurrency";
 import {
   loadSeen,
   saveSeen,
@@ -171,28 +173,14 @@ export function deduplicateByCompanyTitle(
   return deduped;
 }
 
-async function withConcurrency<T>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T) => Promise<void>,
-): Promise<void> {
-  const queue = [...items];
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      while (queue.length > 0) {
-        const item = queue.shift()!;
-        await fn(item);
-      }
-    },
-  );
-  await Promise.all(workers);
-}
-
 export async function getResults(): Promise<SearchResults> {
   const timeFrame = process.env[ENV.SEARCH_TIME_FRAME] ?? TIME_FRAME;
   let results: SearchResults = {};
   results = mergeResults(results, await getLinkedinSearchResults(timeFrame));
+  // ATS before the search layer: its company names are canonical rather than
+  // parsed out of a page title, so they win the shallow merge and seed
+  // deduplicateByCompanyTitle's first pass with the clean spelling.
+  results = mergeResults(results, await fetchAtsResults(timeFrame));
   results = mergeResults(results, await fetchGoogleResults(timeFrame));
   results = mergeResults(results, await getTopApplicantResults());
   results = deduplicateByCompanyTitle(results);
@@ -325,6 +313,15 @@ export async function runLinkedin(): Promise<void> {
 
 export async function runTopApplicant(): Promise<void> {
   const results = await applyStopList(await getTopApplicantResults());
+  const webAppUrl = process.env["WEB_APP_URL"] ?? "";
+  await notify(results, webAppUrl);
+}
+
+export async function runAts(): Promise<void> {
+  const timeFrame = process.env[ENV.SEARCH_TIME_FRAME] ?? TIME_FRAME;
+  const results = await applyStopList(
+    deduplicateByCompanyTitle(await fetchAtsResults(timeFrame)),
+  );
   const webAppUrl = process.env["WEB_APP_URL"] ?? "";
   await notify(results, webAppUrl);
 }

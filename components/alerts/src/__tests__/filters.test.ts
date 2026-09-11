@@ -76,6 +76,8 @@ describe("titlePassesPatterns — exclude patterns (explicit blocklist)", () => 
     "Executive Director",
     "Director of Research",
     "Head of IT",
+    // real ATS title that cleared the Director pattern via "Technical"
+    "Director, Technical Revenue Accounting",
   ];
 
   test.each(shouldFail)("rejects via exclude: %s", (title) => {

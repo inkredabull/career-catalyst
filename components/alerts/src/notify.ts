@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 import { requireEnv, ENV } from "./config/settings";
 import { JobResult, SearchResults } from "./linkedin";
-import { COMPANY_TARGETS } from "./google";
+import { COMPANY_TARGETS } from "./config/boards";
 
 const TRACK_BASE = process.env[ENV.NGROK_TUNNEL_URL] ?? "http://localhost:3000";
 
@@ -52,7 +52,14 @@ export function formatEntry(
   };
 }
 
-function geoLabel(search: string): string {
+/**
+ * Route a job into an email section from its `search` label.
+ *
+ * This is a stringly-typed contract with every source module: a label that
+ * matches nothing lands silently in "Other". boards.test.ts pins it for every
+ * label the codebase actually emits.
+ */
+export function geoLabel(search: string): string {
   const s = search.toLowerCase();
   if (s.includes("top applicant")) return "Top Applicant";
   if (s.startsWith("target/")) {
