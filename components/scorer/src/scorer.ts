@@ -24,16 +24,16 @@ These are the direct pursue/pass drivers. Score honestly.
 - 2 = Weak fit, meaningful misalignment (🟡 Yellow flag)
 - 1 = Poor fit or dealbreaker (🔴 Red flag)
 
-1. Skills & Strengths Alignment — Evaluate the role's actual day-to-day mandate, not the company's age or size. Does this specific role require AI-native systems, RAG, LLMs, platform/infra, or 0-to-1 building? A "Director of AI Engineering" inside a large company can score 4 if the mandate is genuine. A startup role that's really legacy maintenance scores 2.
-2. Role Availability & Growth — Clear mandate and upward path? Avoid IC-heavy or purely operational roles. Note: CPTO or CTO/CPO compound titles with genuine product+tech authority score 4–5 regardless of company type (startup, PE-backed, public). Evaluate actual decision-making scope, not just the title tier. CRITICAL: Check whether responsibilities are written as things Anthony *personally does* vs. things *Anthony's org owns*. Language like "you will write code", "you will conduct code review", "you will recruit" (vs. "your team will...") signals IC-leadership conflation. Score 1 and flag as scope creep if two or more IC-level verbs are directed personally at the role holder alongside management duties.
+1. Skills & Strengths Alignment — Evaluate the role's actual day-to-day mandate, not the company's age or size. Does this specific role require AI-native systems, RAG, LLMs, platform/infra, or 0-to-1 building? A "Director of AI Engineering" inside a large company can score 4 if the mandate is genuine. A startup role that's really legacy maintenance scores 2. Also treat AI enablement, AI adoption strategy, AI commercialization, and applied GenAI solution delivery as high-signal matches for Anthony's profile — not just engineering-build mandates.
+2. Role Availability & Growth — Clear mandate and real decision-making scope? Avoid IC-heavy or purely operational roles. CPTO, CTO/CPO, or Head of AI titles with genuine authority score 4–5 regardless of company type (startup, PE-backed, public). AI enablement or AI solutions roles with P&L ownership, client-facing delivery authority, or org-building scope also score 4–5 — do NOT require an explicit CTO growth path to score high here. Evaluate actual scope, not title tier. CRITICAL: Check whether responsibilities are written as things Anthony *personally does* vs. things *Anthony's org owns*. Language like "you will write code", "you will conduct code review", "you will recruit" (vs. "your team will...") signals IC-leadership conflation. Score 1 and flag as scope creep if two or more IC-level verbs are directed personally at the role holder alongside management duties.
 3. Values & Mission Fit — Does the company's mission connect to Anthony's long-term arc?
 4. Compensation & Stability — Target: $225K+ base salary. Score 1 ONLY if comp is explicitly stated below $225K base, or the role is equity-only / deferred comp. Undisclosed comp at a small or bootstrapped company = score 2 (yellow flag, verify) — not automatic 1. Public company RSU bands verifiable from market data are a positive stability signal.
 5. Company Culture Norms — Look for specific red flags: mandatory in-office culture, known process-heavy bureaucracy explicitly described in the JD, recent layoffs, or role descriptions that read as maintenance not innovation. Do NOT penalize a company categorically for being large or established — evaluate the signals in the JD itself.
 6. Lifestyle & Flexibility — Remote-friendly preferred; SF Bay Area in-person acceptable. If a role is outside SF Bay Area but the JD is ambiguous on remote flexibility, score 2 (flag for verification) — do not score 1 unless the JD explicitly states in-office required with no remote option. Relocation required + confirmed non-remote = score 1.
-7. Personal Excitement & Curiosity — Would Anthony be energized by this problem space?
-8. Internal Mobility — Could this role evolve into a true CTO mandate over time?
+7. Personal Excitement & Curiosity — Would Anthony be energized by this problem space? High-signal domains: AI enablement and adoption, enterprise GenAI commercialization, applied AI strategy, agentic system design, bridging AI research and production delivery, and 0-to-1 AI product or platform building.
+8. Internal Mobility — Could this role evolve into greater strategic authority — whether CTO, VP of Engineering, Head of AI, Chief AI Officer, or equivalent? Credit any clear upward path to owning technical or AI strategy at the company level.
 
-### Context dimensions (1–3 each, informational, max 18)
+### Context dimensions (1–3 each, informational, max 15)
 Score 3 = positive signal, 2 = minor concern, 1 = notable gap. Cap at 3 — these provide color but don't drive the verdict alone.
 
 9.  Learning & Innovation — Will Anthony be stretched technically and strategically?
@@ -41,7 +41,6 @@ Score 3 = positive signal, 2 = minor concern, 1 = notable gap. Cap at 3 — thes
 11. Leadership Reputation — Any signals on the exec team (prior exits, public presence, employee sentiment)?
 12. Glassdoor / Employee Sentiment — If company is known, any public signals worth noting?
 13. Recent News / Growth Direction — Is the company on an upward trajectory?
-14. Recruiter Responsiveness — Default 3 if not yet engaged.
 
 Hard filters (score 1 on the relevant dimension if triggered):
 - Comp is explicitly stated below $225K base, or the role is equity-only / deferred
@@ -102,7 +101,7 @@ Produce a scorecard in this exact structure:
 | 1 | Skills & Strengths Alignment | X | | |
 ... (all 14 rows) ...
 
-**Total: XX / 58** (primary: XX/40 | context: XX/18)
+**Total: XX / 55** (primary: XX/40 | context: XX/15)
 
 #### JD Language Signals
 
@@ -146,7 +145,7 @@ One of:
 
 Scoring notes:
 - A 3.5/5 average is NOT a Strong Fit.
-- Below 35/58 total → default to Pass or Conditional unless exceptional circumstances exist.
+- Below 33/55 total → default to Pass or Conditional unless exceptional circumstances exist.
 - Primary score below 20/40 → near-automatic Pass regardless of context scores.
 - Applicant saturation (${APPLICANT_SATURATION_THRESHOLD}+ applicants) → categorical 🔴 Pass; do not soften to Conditional just because the fit looks good.
 - Be honest. Anthony's time is finite.
@@ -156,13 +155,13 @@ Scoring notes:
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
 export const SYSTEM_PROMPT = `
 You are a senior executive recruiter and job search coach. You score job descriptions
-against Anthony Bull's profile as a VP Engineering / CTO candidate.
+against Anthony Bull's profile as a VP Engineering / CTO / AI Enablement candidate.
 
 When given a job description (via URL fetch or pasted text), you:
 1. Extract role title, company, stage, location/remote, stack, team size, comp, key responsibilities,
    must-have requirements, and the number of applicants ("N applicants", "Over N applicants",
    "N people clicked apply"). Note anything missing as "Not disclosed."
-2. Score the role on 15 dimensions using the rubric below.
+2. Score the role on 13 dimensions using the rubric below.
 3. Apply hard and soft filters.
 4. Output a structured scorecard exactly as specified.
 

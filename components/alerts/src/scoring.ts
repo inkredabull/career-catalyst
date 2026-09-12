@@ -8,7 +8,7 @@ import { log } from "./utils/logger";
 // ---------------------------------------------------------------------------
 
 const RUBRIC = `
-## 14-Dimension Scoring Rubric
+## 13-Dimension Scoring Rubric
 
 ### Primary dimensions (1–5 each, count toward total, max 40)
 These are the direct pursue/pass drivers. Score honestly.
@@ -18,22 +18,21 @@ These are the direct pursue/pass drivers. Score honestly.
 - 2 = Weak fit, meaningful misalignment (🟡 Yellow flag)
 - 1 = Poor fit or dealbreaker (🔴 Red flag)
 
-1. Skills & Strengths Alignment — Does this role require AI-native systems, RAG, LLMs, platform/infra, or 0-to-1 building?
-2. Role Availability & Growth — Clear mandate and upward path? CPTO/CTO+CPO compound titles with genuine authority score 4–5.
+1. Skills & Strengths Alignment — Does this role require AI-native systems, RAG, LLMs, platform/infra, or 0-to-1 building? Also treat AI enablement, AI adoption strategy, AI commercialization, and applied GenAI solution delivery as high-signal matches — not just engineering-build mandates.
+2. Role Availability & Growth — Clear mandate and real decision-making scope? CPTO, CTO/CPO, or Head of AI titles with genuine authority score 4–5. AI enablement or AI solutions roles with P&L ownership, client-facing delivery authority, or org-building scope also score 4–5 — do NOT require an explicit CTO growth path to score high here.
 3. Values & Mission Fit — Does the company's mission connect to Anthony's long-term arc?
 4. Compensation & Stability — Target: $225K+ base. Score 1 only if comp explicitly below $225K or equity-only. Undisclosed = score 2.
 5. Company Culture Norms — Red flags: mandatory in-office, process-heavy bureaucracy in JD, recent layoffs. Don't penalize for size alone.
 6. Lifestyle & Flexibility — Remote-friendly preferred; SF Bay Area in-person acceptable. Ambiguous on remote = score 2. Confirmed relocation required = score 1.
-7. Personal Excitement & Curiosity — Would Anthony be energized by this problem space?
-8. Internal Mobility — Could this role evolve into a true CTO mandate over time?
+7. Personal Excitement & Curiosity — Would Anthony be energized by this problem space? High-signal domains: AI enablement and adoption, enterprise GenAI commercialization, applied AI strategy, agentic system design, bridging AI research and production delivery, and 0-to-1 AI product or platform building.
+8. Internal Mobility — Could this role evolve into greater strategic authority — whether CTO, VP of Engineering, Head of AI, Chief AI Officer, or equivalent? Credit any clear upward path to owning technical or AI strategy at the company level.
 
-### Context dimensions (1–3 each, informational, max 18)
+### Context dimensions (1–3 each, informational, max 15)
 9.  Learning & Innovation
 10. Network & Access
 11. Leadership Reputation
 12. Glassdoor / Employee Sentiment
 13. Recent News / Growth Direction
-14. Recruiter Responsiveness — Default 3 if not yet engaged.
 
 Hard filters (score 1): comp below $225K, confirmed in-office outside SF Bay Area, IC-only, no AI/tech leadership mandate.
 Soft filters (flag yellow if absent): React/Python/TypeScript stack, GCP, Series A–B or verified strong TC public co, prior exit on exec team.
