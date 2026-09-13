@@ -6,7 +6,7 @@ import {
   STRONG_FIT_MAX_APPLICANTS,
   APPLICANT_SATURATION_THRESHOLD,
 } from "./config/constants";
-import { SEARCH_TITLES, allIncludePatterns } from "./config/titles";
+import { SEARCH_TITLES, INCLUDE_PATTERNS } from "./config/titles";
 import { pause } from "./clock";
 import {
   getSearchResultsFromLinkedin,
@@ -137,15 +137,15 @@ async function getTopApplicantResults(): Promise<SearchResults> {
   for (const page of pages) {
     results = mergeResults(
       results,
-      // Deliberately every batch, not just the active one. This feed is
-      // LinkedIn matching the whole profile rather than answering a query, so
-      // narrowing it to the current batch discards what makes it worth having
-      // — it returned zero for a full run under ai-enablement alone.
+      // Scoped to the active batch, same as every other source — switching
+      // batches should mean Top Applicant stops surfacing the old batch's
+      // roles too, even though this feed can go quiet (or empty) on a run
+      // where nothing in the active batch matches the candidate's profile.
       extractInfo(
         page,
         "Top Applicant",
         "LinkedIn (Top Applicant)",
-        allIncludePatterns(),
+        INCLUDE_PATTERNS,
       ),
     );
   }
