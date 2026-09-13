@@ -991,6 +991,7 @@ async function createMailMergeReminder(fullName, profileUrl) {
     notes: `Added ${fullName} to mail merge sheet.\n\nLinkedIn: ${profileUrl}\n\nSpreadsheet: ${MAIL_MERGE_SHEET_URL}`,
     priority: 5,
     dueDate: today,
+    dueTime: '12:00',
     listName: 'Build with purpose',
     tags: ['KR-Get-a-new-job'],
     url: MAIL_MERGE_SHEET_URL
