@@ -983,9 +983,37 @@ async function addToMailMerge() {
 }
 
 const MAIL_MERGE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1PpJw3tjPnwZ5G180S8VeMsR8haXdoL4JqEfdWx5dqdk/edit?gid=1276038727#gid=1276038727';
+const FOLLOWUP_EMAIL_SUBJECT = "Exploring What's Next";
+
+function addDaysToDateString(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function postReminder(reminderData, label) {
+  try {
+    const resp = await fetch('http://localhost:3000/linkedin-reminder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reminderData)
+    });
+    const data = await resp.json();
+    if (data.success) {
+      log(`✅ Reminder "${reminderData.title}" created for ${label}`);
+    } else {
+      throw new Error(data.error || 'Unknown server error');
+    }
+  } catch (err) {
+    console.warn(`Reminder creation failed (${reminderData.title}):`, err.message);
+    alert(`⚠️ Could not create reminder "${reminderData.title}" (${err.message})`);
+  }
+}
 
 async function createMailMergeReminder(fullName, profileUrl) {
+  const firstName = fullName.split(/\s+/)[0] || fullName;
   const today = new Date().toISOString().slice(0, 10);
+
   const reminderData = {
     title: `Inquire about opportunities with: ${fullName}`,
     notes: `Added ${fullName} to mail merge sheet.\n\nLinkedIn: ${profileUrl}\n\nSpreadsheet: ${MAIL_MERGE_SHEET_URL}`,
@@ -996,23 +1024,21 @@ async function createMailMergeReminder(fullName, profileUrl) {
     tags: ['KR-Get-a-new-job'],
     url: MAIL_MERGE_SHEET_URL
   };
+  await postReminder(reminderData, fullName);
 
-  try {
-    const resp = await fetch('http://localhost:3000/linkedin-reminder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reminderData)
-    });
-    const data = await resp.json();
-    if (data.success) {
-      log(`✅ Reminder created for ${fullName}`);
-    } else {
-      throw new Error(data.error || 'Unknown server error');
-    }
-  } catch (err) {
-    console.warn('Reminder creation failed:', err.message);
-    alert(`⚠️ Could not create reminder (${err.message})`);
-  }
+  const followUpDate = addDaysToDateString(today, 3);
+  const followUpGmailUrl = `https://mail.google.com/mail/u/0/#search/in%3Asent+subject%3A${encodeURIComponent(`"${FOLLOWUP_EMAIL_SUBJECT}"`)}+to%3A${encodeURIComponent(firstName)}`;
+  const followUpReminderData = {
+    title: `Followup with: ${fullName}`,
+    notes: `Follow up on outreach to ${fullName}.\n\nSent emails: ${followUpGmailUrl}`,
+    priority: 5,
+    dueDate: followUpDate,
+    dueTime: '12:00',
+    listName: 'Build with purpose',
+    tags: ['KR-Get-a-new-job'],
+    url: followUpGmailUrl
+  };
+  await postReminder(followUpReminderData, fullName);
 }
 
 async function _doConnectWithNote(outreach, LOG) {
