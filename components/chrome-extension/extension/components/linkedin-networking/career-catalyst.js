@@ -1020,7 +1020,7 @@ async function createMailMergeReminder(fullName, profileUrl) {
     priority: 5,
     dueDate: today,
     dueTime: '12:00',
-    listName: 'Build with purpose',
+    listName: '2. Build with purpose',
     tags: ['KR-Get-a-new-job'],
     url: MAIL_MERGE_SHEET_URL
   };
@@ -1034,7 +1034,7 @@ async function createMailMergeReminder(fullName, profileUrl) {
     priority: 5,
     dueDate: followUpDate,
     dueTime: '12:00',
-    listName: 'Build with purpose',
+    listName: '2. Build with purpose',
     tags: ['KR-Get-a-new-job'],
     url: followUpGmailUrl
   };
