@@ -72,11 +72,6 @@ export const SUBJECT_LINE_CONFIG = [
     flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
   },
   {
-    subject: "Catching up + a quick ask",
-    defaultTopic: 'quick ask about opportunities',
-    flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true },
-  },
-  {
     subject: "Willing to be a reference?",
     defaultTopic: 'being a reference',
     flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
