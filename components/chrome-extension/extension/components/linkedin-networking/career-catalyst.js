@@ -1418,6 +1418,27 @@ function extractProfileUrnParam(urlStr) {
 const PENDING_MSG_FALLBACK_KEY = 'li_pending_msg_latest';
 const pendingMsgKeyForUrn = (profileUrn) => 'li_pending_msg_' + encodeURIComponent(profileUrn);
 
+const PENDING_STAMP_KEY = 'li_pending_msgs_at';
+const PENDING_TTL_MS = 60 * 60 * 1000;
+
+// Queued messages are only consumed when you actually visit the profile, so a batch for profiles
+// you skipped would otherwise sit in storage forever. That matters because li_first_<firstName> is
+// a deliberately loose key — a months-old "li_first_sarah" would fire the wrong message at the next
+// Sarah you happen to open. Batches written before this stamp existed have no timestamp and are
+// swept on the first run.
+async function sweepStalePendingMessages() {
+  const { [PENDING_STAMP_KEY]: queuedAt } = await chrome.storage.local.get(PENDING_STAMP_KEY);
+  if (queuedAt && Date.now() - queuedAt < PENDING_TTL_MS) return;
+
+  const all = await chrome.storage.local.get(null);
+  const stale = Object.keys(all).filter(k =>
+    k.startsWith('li_msg_') || k.startsWith('li_first_') || k.startsWith('li_pending_msg_'));
+  if (!stale.length && !queuedAt) return;
+
+  await chrome.storage.local.remove([...stale, PENDING_STAMP_KEY]);
+  log('[AutoMsg] Expired ' + stale.length + ' stale pending message key(s)');
+}
+
 async function fillPendingMessage() {
   const profileUrn = extractProfileUrnParam(location.href);
   const specificKey = profileUrn ? pendingMsgKeyForUrn(profileUrn) : null;
@@ -1455,6 +1476,8 @@ async function fillPendingMessage() {
 }
 
 (async function autoMessageIfPending() {
+  await sweepStalePendingMessages();
+
   // Handle a message queued just before a Message-button click that ended up navigating (possibly
   // to a new tab) to a fresh URL, e.g. /messaging/compose/... — runs on every LinkedIn page load.
   const filled = await fillPendingMessage();
