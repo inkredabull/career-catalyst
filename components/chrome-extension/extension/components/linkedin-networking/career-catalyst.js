@@ -1418,25 +1418,47 @@ function extractProfileUrnParam(urlStr) {
 const PENDING_MSG_FALLBACK_KEY = 'li_pending_msg_latest';
 const pendingMsgKeyForUrn = (profileUrn) => 'li_pending_msg_' + encodeURIComponent(profileUrn);
 
-const PENDING_STAMP_KEY = 'li_pending_msgs_at';
+const PENDING_SEEN_KEY = 'li_pending_seen';
+const LEGACY_PENDING_STAMP_KEY = 'li_pending_msgs_at';
 const PENDING_TTL_MS = 60 * 60 * 1000;
+const isPendingKey = (k) =>
+  k.startsWith('li_msg_') || k.startsWith('li_first_') || k.startsWith('li_pending_msg_');
 
-// Queued messages are only consumed when you actually visit the profile, so a batch for profiles
-// you skipped would otherwise sit in storage forever. That matters because li_first_<firstName> is
-// a deliberately loose key — a months-old "li_first_sarah" would fire the wrong message at the next
-// Sarah you happen to open. Batches written before this stamp existed have no timestamp and are
-// swept on the first run.
+// Pending messages are only deleted when consumed, so keys for profiles that were never visited
+// would otherwise pile up forever — and li_first_<firstName> is a loose key, so a months-old
+// "li_first_sarah" would fire at the next Sarah opened.
+//
+// Age is tracked by first sighting here rather than by a write-time stamp. The writer runs in the
+// Google Sheets tab, and reloading the extension does not re-inject into tabs that are already
+// open — so a freshly queued batch can arrive from an old content script that stamps nothing, and
+// treating "no stamp" as "ancient" deletes live messages. Recording first-seen instead means a key
+// is never removed on the page load that first observes it: anything queued gets a full TTL window
+// of browsing to be consumed, whatever wrote it.
 async function sweepStalePendingMessages() {
-  const { [PENDING_STAMP_KEY]: queuedAt } = await chrome.storage.local.get(PENDING_STAMP_KEY);
-  if (queuedAt && Date.now() - queuedAt < PENDING_TTL_MS) return;
-
   const all = await chrome.storage.local.get(null);
-  const stale = Object.keys(all).filter(k =>
-    k.startsWith('li_msg_') || k.startsWith('li_first_') || k.startsWith('li_pending_msg_'));
-  if (!stale.length && !queuedAt) return;
+  const seen = all[PENDING_SEEN_KEY] || {};
+  const now = Date.now();
 
-  await chrome.storage.local.remove([...stale, PENDING_STAMP_KEY]);
-  log('[AutoMsg] Expired ' + stale.length + ' stale pending message key(s)');
+  const nextSeen = {};
+  const expired = [];
+  for (const key of Object.keys(all).filter(isPendingKey)) {
+    const firstSeen = seen[key] ?? now;
+    if (now - firstSeen > PENDING_TTL_MS) expired.push(key);
+    else nextSeen[key] = firstSeen;
+  }
+
+  // Drop the obsolete batch stamp if an earlier build left one behind.
+  if (all[LEGACY_PENDING_STAMP_KEY] !== undefined) expired.push(LEGACY_PENDING_STAMP_KEY);
+
+  const seenKeys = Object.keys(seen);
+  const changed = expired.length > 0
+    || seenKeys.length !== Object.keys(nextSeen).length
+    || seenKeys.some(k => seen[k] !== nextSeen[k]);
+  if (!changed) return;
+
+  if (expired.length) await chrome.storage.local.remove(expired);
+  await chrome.storage.local.set({ [PENDING_SEEN_KEY]: nextSeen });
+  if (expired.length) log('[AutoMsg] Expired ' + expired.length + ' stale pending message key(s)');
 }
 
 async function fillPendingMessage() {
@@ -1487,14 +1509,28 @@ async function fillPendingMessage() {
   if (!match) { log('[AutoMsg] Not a profile URL: ' + location.pathname); return; }
   const slug = match[1].toLowerCase();
   const slugKey = 'li_msg_' + slug;
+  const keysToCheck = [slugKey];
+  let stored = await chrome.storage.local.get(keysToCheck);
+  let hitKey = stored[slugKey] ? slugKey : '';
 
-  // Fallback: first name from the page h1 (covers URL slug mismatches between sheet and actual profile)
-  const pageFirstName = (document.querySelector('h1')?.innerText?.trim()?.split(/\s+/)?.[0] ?? '').toLowerCase();
-  const firstKey = pageFirstName ? 'li_first_' + pageFirstName : '';
+  // Fallback: first name from the page h1 (covers URL slug mismatches between sheet and actual
+  // profile). The topcard h1 renders after document_idle on a cold tab, so poll for it instead of
+  // reading once — a single read returns '' and drops the fallback without ever checking storage.
+  if (!hitKey) {
+    const nameDeadline = Date.now() + 5000;
+    let firstKey = '';
+    while (Date.now() < nameDeadline) {
+      const name = (document.querySelector('h1')?.innerText?.trim()?.split(/\s+/)?.[0] ?? '').toLowerCase();
+      if (name) { firstKey = 'li_first_' + name; break; }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    if (firstKey) {
+      keysToCheck.push(firstKey);
+      stored = await chrome.storage.local.get([firstKey]);
+      if (stored[firstKey]) hitKey = firstKey;
+    }
+  }
 
-  const keysToCheck = [slugKey, firstKey].filter(Boolean);
-  const stored = await chrome.storage.local.get(keysToCheck);
-  const hitKey = keysToCheck.find(k => stored[k]);
   const message = hitKey ? stored[hitKey] : undefined;
   if (!message) {
     const allKeys = await chrome.storage.local.get(null);
@@ -1504,8 +1540,9 @@ async function fillPendingMessage() {
   }
   log('[AutoMsg] Found pending message via key "' + hitKey + '" for ' + slug);
 
-  // Consume immediately so a reload doesn't re-trigger
-  await chrome.storage.local.remove(keysToCheck.filter(k => stored[k]));
+  // Consume immediately so a reload doesn't re-trigger. Removes both aliases for this person, not
+  // just the one that hit, so the sibling li_first_ key can't later fire at an unrelated profile.
+  await chrome.storage.local.remove(keysToCheck);
 
   // Poll for the Message button on the profile top card (cold tab loads can take a few seconds)
   const findMsgBtn = () => {

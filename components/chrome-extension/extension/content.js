@@ -3837,9 +3837,6 @@ window.addEventListener('message', function(e) {
         map['li_first_' + c.firstName.toLowerCase()] = c.message;
       }
     }
-    // Stamp the batch so the consumer can expire it. The tabs for a merge open immediately, so a
-    // batch still sitting in storage an hour later is for profiles that were never visited.
-    map['li_pending_msgs_at'] = Date.now();
     console.log('[AutoMsg] Storing keys directly:', Object.keys(map));
     chrome.storage.local.set(map, () => {
       if (chrome.runtime.lastError) {
