@@ -1011,114 +1011,50 @@ app.post('/teal-track', async (req, res) => {
   });
 });
 
+// Shared reminder creation logic (reused by /linkedin-reminder and /connect)
+async function createReminder({ title, notes, priority = 5, dueDate = null, dueTime = null, listName = 'LinkedIn Saved Posts', tags = null, url = null }) {
+  const projectDir = path.resolve(__dirname, '..', '..');
+  return new Promise((resolve, reject) => {
+    const args = ['ts-node', 'components/core/src/cli.ts', 'reminder', '--title', title];
+    if (notes)                              args.push('--notes', notes);
+    args.push('--priority', priority.toString());
+    args.push('--list', listName);
+    if (dueDate)                            args.push('--due', dueDate);
+    if (dueTime)                            args.push('--due-time', dueTime);
+    if (tags && Array.isArray(tags) && tags.length > 0) args.push('--tags', tags.join(','));
+    if (url)                                args.push('--url', url);
+
+    const child = spawn('npx', args, { cwd: projectDir, stdio: ['pipe', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', d => { stdout += d; });
+    child.stderr.on('data', d => { stderr += d; });
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Reminder creation timed out')); }, 30000);
+    child.on('close', code => {
+      clearTimeout(timer);
+      if (code === 0) resolve(stdout);
+      else reject(new Error(`Reminder creation failed (code ${code}): ${stderr}`));
+    });
+  });
+}
+
 // LinkedIn post reminder creation endpoint
 app.post('/linkedin-reminder', async (req, res) => {
   console.log(`[${new Date().toISOString()}] LinkedIn reminder creation request`);
   const { title, notes, priority = 5, dueDate = null, dueTime = null, listName = 'LinkedIn Saved Posts', tags = null, url = null } = req.body;
-  
+
   if (!title) {
-    return res.status(400).json({
-      success: false,
-      error: 'Title is required for reminder creation'
-    });
+    return res.status(400).json({ success: false, error: 'Title is required for reminder creation' });
   }
-  
+
   console.log(`  -> Creating reminder: ${title.substring(0, 50)}...`);
-  
+
   try {
-    // Change to the main project directory (two levels up from packages/unified-server)
-    const projectDir = path.resolve(__dirname, '..', '..');
-    
-    // Use the MacOS reminder creation via CLI
-    const output = await new Promise((resolve, reject) => {
-      const args = ['ts-node', 'components/core/src/cli.ts', 'reminder'];
-      
-      // Add title (required)
-      args.push('--title', title);
-      
-      // Add notes if provided
-      if (notes) {
-        args.push('--notes', notes);
-      }
-      
-      // Add priority
-      args.push('--priority', priority.toString());
-      
-      // Add list name
-      args.push('--list', listName);
-      
-      // Add due date if provided
-      if (dueDate) {
-        args.push('--due', dueDate);
-      }
-
-      // Add due time if provided
-      if (dueTime) {
-        args.push('--due-time', dueTime);
-      }
-
-      // Add tags if provided
-      if (tags && Array.isArray(tags) && tags.length > 0) {
-        args.push('--tags', tags.join(','));
-      }
-
-      // Add url if provided
-      if (url) {
-        args.push('--url', url);
-      }
-
-      console.log(`  -> Running command: npx ${args.join(' ')}`);
-      
-      const child = spawn('npx', args, {
-        cwd: projectDir,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      child.stdout.on('data', (data) => {
-        stdout += data;
-      });
-      
-      child.stderr.on('data', (data) => {
-        stderr += data;
-      });
-      
-      child.on('close', (code) => {
-        clearTimeout(timeoutHandle);
-        console.log(`  -> Command finished with code ${code}`);
-        console.log(`  -> STDOUT: ${stdout}`);
-        console.log(`  -> STDERR: ${stderr}`);
-
-        if (code === 0) {
-          resolve(stdout);
-        } else {
-          reject(new Error(`Reminder creation failed with code ${code}: ${stderr}`));
-        }
-      });
-
-      // Set timeout — npx/ts-node cold start (compiling TS on the fly) can take well over 10s
-      const timeoutHandle = setTimeout(() => {
-        child.kill();
-        reject(new Error('Reminder creation timed out after 30 seconds'));
-      }, 30000);
-    });
-    
+    await createReminder({ title, notes, priority, dueDate, dueTime, listName, tags, url });
     console.log(`  -> Reminder created successfully`);
-    
-    res.json({
-      success: true,
-      reminderId: 'created',
-      message: 'LinkedIn post reminder created successfully'
-    });
-    
+    res.json({ success: true, reminderId: 'created', message: 'LinkedIn post reminder created successfully' });
   } catch (error) {
     console.error(`  -> Reminder creation failed: ${error.message}`);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -1581,12 +1517,15 @@ app.get('/check-blurb/:jobId/:person', (req, res) => {
 // Open a LinkedIn profile in Chrome, inject a connect modal, optionally follow the company
 // and append a company row to the tracking sheet.
 // Delegates all Chrome automation to @inkredabull/career-catalyst-linkedin-automation.
-app.get('/connect', (req, res) => {
-  const { firstName, round, domain, summary, linkedInUrl, companyLinkedInUrl, companyUrl } = req.query;
+app.get('/connect', async (req, res) => {
+  const { firstName, fullName, round, domain, summary, linkedInUrl, companyLinkedInUrl, companyUrl } = req.query;
 
   if (!firstName || !linkedInUrl) {
     return res.status(400).json({ success: false, error: 'firstName and linkedInUrl are required' });
   }
+
+  const displayName = String(fullName || firstName);
+  const profileUrl = String(linkedInUrl);
 
   const args = [
     'run', 'dev',
@@ -1594,7 +1533,7 @@ app.get('/connect', (req, res) => {
     '--',
     'connect',
     '--firstName', String(firstName),
-    '--linkedInUrl', String(linkedInUrl),
+    '--linkedInUrl', profileUrl,
   ];
   if (domain)             args.push('--domain',             String(domain));
   if (summary)            args.push('--summary',            String(summary));
@@ -1617,11 +1556,53 @@ app.get('/connect', (req, res) => {
   });
   child.stderr.on('data', d => process.stderr.write(`[connect:err] ${d}`));
 
-  child.on('close', code => {
+  child.on('close', async code => {
     if (code !== 0) {
-      res.status(500).json({ success: false, error: `linkedin-automation exited with code ${code}` });
-    } else {
-      res.json({ success: true, message: `Connect modal injected for ${firstName}`, preview });
+      return res.status(500).json({ success: false, error: `linkedin-automation exited with code ${code}` });
+    }
+
+    res.json({ success: true, message: `Connect modal injected for ${firstName}`, preview });
+
+    // Fire-and-forget: create outreach + follow-up reminders (mirrors addToMailMerge pattern)
+    const today = new Date().toISOString().slice(0, 10);
+    const followUpDate = (() => {
+      const d = new Date(`${today}T00:00:00`);
+      d.setDate(d.getDate() + 3);
+      return d.toISOString().slice(0, 10);
+    })();
+    const FOLLOWUP_EMAIL_SUBJECT = "Exploring What's Next";
+    const gmailSearchUrl = `https://mail.google.com/mail/u/0/#search/in%3Asent+subject%3A${encodeURIComponent(`"${FOLLOWUP_EMAIL_SUBJECT}"`)}+to%3A${encodeURIComponent(String(firstName))}`;
+
+    try {
+      await createReminder({
+        title: `Inquire about opportunities with: ${displayName}`,
+        notes: `Sent connection request to ${displayName}.\n\nLinkedIn: ${profileUrl}`,
+        priority: 5,
+        dueDate: today,
+        dueTime: '12:00',
+        listName: '2. Build with purpose',
+        tags: ['KR-Get-a-new-job'],
+        url: profileUrl
+      });
+      console.log(`[connect] Outreach reminder created for ${displayName}`);
+    } catch (err) {
+      console.error(`[connect] Failed to create outreach reminder for ${displayName}:`, err.message);
+    }
+
+    try {
+      await createReminder({
+        title: `Followup with: ${displayName}`,
+        notes: `Follow up on connection request to ${displayName}.\n\nSent emails: ${gmailSearchUrl}`,
+        priority: 5,
+        dueDate: followUpDate,
+        dueTime: '12:00',
+        listName: '2. Build with purpose',
+        tags: ['KR-Get-a-new-job'],
+        url: gmailSearchUrl
+      });
+      console.log(`[connect] Follow-up reminder created for ${displayName} (due ${followUpDate})`);
+    } catch (err) {
+      console.error(`[connect] Failed to create follow-up reminder for ${displayName}:`, err.message);
     }
   });
 });
