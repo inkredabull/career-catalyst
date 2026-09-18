@@ -1563,15 +1563,10 @@ app.get('/connect', async (req, res) => {
 
     res.json({ success: true, message: `Connect modal injected for ${firstName}`, preview });
 
-    // Fire-and-forget: create outreach + follow-up reminders (mirrors addToMailMerge pattern)
+    // Fire-and-forget: create outreach reminder confirming the connection request was sent.
+    // Connection requests don't get an email-style follow-up reminder here — outstanding
+    // LinkedIn requests are swept separately by the monthly LinkedIn invite job.
     const today = new Date().toISOString().slice(0, 10);
-    const followUpDate = (() => {
-      const d = new Date(`${today}T00:00:00`);
-      d.setDate(d.getDate() + 3);
-      return d.toISOString().slice(0, 10);
-    })();
-    const FOLLOWUP_EMAIL_SUBJECT = "Exploring What's Next";
-    const gmailSearchUrl = `https://mail.google.com/mail/u/0/#search/in%3Asent+subject%3A${encodeURIComponent(`"${FOLLOWUP_EMAIL_SUBJECT}"`)}+to%3A${encodeURIComponent(String(firstName))}`;
 
     try {
       await createReminder({
@@ -1587,22 +1582,6 @@ app.get('/connect', async (req, res) => {
       console.log(`[connect] Outreach reminder created for ${displayName}`);
     } catch (err) {
       console.error(`[connect] Failed to create outreach reminder for ${displayName}:`, err.message);
-    }
-
-    try {
-      await createReminder({
-        title: `Followup with: ${displayName}`,
-        notes: `Follow up on connection request to ${displayName}.\n\nSent emails: ${gmailSearchUrl}`,
-        priority: 5,
-        dueDate: followUpDate,
-        dueTime: '12:00',
-        listName: '2. Build with purpose',
-        tags: ['KR-Get-a-new-job'],
-        url: gmailSearchUrl
-      });
-      console.log(`[connect] Follow-up reminder created for ${displayName} (due ${followUpDate})`);
-    } catch (err) {
-      console.error(`[connect] Failed to create follow-up reminder for ${displayName}:`, err.message);
     }
   });
 });
