@@ -983,14 +983,6 @@ async function addToMailMerge() {
 }
 
 const MAIL_MERGE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1PpJw3tjPnwZ5G180S8VeMsR8haXdoL4JqEfdWx5dqdk/edit?gid=1276038727#gid=1276038727';
-const FOLLOWUP_EMAIL_SUBJECT = "Exploring What's Next";
-
-function addDaysToDateString(dateStr, days) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 async function postReminder(reminderData, label) {
   try {
     const resp = await fetch('http://localhost:3000/linkedin-reminder', {
@@ -1010,8 +1002,10 @@ async function postReminder(reminderData, label) {
   }
 }
 
+// Only the "inquire" nudge is created here. The 3-day follow-up is created by the mail merge's
+// "Send Emails" run instead, dated from the actual send — adding a row to the sheet can precede
+// the send by days, which made a follow-up dated from this moment fire before the email went out.
 async function createMailMergeReminder(fullName, profileUrl) {
-  const firstName = fullName.split(/\s+/)[0] || fullName;
   const today = new Date().toISOString().slice(0, 10);
 
   const reminderData = {
@@ -1025,20 +1019,6 @@ async function createMailMergeReminder(fullName, profileUrl) {
     url: MAIL_MERGE_SHEET_URL
   };
   await postReminder(reminderData, fullName);
-
-  const followUpDate = addDaysToDateString(today, 3);
-  const followUpGmailUrl = `https://mail.google.com/mail/u/0/#search/in%3Asent+subject%3A${encodeURIComponent(`"${FOLLOWUP_EMAIL_SUBJECT}"`)}+to%3A${encodeURIComponent(firstName)}`;
-  const followUpReminderData = {
-    title: `Followup with: ${fullName}`,
-    notes: `Follow up on outreach to ${fullName}.\n\nSent emails: ${followUpGmailUrl}`,
-    priority: 5,
-    dueDate: followUpDate,
-    dueTime: '12:00',
-    listName: '2. Build with purpose',
-    tags: ['KR-Get-a-new-job'],
-    url: followUpGmailUrl
-  };
-  await postReminder(followUpReminderData, fullName);
 }
 
 async function _doConnectWithNote(outreach, LOG) {

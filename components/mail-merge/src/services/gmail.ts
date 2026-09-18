@@ -46,6 +46,51 @@ interface LinkedInContact {
   firstName: string;
 }
 
+/** Payload shape accepted by unified-server POST /linkedin-reminder. */
+interface ReminderPayload {
+  title: string;
+  notes: string;
+  priority: number;
+  dueDate: string;
+  dueTime: string;
+  listName: string;
+  tags: string[];
+  url: string;
+}
+
+const REMINDER_LIST = '2. Build with purpose';
+const REMINDER_TAGS = ['KR-Get-a-new-job'];
+const FOLLOWUP_DAYS = 3;
+
+/** Gmail search for the message that was just sent, so the reminder links to the real thread. */
+const sentEmailSearchUrl = (subject: string, recipient: string): string =>
+  'https://mail.google.com/mail/u/0/#search/'
+  + encodeURIComponent(`in:sent subject:"${subject}" to:${recipient}`);
+
+/** Follow-up reminder for one recipient, due FOLLOWUP_DAYS after the send that just happened.
+ *  `sentSubject` is the rendered subject (tokens filled), which is what the mailbox search needs. */
+const buildFollowUpReminder = (
+  row: Record<string, string>,
+  sentSubject: string
+): ReminderPayload => {
+  const recipient = row[COLS.RECIPIENT] ?? '';
+  const fullName = row[COLS.FULL_NAME]?.trim() || row[COLS.FIRST_NAME]?.trim() || recipient;
+  const due = new Date();
+  due.setDate(due.getDate() + FOLLOWUP_DAYS);
+  const url = sentEmailSearchUrl(sentSubject, recipient);
+
+  return {
+    title: `Followup with: ${fullName}`,
+    notes: `Follow up on outreach to ${fullName}.\n\nSent emails: ${url}`,
+    priority: 5,
+    dueDate: Utilities.formatDate(due, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+    dueTime: '12:00',
+    listName: REMINDER_LIST,
+    tags: REMINDER_TAGS,
+    url,
+  };
+};
+
 /** True if `email` is the same mailbox as `myEmail`, ignoring plus-addressing (e.g. anthony+test@bluxomelabs.com). */
 const isSelfEmailVariant = (email: string, myEmail: string): boolean => {
   if (!email || !myEmail) return false;
@@ -57,25 +102,43 @@ const isSelfEmailVariant = (email: string, myEmail: string): boolean => {
   return normalize(email) === normalize(myEmail);
 };
 
-/** Opens each LinkedIn profile in a new tab and auto-closes after 2 s.
+/** Opens each LinkedIn profile in a new tab and hands any reminders to the extension, then
+ *  auto-closes after 2 s.
+ *
+ *  Reminders have to travel through the browser: Apps Script runs on Google's servers and
+ *  UrlFetchApp cannot reach the unified-server on localhost, but content.js (running in this
+ *  docs.google.com tab) can. Same bridge the LinkedIn messages already use.
+ *
  *  Requires popups allowed for docs.google.com (one-time browser setting). */
-const openLinkedInTabs = (contacts: LinkedInContact[]): void => {
+const handOffToExtension = (
+  contacts: LinkedInContact[],
+  reminders: ReminderPayload[] = []
+): void => {
   const contactsJson = JSON.stringify(contacts);
+  const remindersJson = JSON.stringify(reminders);
   const withUrl = contacts.filter(c => c.url).length;
+  const headline = [
+    withUrl > 0 ? `Opening ${withUrl} LinkedIn profile(s)` : '',
+    reminders.length > 0 ? `queueing ${reminders.length} reminder(s)` : '',
+  ].filter(Boolean).join(', ');
   const html = `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;font-size:13px;color:#333}
 h3{margin:0 0 8px;font-size:14px}
 ul{margin:8px 0 0;padding-left:18px}
 li{margin-bottom:6px}
 </style></head><body>
-<h3 id="status">Opening ${withUrl} LinkedIn profile(s)\u2026</h3>
+<h3 id="status">${headline}\u2026</h3>
 <ul id="list"></ul>
 <script>
 var contacts=${contactsJson};
+var reminders=${remindersJson};
 // Send contacts+messages to content.js in the outermost docs.google.com frame,
 // which bridges them to the extension background for storage keyed by LinkedIn slug.
 // Use window.top (not window.parent) since this dialog can be nested more than one iframe deep.
 window.top.postMessage({type:'CC_LI_MESSAGES',contacts:contacts},'*');
+// Reminders go to the same bridge, which POSTs them to the local unified-server. This continues
+// in the docs.google.com tab after the dialog closes, so leave that tab open until it finishes.
+if(reminders.length) window.top.postMessage({type:'CC_REMINDERS',reminders:reminders},'*');
 // Random delay between tab opens, same range as components/networker/src/commands/send.ts,
 // to avoid opening all LinkedIn tabs at once (looks less bot-like, easier on LinkedIn rate limits).
 function randomDelay(min,max){return new Promise(function(r){setTimeout(r, Math.floor(Math.random()*(max-min+1))+min);});}
@@ -373,7 +436,8 @@ export const doSendTestEmail = (
   row[COLS.RECIPIENT] = testRecipient;
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
   const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
-  if (linkedin) openLinkedInTabs([linkedin]);
+  // No follow-up reminder for test sends — the recipient is you.
+  if (linkedin) handOffToExtension([linkedin]);
   Logger.log('Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
 };
@@ -421,6 +485,7 @@ export const doSendEmails = (
   let sentCount = 0;
   const skipped: string[] = [];
   const linkedInContacts: LinkedInContact[] = [];
+  const reminders: ReminderPayload[] = [];
 
   for (const row of rows) {
     if (row[COLS.EMAIL_SENT] === '') {
@@ -428,6 +493,9 @@ export const doSendEmails = (
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
         const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
         if (linkedin) linkedInContacts.push(linkedin);
+        // Queued only after sendViaGmail returns, so a throw above leaves no reminder for an
+        // email that never went out. Dated from the actual send, not from when the row was added.
+        reminders.push(buildFollowUpReminder(row, msgObj.subject));
         out.push([new Date()]);
         sentCount++;
       } catch (e) {
@@ -455,8 +523,10 @@ export const doSendEmails = (
     SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
   }
 
-  if (linkedInContacts.length > 0) {
-    openLinkedInTabs(linkedInContacts);
+  // Show the bridge dialog if there is anything at all to hand off — reminders are created even
+  // for recipients with no LinkedIn URL, so this can't be gated on linkedInContacts alone.
+  if (linkedInContacts.length > 0 || reminders.length > 0) {
+    handOffToExtension(linkedInContacts, reminders);
   }
 };
 

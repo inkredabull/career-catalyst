@@ -3848,6 +3848,43 @@ window.addEventListener('message', function(e) {
   }
 });
 
+// Bridge: create follow-up reminders on behalf of the mail merge. Apps Script runs on Google's
+// servers and cannot reach the unified-server on localhost, so "Send Emails" hands the fully-formed
+// payloads here and this tab does the POSTs.
+window.addEventListener('message', async function(e) {
+  if (!e.data || e.data.type !== 'CC_REMINDERS' || !Array.isArray(e.data.reminders)) return;
+
+  const reminders = e.data.reminders;
+  console.log('[Reminders] Received', reminders.length, 'reminder(s) from', e.origin);
+
+  // Sequential on purpose: each request spawns an ts-node process server-side, so firing a whole
+  // merge at once would pile up dozens of them. Expect a few seconds per reminder.
+  let created = 0;
+  const failures = [];
+  for (const reminder of reminders) {
+    try {
+      const resp = await fetch('http://localhost:3000/linkedin-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reminder)
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Unknown server error');
+      created++;
+      console.log(`[Reminders] ${created}/${reminders.length} created: ${reminder.title}`);
+    } catch (err) {
+      failures.push(`${reminder.title} — ${err.message}`);
+      console.warn('[Reminders] Failed:', reminder.title, err.message);
+    }
+  }
+
+  if (failures.length) {
+    alert(`⚠️ Created ${created}/${reminders.length} follow-up reminders.\n\nFailed:\n${failures.join('\n')}`);
+  } else {
+    console.log(`[Reminders] All ${created} follow-up reminder(s) created`);
+  }
+});
+
 console.log('Career Catalyst Assistant: Content script loaded');
 console.log('💡 Console functions available:');
 console.log('  • toggleJobExtractor(true/false) - Enable/disable automation');
