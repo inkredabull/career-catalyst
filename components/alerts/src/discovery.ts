@@ -40,6 +40,9 @@ const NOISE_SEGMENTS = new Set([
   "levels",
   "levels.fyi",
   "y combinator",
+  "lenny's jobs",
+  "lennysjobs",
+  "trueup",
 ]);
 
 /** Trailing site-name noise that follows a dash rather than a pipe. */
@@ -239,6 +242,12 @@ const DISCOVERY_SEARCHES: DiscoverySearch[] = [
     pathPrefixes: ["/jobs"],
   },
   {
+    // Label carries ", US" so geoLabel() routes it to Remote US.
+    label: "LennysJobs, US",
+    source: "Lenny's Jobs",
+    includeDomains: ["lennysjobs.com"],
+  },
+  {
     // includeDomains matches subdomains, so Hacker News threads leak in through
     // ycombinator.com and parse into garbage. Excluded twice, deliberately.
     label: "YC/US",
@@ -259,7 +268,7 @@ const NUM_RESULTS = 10;
 /**
  * Hard stop for one run's Exa spend. Serper died by silently exhausting its
  * credits; this makes that failure mode loud and bounded instead.
- * Eight slots cost ~$0.056, so this leaves headroom without being a blank cheque.
+ * Nine slots cost ~$0.063, so this leaves headroom without being a blank cheque.
  */
 const RUN_COST_CEILING_USD = 0.1;
 

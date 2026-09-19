@@ -56,6 +56,7 @@ describe("geoLabel routes every label the codebase emits", () => {
     ["Lever/US", US],
     ["Levels/US", US],
     ["YC/US", US],
+    ["LennysJobs, US", US],
   ];
 
   test.each(searchLabels)("%s routes to %s", (label, expected) => {
