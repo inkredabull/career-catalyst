@@ -62,6 +62,7 @@ export function formatEntry(
 export function geoLabel(search: string): string {
   const s = search.toLowerCase();
   if (s.includes("top applicant")) return "Top Applicant";
+  if (s === "usajobs") return "Federal (USAJOBS)";
   if (s.startsWith("target/")) {
     const name = search.slice("target/".length);
     const target = COMPANY_TARGETS.find((t) => t.name === name);

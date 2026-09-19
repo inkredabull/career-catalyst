@@ -66,6 +66,10 @@ describe("geoLabel routes every label the codebase emits", () => {
     expect(geoLabel("Top Applicant")).toBe("Top Applicant");
   });
 
+  it("routes USAJOBS to its own section", () => {
+    expect(geoLabel("USAJOBS")).toBe("Federal (USAJOBS)");
+  });
+
   it("falls back to Other for an unrecognised label", () => {
     expect(geoLabel("Something/Unmapped")).toBe("Other");
   });
