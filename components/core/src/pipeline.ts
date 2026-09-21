@@ -1,80 +1,43 @@
-import { ResumeClassifierAgent } from './agents/classifier';
-import { ResumeCreatorAgent } from './agents/resume-creator-agent';
-import { ResumeResult } from './types';
-import { BaseLLMProvider, LLMProviderConfig } from './providers/llm-provider';
-import * as fs from 'fs';
+/**
+ * Generic two-stage content customization pipeline.
+ *
+ * Stage 1 (fast model): analyze variable context (prospect brief, job description, account signals)
+ * Stage 2 (quality model + prompt caching): generate customized content from cached static asset
+ *
+ * The pattern: any stable content asset (CV, pitch deck, one-pager template) paired with
+ * variable opportunity context maps onto the same two stages. Wire up concrete agents via
+ * ContextAnalyzer and ContentGenerator, then call runContentPipeline.
+ */
 
-export interface PipelineOptions {
-  jobId: string;
-  cvFilePath: string;
-  resumeProviderConfig: LLMProviderConfig;
-  critiqueProviderConfig: LLMProviderConfig;
-  classifierApiKey: string;
-  maxRoles?: number;
-  mode?: 'builder' | 'leader';
-  experienceFormat?: 'standard' | 'split';
-  outputPath?: string;
-  critique?: boolean;
-  skipJudge?: boolean;
+export interface ContextAnalyzer<TContext> {
+  analyze(contextInput: string, staticContent: string): Promise<TContext>;
 }
 
-/**
- * Two-stage resume pipeline:
- *   Agent 1 (Haiku): Classify job posting (~2–4s)
- *   Agent 2 (Sonnet): Generate resume with cached static prompt (~12–18s)
- *
- * Total target: ~15–22s vs ~90s for single-call approach.
- */
-export async function runTwoStagePipeline(options: PipelineOptions): Promise<ResumeResult> {
-  const {
-    jobId,
-    cvFilePath,
-    resumeProviderConfig,
-    critiqueProviderConfig,
-    classifierApiKey,
-    maxRoles = 4,
-    mode = 'leader',
-    experienceFormat = 'standard',
-    outputPath,
-    critique = true,
-    skipJudge = false
-  } = options;
+export interface ContentGenerator<TContext, TResult> {
+  generate(context: TContext, staticContent: string, contextInput: string): Promise<TResult>;
+}
 
-  // Read job description and CV for the classifier
-  const { resolveFromProjectRoot } = await import('./utils/project-root');
-  const path = await import('path');
+export interface ContentPipelineOptions<TContext, TResult> {
+  /** Variable input — changes per opportunity (job description, prospect brief, account signals) */
+  contextInput: string;
+  /** Stable asset — cached across burst runs (CV, deck template, brand boilerplate) */
+  staticContent: string;
+  /** Stage 1: fast model that analyzes contextInput and returns structured classification */
+  analyzer: ContextAnalyzer<TContext>;
+  /** Stage 2: quality model that generates the final asset using cached staticContent */
+  generator: ContentGenerator<TContext, TResult>;
+}
 
-  const jobDir = resolveFromProjectRoot('logs', jobId);
-  const jobFiles = fs.readdirSync(jobDir).filter(f => f.startsWith('job-') && f.endsWith('.json'));
-  if (jobFiles.length === 0) {
-    throw new Error(`No job file found for job ID: ${jobId}`);
-  }
-  const jobData = JSON.parse(fs.readFileSync(path.join(jobDir, jobFiles[0]), 'utf-8'));
-  const cvContent = fs.readFileSync(cvFilePath, 'utf-8');
+export async function runContentPipeline<TContext, TResult>(
+  options: ContentPipelineOptions<TContext, TResult>
+): Promise<TResult> {
+  const { contextInput, staticContent, analyzer, generator } = options;
 
-  // Agent 1: Fast classification with Haiku
-  console.log('🚀 Starting two-stage resume pipeline...');
-  const classifier = new ResumeClassifierAgent(classifierApiKey);
-  const classification = await classifier.classify(jobData.description, cvContent);
+  console.log('🚀 Starting two-stage content pipeline...');
 
-  // Agent 2: Full resume generation with pre-computed classification
-  const creator = new ResumeCreatorAgent(
-    resumeProviderConfig,
-    critiqueProviderConfig,
-    maxRoles,
-    mode,
-    experienceFormat
-  );
+  // Stage 1: fast context analysis
+  const context = await analyzer.analyze(contextInput, staticContent);
 
-  return creator.createResume(
-    jobId,
-    cvFilePath,
-    outputPath,
-    false,   // regenerate = false (generate fresh)
-    false,   // generate = false (job description already present)
-    critique,
-    'programmatic',
-    skipJudge,
-    classification
-  );
+  // Stage 2: customized content generation with cached static asset
+  return generator.generate(context, staticContent, contextInput);
 }

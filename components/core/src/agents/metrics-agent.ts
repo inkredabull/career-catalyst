@@ -262,7 +262,7 @@ Make the KPIs specific to the role level and company context. For senior roles, 
     throw new Error('MetricsAgent does not implement extract method. Use extractMetrics instead.');
   }
 
-  async createResume(): Promise<never> {
-    throw new Error('MetricsAgent does not implement createResume method. Use extractMetrics instead.');
+  async generateContent(): Promise<never> {
+    throw new Error('MetricsAgent does not implement generateContent. Use extractMetrics instead.');
   }
 }

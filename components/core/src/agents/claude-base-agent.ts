@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { ResumeResult } from '../types';
 
 export abstract class ClaudeBaseAgent {
   protected anthropic: Anthropic;
@@ -97,5 +96,5 @@ export abstract class ClaudeBaseAgent {
     }
   }
 
-  abstract createResume(jobId: string, cvFilePath: string, outputPath?: string, regenerate?: boolean, generate?: boolean | string, critique?: boolean, source?: 'cli' | 'programmatic'): Promise<ResumeResult>;
+  abstract generateContent(contextInput: string, staticContent?: string): Promise<string>;
 }
