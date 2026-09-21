@@ -66,6 +66,7 @@ export interface FallbackModels {
   OPENAI: string;
   MISTRAL: string;
   COHERE: string;
+  LLAMA: string;
 }
 
 export interface ModelDiscoverySettings {
@@ -220,6 +221,7 @@ export const CONFIG: Config = {
       OPENAI: 'openai/gpt-4o-mini',
       MISTRAL: 'mistralai/mistral-large-2407',
       COHERE: 'cohere/command-r-plus',
+      LLAMA: 'meta-llama/llama-3.3-70b-instruct',
     },
     // Model discovery settings
     DISCOVERY: {

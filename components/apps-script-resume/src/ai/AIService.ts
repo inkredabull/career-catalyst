@@ -47,7 +47,7 @@ export class AIService {
 
   /**
    * Discover and cache latest models from OpenRouter
-   * @returns Model map {claude: 'id', gemini: 'id', openai: 'id', mistral: 'id', cohere: 'id'}
+   * @returns Model map {claude: 'id', gemini: 'id', openai: 'id', mistral: 'id', cohere: 'id', llama: 'id'}
    */
   discoverModels(): Record<string, string> {
     try {
@@ -58,6 +58,7 @@ export class AIService {
         openai: discovered.OPENAI,
         mistral: discovered.MISTRAL,
         cohere: discovered.COHERE,
+        llama: discovered.LLAMA,
       };
     } catch (error) {
       Logger.warn(`Model discovery failed, using fallbacks: ${(error as Error).message}`);
@@ -67,6 +68,7 @@ export class AIService {
         openai: CONFIG.AI.FALLBACK_MODELS.OPENAI,
         mistral: CONFIG.AI.FALLBACK_MODELS.MISTRAL,
         cohere: CONFIG.AI.FALLBACK_MODELS.COHERE,
+        llama: CONFIG.AI.FALLBACK_MODELS.LLAMA,
       };
     }
   }
@@ -84,6 +86,7 @@ export class AIService {
         openai: discovered.OPENAI,
         mistral: discovered.MISTRAL,
         cohere: discovered.COHERE,
+        llama: discovered.LLAMA,
       };
       Logger.log('Models refreshed:', JSON.stringify(this.modelMap));
       return this.modelMap;

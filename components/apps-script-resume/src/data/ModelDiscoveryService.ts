@@ -25,6 +25,7 @@ export interface ModelMap {
   OPENAI: string;
   MISTRAL: string;
   COHERE: string;
+  LLAMA: string;
 }
 
 /**
@@ -162,6 +163,7 @@ export class ModelDiscoveryService {
       openai: null,
       mistralai: null,
       cohere: null,
+      'meta-llama': null,
     };
 
     models.forEach((model) => {
@@ -173,6 +175,11 @@ export class ModelDiscoveryService {
         return;
       }
 
+      // Skip variant suffixes (e.g. ':batch') — they aren't served by chat/completions
+      if (modelId.includes(':')) {
+        return;
+      }
+
       // Filter criteria
       const contextLength = model.context_length || 0;
       const isChat =
@@ -181,7 +188,8 @@ export class ModelDiscoveryService {
         modelId.includes('flash') ||
         modelId.includes('gpt') ||
         modelId.includes('mistral') ||
-        modelId.includes('command');
+        modelId.includes('command') ||
+        modelId.includes('llama');
 
       // Must meet minimum context requirement
       if (contextLength < CONFIG.AI.DISCOVERY.MIN_CONTEXT) {
@@ -228,6 +236,7 @@ export class ModelDiscoveryService {
       OPENAI: providers['openai']?.id || CONFIG.AI.FALLBACK_MODELS.OPENAI,
       MISTRAL: providers['mistralai']?.id || CONFIG.AI.FALLBACK_MODELS.MISTRAL,
       COHERE: providers['cohere']?.id || CONFIG.AI.FALLBACK_MODELS.COHERE,
+      LLAMA: providers['meta-llama']?.id || CONFIG.AI.FALLBACK_MODELS.LLAMA,
     };
 
     Logger.log('Selected models:', JSON.stringify(result));

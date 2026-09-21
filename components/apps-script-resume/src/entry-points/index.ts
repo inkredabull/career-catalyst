@@ -609,6 +609,7 @@ export function logModelChoice(
       'GPT',
       'Mistral',
       'Cohere',
+      'Llama',
     ];
 
     const sheet = services.sheet.ensureSheet(FEEDBACK_SHEET);
@@ -627,6 +628,7 @@ export function logModelChoice(
       allOutputs['openai'] || '',
       allOutputs['mistral'] || '',
       allOutputs['cohere'] || '',
+      allOutputs['llama'] || '',
     ];
 
     sheet.appendRow(row);
@@ -659,9 +661,11 @@ export function compareModels(): void {
     >;
 
     const claudeModel = models['claude'] || CONFIG.AI.FALLBACK_MODELS.CLAUDE;
+    const geminiModel = models['gemini'] || CONFIG.AI.FALLBACK_MODELS.GEMINI;
     const openaiModel = models['openai'] || CONFIG.AI.FALLBACK_MODELS.OPENAI;
     const mistralModel = models['mistral'] || CONFIG.AI.FALLBACK_MODELS.MISTRAL;
     const cohereModel = models['cohere'] || CONFIG.AI.FALLBACK_MODELS.COHERE;
+    const llamaModel = models['llama'] || CONFIG.AI.FALLBACK_MODELS.LLAMA;
 
     const fmt = (id: string): string => {
       const parts = id.split('/');
@@ -673,9 +677,11 @@ export function compareModels(): void {
     };
 
     const claudeDisplay = fmt(claudeModel);
+    const geminiDisplay = fmt(geminiModel);
     const openaiDisplay = fmt(openaiModel);
     const mistralDisplay = fmt(mistralModel);
     const cohereDisplay = fmt(cohereModel);
+    const llamaDisplay = fmt(llamaModel);
 
     const html = `<!DOCTYPE html>
 <html>
@@ -685,7 +691,7 @@ export function compareModels(): void {
     body{font-family:Arial,sans-serif;padding:20px;margin:0;background:#f5f5f5}
     .container{max-width:1200px;margin:0 auto}
     .controls{background:white;padding:20px;border-radius:8px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);text-align:center}
-    .results{display:grid;grid-template-columns:repeat(5,1fr);gap:15px}
+    .results{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
     .result-card{background:white;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);min-height:250px;display:flex;flex-direction:column}
     .result-card h4{margin:0 0 10px;color:#1a73e8;border-bottom:2px solid #1a73e8;padding-bottom:8px;font-size:15px}
     .model-label{font-size:12px;color:#666;margin-bottom:15px}
@@ -732,7 +738,15 @@ export function compareModels(): void {
         <textarea class="notes-input" id="notesClaude" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseClaude" onclick="chooseModel('claude')">✓ Choose This</button>
       </div>
-      <!-- Gemini disabled: re-add result-card div here to re-enable -->
+      <div class="result-card" id="resultGemini">
+        <h4>✨ ${geminiDisplay}</h4>
+        <div class="model-label">${geminiModel}</div>
+        <div class="result-content" id="contentGemini"><div class="loading">Pending...</div></div>
+        <div class="char-count" id="countGemini"></div>
+        <div class="metadata" id="metadataGemini"></div>
+        <textarea class="notes-input" id="notesGemini" placeholder="Notes..."></textarea>
+        <button class="choose-btn" id="chooseGemini" onclick="chooseModel('gemini')">✓ Choose This</button>
+      </div>
       <div class="result-card" id="resultOpenAI">
         <h4>💬 ${openaiDisplay}</h4>
         <div class="model-label">${openaiModel}</div>
@@ -760,15 +774,25 @@ export function compareModels(): void {
         <textarea class="notes-input" id="notesCohere" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseCohere" onclick="chooseModel('cohere')">✓ Choose This</button>
       </div>
+      <div class="result-card" id="resultLlama">
+        <h4>🦙 ${llamaDisplay}</h4>
+        <div class="model-label">${llamaModel}</div>
+        <div class="result-content" id="contentLlama"><div class="loading">Pending...</div></div>
+        <div class="char-count" id="countLlama"></div>
+        <div class="metadata" id="metadataLlama"></div>
+        <textarea class="notes-input" id="notesLlama" placeholder="Notes..."></textarea>
+        <button class="choose-btn" id="chooseLlama" onclick="chooseModel('llama')">✓ Choose This</button>
+      </div>
     </div>
   </div>
   <script>
     const MODELS=[
       {key:'claude',contentId:'contentClaude',countId:'countClaude',cardId:'resultClaude',buttonId:'chooseClaude',metadataId:'metadataClaude',notesId:'notesClaude'},
-      // Gemini disabled: re-add {key:'gemini',...} here to re-enable
+      {key:'gemini',contentId:'contentGemini',countId:'countGemini',cardId:'resultGemini',buttonId:'chooseGemini',metadataId:'metadataGemini',notesId:'notesGemini'},
       {key:'openai',contentId:'contentOpenAI',countId:'countOpenAI',cardId:'resultOpenAI',buttonId:'chooseOpenAI',metadataId:'metadataOpenAI',notesId:'notesOpenAI'},
       {key:'mistral',contentId:'contentMistral',countId:'countMistral',cardId:'resultMistral',buttonId:'chooseMistral',metadataId:'metadataMistral',notesId:'notesMistral'},
-      {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere',notesId:'notesCohere'}
+      {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere',notesId:'notesCohere'},
+      {key:'llama',contentId:'contentLlama',countId:'countLlama',cardId:'resultLlama',buttonId:'chooseLlama',metadataId:'metadataLlama',notesId:'notesLlama'}
     ];
     var modelResults={};
     function startComparison(){
@@ -887,7 +911,7 @@ export function compareModels(): void {
 </body>
 </html>`;
 
-    const htmlOutput = HtmlService.createHtmlOutput(html).setWidth(1250).setHeight(650);
+    const htmlOutput = HtmlService.createHtmlOutput(html).setWidth(1250).setHeight(900);
     SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Compare All AI Models');
   } catch (error) {
     Logger.error('Error in compareModels', error as Error);
