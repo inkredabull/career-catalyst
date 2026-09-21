@@ -1,4 +1,8 @@
-import { usajobsItemToResult, fetchUsajobsResults } from "../usajobs";
+import {
+  usajobsItemToResult,
+  fetchUsajobsResults,
+  buildSearchUrl,
+} from "../usajobs";
 import { ENV } from "../config/settings";
 
 describe("usajobsItemToResult", () => {
@@ -60,5 +64,20 @@ describe("fetchUsajobsResults — degrade path", () => {
     delete process.env[ENV.USAJOBS_USER_AGENT];
 
     await expect(fetchUsajobsResults("24h")).resolves.toEqual({});
+  });
+});
+
+describe("buildSearchUrl", () => {
+  it("asks for the time window, newest first", () => {
+    const url = new URL(buildSearchUrl("r259200", 2));
+    expect(url.searchParams.get("DatePosted")).toBe("3");
+    expect(url.searchParams.get("SortField")).toBe("opendate");
+    expect(url.searchParams.get("SortDirection")).toBe("desc");
+    expect(url.searchParams.get("Page")).toBe("2");
+  });
+
+  it("clamps DatePosted to the API's 60-day maximum", () => {
+    const url = new URL(buildSearchUrl("r31536000", 1));
+    expect(url.searchParams.get("DatePosted")).toBe("60");
   });
 });

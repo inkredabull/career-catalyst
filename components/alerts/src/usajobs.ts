@@ -1,11 +1,13 @@
 import { ENV } from "./config/settings";
-import { timeFrameToCutoffMs } from "./clock";
+import { timeFrameToCutoffMs, timeFrameToSeconds } from "./clock";
 import { titlePassesPatterns } from "./filters";
 import { SearchResults, JobResult } from "./linkedin";
 import { log } from "./utils/logger";
 
 const SEARCH_URL = "https://data.usajobs.gov/api/Search";
 const RESULTS_PER_PAGE = 500;
+const MAX_PAGES = 3;
+const MAX_DATE_POSTED_DAYS = 60;
 const FETCH_TIMEOUT_MS = 15_000;
 
 interface MatchedObjectDescriptor {
@@ -25,6 +27,26 @@ interface UsajobsResponse {
     SearchResultItems?: SearchResultItem[];
     SearchResultCountAll?: number;
   };
+}
+
+/**
+ * Ask the API for only the window we care about, newest first. Without
+ * DatePosted and a sort the first 500 rows are an arbitrary slice of every
+ * open federal posting, and fresh ones mostly fall outside it.
+ */
+export function buildSearchUrl(timeFrame: string, page: number): string {
+  const days = Math.min(
+    MAX_DATE_POSTED_DAYS,
+    Math.max(1, Math.ceil(timeFrameToSeconds(timeFrame) / 86_400)),
+  );
+  const params = new URLSearchParams({
+    ResultsPerPage: String(RESULTS_PER_PAGE),
+    Page: String(page),
+    DatePosted: String(days),
+    SortField: "opendate",
+    SortDirection: "desc",
+  });
+  return `${SEARCH_URL}?${params.toString()}`;
 }
 
 /** Map a raw USAJOBS search hit onto the digest's JobResult shape. */
@@ -75,50 +97,56 @@ export async function fetchUsajobsResults(
   }
 
   const cutoffMs = timeFrameToCutoffMs(timeFrame, now);
-  const url = `${SEARCH_URL}?ResultsPerPage=${RESULTS_PER_PAGE}`;
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: {
-        Host: "data.usajobs.gov",
-        "User-Agent": userAgent,
-        "Authorization-Key": apiKey,
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-  } catch (err) {
-    log("WARN", "USAJOBS fetch failed: %s", (err as Error).message);
-    return {};
-  }
-
-  if (!response.ok) {
-    log(
-      "WARN",
-      "USAJOBS HTTP %s: %s",
-      response.status,
-      (await response.text()).slice(0, 200),
-    );
-    return {};
-  }
-
-  const body = (await response.json()) as UsajobsResponse;
-  const items = body.SearchResult?.SearchResultItems ?? [];
+  const headers = {
+    Host: "data.usajobs.gov",
+    "User-Agent": userAgent,
+    "Authorization-Key": apiKey,
+  };
 
   const results: SearchResults = {};
-  for (const item of items) {
-    if (!isFresh(item, cutoffMs)) continue;
-    if (!titlePassesPatterns(item.MatchedObjectDescriptor.PositionTitle))
-      continue;
-    const result = usajobsItemToResult(item);
-    results[result.id] = result;
+  let rawCount = 0;
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    let body: UsajobsResponse;
+    try {
+      const response = await fetch(buildSearchUrl(timeFrame, page), {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        log(
+          "WARN",
+          "USAJOBS HTTP %s: %s",
+          response.status,
+          (await response.text()).slice(0, 200),
+        );
+        break;
+      }
+      body = (await response.json()) as UsajobsResponse;
+    } catch (err) {
+      log("WARN", "USAJOBS fetch failed: %s", (err as Error).message);
+      break;
+    }
+
+    const items = body.SearchResult?.SearchResultItems ?? [];
+    rawCount += items.length;
+    for (const item of items) {
+      if (!isFresh(item, cutoffMs)) continue;
+      if (!titlePassesPatterns(item.MatchedObjectDescriptor.PositionTitle))
+        continue;
+      const result = usajobsItemToResult(item);
+      results[result.id] = result;
+    }
+
+    const total = body.SearchResult?.SearchResultCountAll ?? 0;
+    if (items.length === 0 || rawCount >= total) break;
   }
 
   log(
     "INFO",
     "USAJOBS: %s jobs from %s raw",
     Object.keys(results).length,
-    items.length,
+    rawCount,
   );
   return results;
 }
