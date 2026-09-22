@@ -7,6 +7,7 @@
 import { CONFIG } from '../config';
 import { Logger } from '../utils/Logger';
 import { AIProviderBase } from './AIProviderBase';
+import { checkIsReasoningModel } from './reasoningModels';
 
 /**
  * OpenRouter unified AI provider
@@ -37,11 +38,22 @@ export class OpenRouterProvider extends AIProviderBase {
    * @returns Request payload
    */
   generatePayload(prompt: string, maxTokens: number, modelName?: string): Record<string, unknown> {
-    return {
+    const payload: Record<string, unknown> = {
       model: modelName,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: maxTokens,
     };
+
+    // Reasoning models (Gemini 3.x, DeepSeek-R, o-series, …) can return their
+    // internal "thinking" text as the message content unless reasoning is
+    // explicitly excluded from the response. The tokens still count against
+    // max_tokens, but parseResponse() gets the final answer instead of the
+    // model's scratch work.
+    if (modelName && checkIsReasoningModel(modelName)) {
+      payload.reasoning = { exclude: true };
+    }
+
+    return payload;
   }
 
   /**

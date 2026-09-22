@@ -11,6 +11,7 @@ import { DialogService } from '../ui/DialogService';
 import { SheetService } from '../data/SheetService';
 import { ConfigService } from '../data/ConfigService';
 import { AIService } from '../ai/AIService';
+import { checkIsReasoningModel } from '../ai/reasoningModels';
 import { DocumentService } from '../document/DocumentService';
 import { AchievementService } from '../business/AchievementService';
 import { EvaluationService } from '../business/EvaluationService';
@@ -411,15 +412,6 @@ export function createCustomization(): void {
     Logger.error('Error in createCustomization', error as Error);
     DialogService.showAlert(`Error creating customization: ${(error as Error).message}`);
   }
-}
-
-function checkIsReasoningModel(modelId: string): boolean {
-  return (
-    modelId.includes('deepseek') ||
-    modelId.includes('gpt-5.5') ||
-    modelId.includes('gemini-3.') ||
-    /\/o\d/.test(modelId)
-  );
 }
 
 /**
