@@ -112,7 +112,18 @@ export class ModelDiscoveryService {
       return null;
     }
 
-    return JSON.parse(cachedJson) as ModelMap;
+    const cached = JSON.parse(cachedJson) as Partial<ModelMap>;
+
+    // Cache written before a provider was added lacks that key — treat as stale
+    const missingProvider = (Object.keys(CONFIG.AI.FALLBACK_MODELS) as Array<keyof ModelMap>).some(
+      (key) => !cached[key]
+    );
+    if (missingProvider) {
+      Logger.log('Model cache missing a provider, refetching');
+      return null;
+    }
+
+    return cached as ModelMap;
   }
 
   /**

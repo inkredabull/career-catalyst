@@ -933,6 +933,7 @@ export function viewCurrentModels(): void {
     const openaiModel = models['openai'] || CONFIG.AI.FALLBACK_MODELS.OPENAI;
     const mistralModel = models['mistral'] || CONFIG.AI.FALLBACK_MODELS.MISTRAL;
     const cohereModel = models['cohere'] || CONFIG.AI.FALLBACK_MODELS.COHERE;
+    const llamaModel = models['llama'] || CONFIG.AI.FALLBACK_MODELS.LLAMA;
 
     const ui = SpreadsheetApp.getUi();
     const message =
@@ -941,7 +942,8 @@ export function viewCurrentModels(): void {
       `Gemini: ${geminiModel}\n` +
       `OpenAI: ${openaiModel}\n` +
       `Mistral: ${mistralModel}\n` +
-      `Cohere: ${cohereModel}\n\n` +
+      `Cohere: ${cohereModel}\n` +
+      `Llama: ${llamaModel}\n\n` +
       `These models are refreshed daily from OpenRouter.\n` +
       `Use "Refresh Models" to force an update.`;
 
@@ -958,31 +960,9 @@ export function viewCurrentModels(): void {
  */
 export function refreshModelsMenu(): void {
   try {
-    const ui = SpreadsheetApp.getUi();
-
-    // Confirm refresh
-    const response = ui.alert(
-      'Refresh AI Models',
-      'This will fetch the latest models from OpenRouter.\n\n' + 'Do you want to continue?',
-      ui.ButtonSet.YES_NO
-    );
-
-    if (response !== ui.Button.YES) {
-      return;
-    }
-
     const services = initializeServices();
     const newModels = services.ai.refreshModels();
-
-    const message =
-      `Models refreshed successfully!\n\n` +
-      `Claude: ${newModels['claude']}\n` +
-      `Gemini: ${newModels['gemini']}\n` +
-      `OpenAI: ${newModels['openai']}\n` +
-      `Mistral: ${newModels['mistral']}\n` +
-      `Cohere: ${newModels['cohere']}`;
-
-    ui.alert('Models Updated', message, ui.ButtonSet.OK);
+    Logger.log('Models refreshed:', JSON.stringify(newModels));
   } catch (error) {
     Logger.error('Error in refreshModelsMenu', error as Error);
     SpreadsheetApp.getUi().alert(

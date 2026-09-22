@@ -60,6 +60,7 @@ export interface FallbackModels {
     OPENAI: string;
     MISTRAL: string;
     COHERE: string;
+    LLAMA: string;
 }
 export interface ModelDiscoverySettings {
     CACHE_DURATION_HOURS: number;

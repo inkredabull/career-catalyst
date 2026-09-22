@@ -27,7 +27,7 @@ export declare class AIService {
     constructor(configService: ConfigService);
     /**
      * Discover and cache latest models from OpenRouter
-     * @returns Model map {claude: 'id', gemini: 'id', openai: 'id', mistral: 'id', cohere: 'id'}
+     * @returns Model map {claude: 'id', gemini: 'id', openai: 'id', mistral: 'id', cohere: 'id', llama: 'id'}
      */
     discoverModels(): Record<string, string>;
     /**
