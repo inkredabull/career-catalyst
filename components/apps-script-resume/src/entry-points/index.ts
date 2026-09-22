@@ -715,9 +715,6 @@ export function compareModels(): void {
     .run-btn{padding:10px 28px;background:#1a73e8;color:white;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:10px}
     .run-btn:hover{background:#1557b0}
     .run-btn:disabled{background:#ccc;cursor:not-allowed}
-    .winner{background:#d4edda;border:2px solid #28a745}
-    .winner h4{color:#28a745;border-bottom-color:#28a745}
-    .winner-badge{display:inline-block;background:#28a745;color:white;padding:2px 8px;border-radius:12px;font-size:10px;margin-left:8px;font-weight:normal}
     .status{margin-top:15px;padding:10px;border-radius:4px;display:none;text-align:center}
     .status.error{background:#f8d7da;color:#721c24;display:block}
   </style>
@@ -810,12 +807,9 @@ export function compareModels(): void {
         document.getElementById(m.contentId).innerHTML='<div class="loading">Pending...</div>';
         document.getElementById(m.countId).textContent='';
         document.getElementById(m.metadataId).style.display='none';
-        document.getElementById(m.cardId).classList.remove('winner');
         document.getElementById(m.buttonId).style.display='none';
         document.getElementById(m.notesId).value='';
         document.getElementById(m.notesId).style.display='none';
-        var h=document.getElementById(m.cardId).querySelector('h4');
-        var b=h.querySelector('.winner-badge');if(b)b.remove();
       });
       modelResults={};
       var completed=0;
@@ -838,7 +832,7 @@ export function compareModels(): void {
               modelResults[m.key]=result;
               displayResult(m.contentId,m.countId,result,m.key);
               completed++;
-              if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
+              if(completed===MODELS.length){status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
               else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
             })
             .withFailureHandler(function(error){
@@ -891,20 +885,6 @@ export function compareModels(): void {
       var w=window.open('','Prompt','width=800,height=600,scrollbars=yes');
       w.document.write('<html><head><title>Prompt for '+key+'</title><style>body{font-family:monospace;padding:20px;white-space:pre-wrap;word-wrap:break-word}h3{font-family:Arial}</style></head><body><h3>Full Prompt — '+key.toUpperCase()+'</h3><hr>'+r.prompt+'</body></html>');
       w.document.close();
-    }
-    function finishComparison(results){
-      var shortest=null,shortestLen=Infinity,shortestKey=null;
-      Object.keys(results).forEach(function(k){
-        var t=results[k].text||results[k];
-        if(t.length>=40&&t.length<shortestLen){shortest=t;shortestLen=t.length;shortestKey=k;}
-      });
-      if(shortestKey){
-        var wm=MODELS.find(function(m){return m.key===shortestKey;});
-        if(wm){
-          document.getElementById(wm.cardId).classList.add('winner');
-          document.getElementById(wm.cardId).querySelector('h4').innerHTML+='<span class="winner-badge">Most Concise</span>';
-        }
-      }
     }
     window.addEventListener('load', startComparison);
   </script>
