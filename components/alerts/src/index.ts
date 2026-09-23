@@ -19,6 +19,7 @@ import {
 import { fetchDiscoveryResults, shouldRunDiscovery } from "./discovery";
 import { fetchAtsResults } from "./ats";
 import { fetchUsajobsResults } from "./usajobs";
+import { fetchAmazonResults } from "./amazon";
 import { log, flushLogs } from "./utils/logger";
 import { withConcurrency } from "./utils/concurrency";
 import {
@@ -188,6 +189,7 @@ export async function getResults(): Promise<SearchResults> {
   // deduplicateByCompanyTitle's first pass with the clean spelling.
   results = mergeResults(results, await fetchAtsResults(timeFrame));
   results = mergeResults(results, await fetchUsajobsResults(timeFrame));
+  results = mergeResults(results, await fetchAmazonResults(timeFrame));
   if (shouldRunDiscovery()) {
     results = mergeResults(results, await fetchDiscoveryResults());
   } else {
