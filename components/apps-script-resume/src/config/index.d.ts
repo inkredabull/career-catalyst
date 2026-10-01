@@ -76,6 +76,10 @@ export interface MaxTokens {
     CATEGORIZATION: number;
     ARCHETYPE: number;
 }
+export interface RetrySettings {
+    MAX_ATTEMPTS: number;
+    BASE_DELAY_MS: number;
+}
 export interface AISettings {
     ENDPOINT: string;
     MODELS_ENDPOINT: string;
@@ -88,6 +92,7 @@ export interface AISettings {
     LONG_SCALE: number;
     SCALE_FACTOR: number;
     REASONING_MULTIPLIER: number;
+    RETRY: RetrySettings;
 }
 export interface DocumentSettings {
     DEFAULT_PADDING: number;

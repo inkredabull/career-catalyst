@@ -85,6 +85,11 @@ export interface MaxTokens {
   ARCHETYPE: number;
 }
 
+export interface RetrySettings {
+  MAX_ATTEMPTS: number;
+  BASE_DELAY_MS: number;
+}
+
 export interface AISettings {
   ENDPOINT: string;
   MODELS_ENDPOINT: string;
@@ -97,6 +102,7 @@ export interface AISettings {
   LONG_SCALE: number;
   SCALE_FACTOR: number;
   REASONING_MULTIPLIER: number;
+  RETRY: RetrySettings;
 }
 
 export interface DocumentSettings {
@@ -244,6 +250,10 @@ export const CONFIG: Config = {
     LONG_SCALE: 1.33,
     SCALE_FACTOR: 1.33, // Use LONG_SCALE as default
     REASONING_MULTIPLIER: 10, // For reasoning models (DeepSeek, GPT-5.5, o-series) that need tokens for thinking
+    RETRY: {
+      MAX_ATTEMPTS: 3, // Total attempts for a 429 (upstream rate-limited) response
+      BASE_DELAY_MS: 1000, // Doubles each retry: 1s, 2s, ...
+    },
   },
 
   // Document generation settings

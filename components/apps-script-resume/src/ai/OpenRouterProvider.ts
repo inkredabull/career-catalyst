@@ -152,32 +152,60 @@ export class OpenRouterProvider extends AIProviderBase {
    * @returns AI response
    */
   queryWithModel(prompt: string, maxTokens: number, modelName: string): string {
-    try {
-      const payload = this.generatePayload(prompt, maxTokens, modelName);
-      const headers = this.generateAuthHeader();
-      const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
-        method: 'post',
-        headers: headers,
-        payload: JSON.stringify(payload),
-        muteHttpExceptions: true,
-        contentType: 'application/json',
-      };
+    const { MAX_ATTEMPTS, BASE_DELAY_MS } = CONFIG.AI.RETRY;
 
-      const url = this.getEndpoint();
-      const response = UrlFetchApp.fetch(url, options);
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const payload = this.generatePayload(prompt, maxTokens, modelName);
+        const headers = this.generateAuthHeader();
+        const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
+          method: 'post',
+          headers: headers,
+          payload: JSON.stringify(payload),
+          muteHttpExceptions: true,
+          contentType: 'application/json',
+        };
 
-      if (response.getResponseCode() === 200) {
-        const result = this.parseResponse(response);
-        Logger.log(`OpenRouter response (${modelName}): ${result.length} chars`);
-        return result;
-      } else {
+        const url = this.getEndpoint();
+        const response = UrlFetchApp.fetch(url, options);
+        const statusCode = response.getResponseCode();
+
+        if (statusCode === 200) {
+          const result = this.parseResponse(response);
+          Logger.log(`OpenRouter response (${modelName}): ${result.length} chars`);
+          return result;
+        }
+
         const errorText = response.getContentText();
+
+        // Upstream rate limiting is transient — a short backoff and retry
+        // usually succeeds. Other errors (bad model id, auth, etc.) won't
+        // resolve themselves, so fail fast on those.
+        if (statusCode === 429 && attempt < MAX_ATTEMPTS) {
+          const delayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+          Logger.warn(
+            `OpenRouter rate-limited for ${modelName} (attempt ${attempt}/${MAX_ATTEMPTS}), retrying in ${delayMs}ms`
+          );
+          Utilities.sleep(delayMs);
+          continue;
+        }
+
         Logger.error(`OpenRouter query failed: ${errorText}`);
-        throw new Error(errorText);
+        throw new Error(
+          statusCode === 429
+            ? `${modelName} is rate-limited upstream and did not recover after ${MAX_ATTEMPTS} attempts. Try again shortly.`
+            : errorText
+        );
+      } catch (error) {
+        if ((error as Error).message.includes('rate-limited upstream')) {
+          throw error;
+        }
+        Logger.error(`OpenRouter query failed: ${(error as Error).message}`, error as Error);
+        throw error;
       }
-    } catch (error) {
-      Logger.error(`OpenRouter query failed: ${(error as Error).message}`, error as Error);
-      throw error;
     }
+
+    // Unreachable: loop always returns or throws
+    throw new Error(`${modelName}: exhausted retry attempts`);
   }
 }

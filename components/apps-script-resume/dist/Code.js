@@ -90,6 +90,7 @@ const CONFIG = {
             OPENAI: 'openai/gpt-4o-mini',
             MISTRAL: 'mistralai/mistral-large-2407',
             COHERE: 'cohere/command-r-plus',
+            LLAMA: 'meta-llama/llama-3.3-70b-instruct',
         },
         // Model discovery settings
         DISCOVERY: {
@@ -112,6 +113,10 @@ const CONFIG = {
         LONG_SCALE: 1.33,
         SCALE_FACTOR: 1.33, // Use LONG_SCALE as default
         REASONING_MULTIPLIER: 10, // For reasoning models (DeepSeek, GPT-5.5, o-series) that need tokens for thinking
+        RETRY: {
+            MAX_ATTEMPTS: 3, // Total attempts for a 429 (upstream rate-limited) response
+            BASE_DELAY_MS: 1000, // Doubles each retry: 1s, 2s, ...
+        },
     },
     // Document generation settings
     DOCUMENT: {
@@ -801,7 +806,14 @@ class ModelDiscoveryService {
             Logger.log('Model cache expired');
             return null;
         }
-        return JSON.parse(cachedJson);
+        const cached = JSON.parse(cachedJson);
+        // Cache written before a provider was added lacks that key — treat as stale
+        const missingProvider = Object.keys(CONFIG.AI.FALLBACK_MODELS).some((key) => !cached[key]);
+        if (missingProvider) {
+            Logger.log('Model cache missing a provider, refetching');
+            return null;
+        }
+        return cached;
     }
     /**
      * Cache models with timestamp
@@ -840,19 +852,24 @@ class ModelDiscoveryService {
      * @private
      */
     _selectBestModels(models) {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f;
         const providers = {
             anthropic: null,
             google: null,
             openai: null,
             mistralai: null,
             cohere: null,
+            'meta-llama': null,
         };
         models.forEach((model) => {
             const modelId = model.id;
             const provider = modelId.split('/')[0];
             // Skip if provider is undefined or not one of our target providers
             if (!provider || !Object.prototype.hasOwnProperty.call(providers, provider)) {
+                return;
+            }
+            // Skip variant suffixes (e.g. ':batch') — they aren't served by chat/completions
+            if (modelId.includes(':')) {
                 return;
             }
             // Filter criteria
@@ -862,7 +879,8 @@ class ModelDiscoveryService {
                 modelId.includes('flash') ||
                 modelId.includes('gpt') ||
                 modelId.includes('mistral') ||
-                modelId.includes('command');
+                modelId.includes('command') ||
+                modelId.includes('llama');
             // Must meet minimum context requirement
             if (contextLength < CONFIG.AI.DISCOVERY.MIN_CONTEXT) {
                 return;
@@ -902,6 +920,7 @@ class ModelDiscoveryService {
             OPENAI: ((_c = providers['openai']) === null || _c === void 0 ? void 0 : _c.id) || CONFIG.AI.FALLBACK_MODELS.OPENAI,
             MISTRAL: ((_d = providers['mistralai']) === null || _d === void 0 ? void 0 : _d.id) || CONFIG.AI.FALLBACK_MODELS.MISTRAL,
             COHERE: ((_e = providers['cohere']) === null || _e === void 0 ? void 0 : _e.id) || CONFIG.AI.FALLBACK_MODELS.COHERE,
+            LLAMA: ((_f = providers['meta-llama']) === null || _f === void 0 ? void 0 : _f.id) || CONFIG.AI.FALLBACK_MODELS.LLAMA,
         };
         Logger.log('Selected models:', JSON.stringify(result));
         return result;
@@ -998,12 +1017,37 @@ class AIProviderBase {
     }
 }
 
+;// ./src/ai/reasoningModels.ts
+/**
+ * Shared helper for identifying reasoning models routed through OpenRouter.
+ *
+ * Reasoning models (DeepSeek-R, GPT-5.5, Gemini 3.x thinking, o-series, …) spend
+ * tokens on an internal "thinking" pass before the final answer. They need a much
+ * higher max_tokens cap, and unless the request explicitly excludes reasoning
+ * tokens from the response, some providers (notably Gemini) return that thinking
+ * text as the message content instead of a clean final answer.
+ *
+ * @module ai/reasoningModels
+ */
+/**
+ * Whether an OpenRouter model ID is a reasoning model.
+ * @param modelId - Model identifier (e.g. 'google/gemini-3.8-flash')
+ * @returns True if the model is a reasoning model
+ */
+function checkIsReasoningModel(modelId) {
+    return (modelId.includes('deepseek') ||
+        modelId.includes('gpt-5.5') ||
+        modelId.includes('gemini-3.') ||
+        /\/o\d/.test(modelId));
+}
+
 ;// ./src/ai/OpenRouterProvider.ts
 /**
  * OpenRouter Provider - Unified AI provider via OpenRouter API
  *
  * @module ai/OpenRouterProvider
  */
+
 
 
 
@@ -1034,11 +1078,20 @@ class OpenRouterProvider extends AIProviderBase {
      * @returns Request payload
      */
     generatePayload(prompt, maxTokens, modelName) {
-        return {
+        const payload = {
             model: modelName,
             messages: [{ role: 'user', content: prompt }],
             max_tokens: maxTokens,
         };
+        // Reasoning models (Gemini 3.x, DeepSeek-R, o-series, …) can return their
+        // internal "thinking" text as the message content unless reasoning is
+        // explicitly excluded from the response. The tokens still count against
+        // max_tokens, but parseResponse() gets the final answer instead of the
+        // model's scratch work.
+        if (modelName && checkIsReasoningModel(modelName)) {
+            payload.reasoning = { exclude: true };
+        }
+        return payload;
     }
     /**
      * Generate OpenRouter authentication headers
@@ -1115,33 +1168,51 @@ class OpenRouterProvider extends AIProviderBase {
      * @returns AI response
      */
     queryWithModel(prompt, maxTokens, modelName) {
-        try {
-            const payload = this.generatePayload(prompt, maxTokens, modelName);
-            const headers = this.generateAuthHeader();
-            const options = {
-                method: 'post',
-                headers: headers,
-                payload: JSON.stringify(payload),
-                muteHttpExceptions: true,
-                contentType: 'application/json',
-            };
-            const url = this.getEndpoint();
-            const response = UrlFetchApp.fetch(url, options);
-            if (response.getResponseCode() === 200) {
-                const result = this.parseResponse(response);
-                Logger.log(`OpenRouter response (${modelName}): ${result.length} chars`);
-                return result;
-            }
-            else {
+        const { MAX_ATTEMPTS, BASE_DELAY_MS } = CONFIG.AI.RETRY;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                const payload = this.generatePayload(prompt, maxTokens, modelName);
+                const headers = this.generateAuthHeader();
+                const options = {
+                    method: 'post',
+                    headers: headers,
+                    payload: JSON.stringify(payload),
+                    muteHttpExceptions: true,
+                    contentType: 'application/json',
+                };
+                const url = this.getEndpoint();
+                const response = UrlFetchApp.fetch(url, options);
+                const statusCode = response.getResponseCode();
+                if (statusCode === 200) {
+                    const result = this.parseResponse(response);
+                    Logger.log(`OpenRouter response (${modelName}): ${result.length} chars`);
+                    return result;
+                }
                 const errorText = response.getContentText();
+                // Upstream rate limiting is transient — a short backoff and retry
+                // usually succeeds. Other errors (bad model id, auth, etc.) won't
+                // resolve themselves, so fail fast on those.
+                if (statusCode === 429 && attempt < MAX_ATTEMPTS) {
+                    const delayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+                    Logger.warn(`OpenRouter rate-limited for ${modelName} (attempt ${attempt}/${MAX_ATTEMPTS}), retrying in ${delayMs}ms`);
+                    Utilities.sleep(delayMs);
+                    continue;
+                }
                 Logger.error(`OpenRouter query failed: ${errorText}`);
-                throw new Error(errorText);
+                throw new Error(statusCode === 429
+                    ? `${modelName} is rate-limited upstream and did not recover after ${MAX_ATTEMPTS} attempts. Try again shortly.`
+                    : errorText);
+            }
+            catch (error) {
+                if (error.message.includes('rate-limited upstream')) {
+                    throw error;
+                }
+                Logger.error(`OpenRouter query failed: ${error.message}`, error);
+                throw error;
             }
         }
-        catch (error) {
-            Logger.error(`OpenRouter query failed: ${error.message}`, error);
-            throw error;
-        }
+        // Unreachable: loop always returns or throws
+        throw new Error(`${modelName}: exhausted retry attempts`);
     }
 }
 
@@ -1175,7 +1246,7 @@ class AIService {
     }
     /**
      * Discover and cache latest models from OpenRouter
-     * @returns Model map {claude: 'id', gemini: 'id', openai: 'id', mistral: 'id', cohere: 'id'}
+     * @returns Model map {claude: 'id', gemini: 'id', openai: 'id', mistral: 'id', cohere: 'id', llama: 'id'}
      */
     discoverModels() {
         try {
@@ -1186,6 +1257,7 @@ class AIService {
                 openai: discovered.OPENAI,
                 mistral: discovered.MISTRAL,
                 cohere: discovered.COHERE,
+                llama: discovered.LLAMA,
             };
         }
         catch (error) {
@@ -1196,6 +1268,7 @@ class AIService {
                 openai: CONFIG.AI.FALLBACK_MODELS.OPENAI,
                 mistral: CONFIG.AI.FALLBACK_MODELS.MISTRAL,
                 cohere: CONFIG.AI.FALLBACK_MODELS.COHERE,
+                llama: CONFIG.AI.FALLBACK_MODELS.LLAMA,
             };
         }
     }
@@ -1212,6 +1285,7 @@ class AIService {
                 openai: discovered.OPENAI,
                 mistral: discovered.MISTRAL,
                 cohere: discovered.COHERE,
+                llama: discovered.LLAMA,
             };
             Logger.log('Models refreshed:', JSON.stringify(this.modelMap));
             return this.modelMap;
@@ -2241,6 +2315,7 @@ class DialogService {
 
 
 
+
 /**
  * Global services object - initialized on first use
  */
@@ -2563,12 +2638,6 @@ function createCustomization() {
         DialogService.showAlert(`Error creating customization: ${error.message}`);
     }
 }
-function checkIsReasoningModel(modelId) {
-    return (modelId.includes('deepseek') ||
-        modelId.includes('gpt-5.5') ||
-        modelId.includes('gemini-3.') ||
-        /\/o\d/.test(modelId));
-}
 /**
  * Generate achievement using specific model
  * @param modelName - Name of model ('claude', 'gemini', 'openai', 'mistral', 'cohere')
@@ -2704,6 +2773,7 @@ function logModelChoice(chosenModelId, rationale, allOutputs) {
             'GPT',
             'Mistral',
             'Cohere',
+            'Llama',
         ];
         const sheet = services.sheet.ensureSheet(FEEDBACK_SHEET);
         if (sheet.getLastRow() === 0) {
@@ -2719,6 +2789,7 @@ function logModelChoice(chosenModelId, rationale, allOutputs) {
             allOutputs['openai'] || '',
             allOutputs['mistral'] || '',
             allOutputs['cohere'] || '',
+            allOutputs['llama'] || '',
         ];
         sheet.appendRow(row);
         Logger.log(`logModelChoice: ${chosenModelId} row=${rowIndex}`);
@@ -2745,9 +2816,11 @@ function compareModels() {
         const services = initializeServices();
         const models = services.ai['modelMap'];
         const claudeModel = models['claude'] || CONFIG.AI.FALLBACK_MODELS.CLAUDE;
+        const geminiModel = models['gemini'] || CONFIG.AI.FALLBACK_MODELS.GEMINI;
         const openaiModel = models['openai'] || CONFIG.AI.FALLBACK_MODELS.OPENAI;
         const mistralModel = models['mistral'] || CONFIG.AI.FALLBACK_MODELS.MISTRAL;
         const cohereModel = models['cohere'] || CONFIG.AI.FALLBACK_MODELS.COHERE;
+        const llamaModel = models['llama'] || CONFIG.AI.FALLBACK_MODELS.LLAMA;
         const fmt = (id) => {
             const parts = id.split('/');
             const model = parts[1] || id;
@@ -2757,9 +2830,11 @@ function compareModels() {
                 .substring(0, 50);
         };
         const claudeDisplay = fmt(claudeModel);
+        const geminiDisplay = fmt(geminiModel);
         const openaiDisplay = fmt(openaiModel);
         const mistralDisplay = fmt(mistralModel);
         const cohereDisplay = fmt(cohereModel);
+        const llamaDisplay = fmt(llamaModel);
         const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -2768,7 +2843,7 @@ function compareModels() {
     body{font-family:Arial,sans-serif;padding:20px;margin:0;background:#f5f5f5}
     .container{max-width:1200px;margin:0 auto}
     .controls{background:white;padding:20px;border-radius:8px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);text-align:center}
-    .results{display:grid;grid-template-columns:repeat(5,1fr);gap:15px}
+    .results{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
     .result-card{background:white;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);min-height:250px;display:flex;flex-direction:column}
     .result-card h4{margin:0 0 10px;color:#1a73e8;border-bottom:2px solid #1a73e8;padding-bottom:8px;font-size:15px}
     .model-label{font-size:12px;color:#666;margin-bottom:15px}
@@ -2792,9 +2867,6 @@ function compareModels() {
     .run-btn{padding:10px 28px;background:#1a73e8;color:white;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:10px}
     .run-btn:hover{background:#1557b0}
     .run-btn:disabled{background:#ccc;cursor:not-allowed}
-    .winner{background:#d4edda;border:2px solid #28a745}
-    .winner h4{color:#28a745;border-bottom-color:#28a745}
-    .winner-badge{display:inline-block;background:#28a745;color:white;padding:2px 8px;border-radius:12px;font-size:10px;margin-left:8px;font-weight:normal}
     .status{margin-top:15px;padding:10px;border-radius:4px;display:none;text-align:center}
     .status.error{background:#f8d7da;color:#721c24;display:block}
   </style>
@@ -2815,7 +2887,15 @@ function compareModels() {
         <textarea class="notes-input" id="notesClaude" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseClaude" onclick="chooseModel('claude')">✓ Choose This</button>
       </div>
-      <!-- Gemini disabled: re-add result-card div here to re-enable -->
+      <div class="result-card" id="resultGemini">
+        <h4>✨ ${geminiDisplay}</h4>
+        <div class="model-label">${geminiModel}</div>
+        <div class="result-content" id="contentGemini"><div class="loading">Pending...</div></div>
+        <div class="char-count" id="countGemini"></div>
+        <div class="metadata" id="metadataGemini"></div>
+        <textarea class="notes-input" id="notesGemini" placeholder="Notes..."></textarea>
+        <button class="choose-btn" id="chooseGemini" onclick="chooseModel('gemini')">✓ Choose This</button>
+      </div>
       <div class="result-card" id="resultOpenAI">
         <h4>💬 ${openaiDisplay}</h4>
         <div class="model-label">${openaiModel}</div>
@@ -2843,15 +2923,25 @@ function compareModels() {
         <textarea class="notes-input" id="notesCohere" placeholder="Notes..."></textarea>
         <button class="choose-btn" id="chooseCohere" onclick="chooseModel('cohere')">✓ Choose This</button>
       </div>
+      <div class="result-card" id="resultLlama">
+        <h4>🦙 ${llamaDisplay}</h4>
+        <div class="model-label">${llamaModel}</div>
+        <div class="result-content" id="contentLlama"><div class="loading">Pending...</div></div>
+        <div class="char-count" id="countLlama"></div>
+        <div class="metadata" id="metadataLlama"></div>
+        <textarea class="notes-input" id="notesLlama" placeholder="Notes..."></textarea>
+        <button class="choose-btn" id="chooseLlama" onclick="chooseModel('llama')">✓ Choose This</button>
+      </div>
     </div>
   </div>
   <script>
     const MODELS=[
       {key:'claude',contentId:'contentClaude',countId:'countClaude',cardId:'resultClaude',buttonId:'chooseClaude',metadataId:'metadataClaude',notesId:'notesClaude'},
-      // Gemini disabled: re-add {key:'gemini',...} here to re-enable
+      {key:'gemini',contentId:'contentGemini',countId:'countGemini',cardId:'resultGemini',buttonId:'chooseGemini',metadataId:'metadataGemini',notesId:'notesGemini'},
       {key:'openai',contentId:'contentOpenAI',countId:'countOpenAI',cardId:'resultOpenAI',buttonId:'chooseOpenAI',metadataId:'metadataOpenAI',notesId:'notesOpenAI'},
       {key:'mistral',contentId:'contentMistral',countId:'countMistral',cardId:'resultMistral',buttonId:'chooseMistral',metadataId:'metadataMistral',notesId:'notesMistral'},
-      {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere',notesId:'notesCohere'}
+      {key:'cohere',contentId:'contentCohere',countId:'countCohere',cardId:'resultCohere',buttonId:'chooseCohere',metadataId:'metadataCohere',notesId:'notesCohere'},
+      {key:'llama',contentId:'contentLlama',countId:'countLlama',cardId:'resultLlama',buttonId:'chooseLlama',metadataId:'metadataLlama',notesId:'notesLlama'}
     ];
     var modelResults={};
     function startComparison(){
@@ -2869,12 +2959,9 @@ function compareModels() {
         document.getElementById(m.contentId).innerHTML='<div class="loading">Pending...</div>';
         document.getElementById(m.countId).textContent='';
         document.getElementById(m.metadataId).style.display='none';
-        document.getElementById(m.cardId).classList.remove('winner');
         document.getElementById(m.buttonId).style.display='none';
         document.getElementById(m.notesId).value='';
         document.getElementById(m.notesId).style.display='none';
-        var h=document.getElementById(m.cardId).querySelector('h4');
-        var b=h.querySelector('.winner-badge');if(b)b.remove();
       });
       modelResults={};
       var completed=0;
@@ -2897,7 +2984,7 @@ function compareModels() {
               modelResults[m.key]=result;
               displayResult(m.contentId,m.countId,result,m.key);
               completed++;
-              if(completed===MODELS.length){finishComparison(modelResults);status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
+              if(completed===MODELS.length){status.textContent='All models completed!';status.className='status';var b=document.getElementById('runBtn');b.disabled=false;b.innerHTML='&#9654; Run Again';}
               else{status.textContent='Generating... ('+completed+'/'+MODELS.length+')';}
             })
             .withFailureHandler(function(error){
@@ -2951,25 +3038,11 @@ function compareModels() {
       w.document.write('<html><head><title>Prompt for '+key+'</title><style>body{font-family:monospace;padding:20px;white-space:pre-wrap;word-wrap:break-word}h3{font-family:Arial}</style></head><body><h3>Full Prompt — '+key.toUpperCase()+'</h3><hr>'+r.prompt+'</body></html>');
       w.document.close();
     }
-    function finishComparison(results){
-      var shortest=null,shortestLen=Infinity,shortestKey=null;
-      Object.keys(results).forEach(function(k){
-        var t=results[k].text||results[k];
-        if(t.length>=40&&t.length<shortestLen){shortest=t;shortestLen=t.length;shortestKey=k;}
-      });
-      if(shortestKey){
-        var wm=MODELS.find(function(m){return m.key===shortestKey;});
-        if(wm){
-          document.getElementById(wm.cardId).classList.add('winner');
-          document.getElementById(wm.cardId).querySelector('h4').innerHTML+='<span class="winner-badge">Most Concise</span>';
-        }
-      }
-    }
     window.addEventListener('load', startComparison);
   </script>
 </body>
 </html>`;
-        const htmlOutput = HtmlService.createHtmlOutput(html).setWidth(1250).setHeight(650);
+        const htmlOutput = HtmlService.createHtmlOutput(html).setWidth(1250).setHeight(900);
         SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Compare All AI Models');
     }
     catch (error) {
@@ -2990,13 +3063,15 @@ function viewCurrentModels() {
         const openaiModel = models['openai'] || CONFIG.AI.FALLBACK_MODELS.OPENAI;
         const mistralModel = models['mistral'] || CONFIG.AI.FALLBACK_MODELS.MISTRAL;
         const cohereModel = models['cohere'] || CONFIG.AI.FALLBACK_MODELS.COHERE;
+        const llamaModel = models['llama'] || CONFIG.AI.FALLBACK_MODELS.LLAMA;
         const ui = SpreadsheetApp.getUi();
         const message = `Current AI Models:\n\n` +
             `Claude: ${claudeModel}\n` +
             `Gemini: ${geminiModel}\n` +
             `OpenAI: ${openaiModel}\n` +
             `Mistral: ${mistralModel}\n` +
-            `Cohere: ${cohereModel}\n\n` +
+            `Cohere: ${cohereModel}\n` +
+            `Llama: ${llamaModel}\n\n` +
             `These models are refreshed daily from OpenRouter.\n` +
             `Use "Refresh Models" to force an update.`;
         ui.alert('Current AI Models', message, ui.ButtonSet.OK);
@@ -3012,21 +3087,9 @@ function viewCurrentModels() {
  */
 function refreshModelsMenu() {
     try {
-        const ui = SpreadsheetApp.getUi();
-        // Confirm refresh
-        const response = ui.alert('Refresh AI Models', 'This will fetch the latest models from OpenRouter.\n\n' + 'Do you want to continue?', ui.ButtonSet.YES_NO);
-        if (response !== ui.Button.YES) {
-            return;
-        }
         const services = initializeServices();
         const newModels = services.ai.refreshModels();
-        const message = `Models refreshed successfully!\n\n` +
-            `Claude: ${newModels['claude']}\n` +
-            `Gemini: ${newModels['gemini']}\n` +
-            `OpenAI: ${newModels['openai']}\n` +
-            `Mistral: ${newModels['mistral']}\n` +
-            `Cohere: ${newModels['cohere']}`;
-        ui.alert('Models Updated', message, ui.ButtonSet.OK);
+        Logger.log('Models refreshed:', JSON.stringify(newModels));
     }
     catch (error) {
         Logger.error('Error in refreshModelsMenu', error);
