@@ -3,6 +3,7 @@
 import { COLS, SCRIPT_PROPS, SUBJECT_LINES, getFlagsForSubject, getTopicForSubject } from '../config/settings';
 import { getJobMetadata, checkMetadataServer } from './job-metadata';
 import { log } from '../utils/logger';
+import { clearProgress, pushProgress } from '../utils/progress';
 import {
   valediction, ideal, accomplishments, aboutMe, reciprocate,
   who, why, cmf, ask, connection, intro, followup, personalization,
@@ -252,7 +253,7 @@ export const sendViaGmail = (
   topic?: string,
 ): LinkedInContact | null => {
   const subjectLine = msgObj.subject;
-  Logger.log('Sending via Gmail: %s', subjectLine);
+  log('DEBUG', 'Sending via Gmail: %s', subjectLine);
 
   // Use the original draft subject (with tokens) for flag lookup so template-based keys match
   const flags = getFlagsForSubject(draftSubject ?? subjectLine);
@@ -291,29 +292,29 @@ export const sendViaGmail = (
     const myPhone = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_PHONE) ?? '';
     const cellValue = (row[COLS.CELL] ?? '').trim();
 
-    Logger.log('SMS Logic - myPhone: "%s", cellValue: "%s", firstName: "%s"', myPhone, cellValue, firstName);
+    log('TRACE', 'SMS Logic - myPhone: "%s", cellValue: "%s", firstName: "%s"', myPhone, cellValue, firstName);
 
     const isSelfOrMissing = !cellValue || (() => {
       try { return myPhone !== '' && normalizePhoneNumber(cellValue) === normalizePhoneNumber(myPhone); }
       catch { return false; }
     })();
 
-    Logger.log('SMS Logic - isSelfOrMissing: %s', isSelfOrMissing);
+    log('TRACE', 'SMS Logic - isSelfOrMissing: %s', isSelfOrMissing);
 
     if (!isSelfOrMissing) {
-      Logger.log('Sending SMS to: %s', cellValue);
+      log('TRACE', 'Sending SMS to: %s', cellValue);
       notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, topic ?? draftSubject ?? subjectLine);
     }
 
     // Queue LinkedIn regardless of whether SMS was sent — they are independent outreach channels.
     if (isSelfEmailVariant(row[COLS.RECIPIENT], myEmail)) {
-      Logger.log('Recipient "%s" is a self-test variant of MY_EMAIL — skipping LinkedIn tab', row[COLS.RECIPIENT]);
+      log('TRACE', 'Recipient "%s" is a self-test variant of MY_EMAIL — skipping LinkedIn tab', row[COLS.RECIPIENT]);
       return null;
     }
     const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
     const resolvedTopic = topic ?? draftSubject ?? subjectLine;
     const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], resolvedTopic);
-    Logger.log('Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
+    log('TRACE', 'Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
     return { url: linkedInUrl, message, firstName };
   }
   return null;
@@ -355,6 +356,7 @@ button{padding:6px 16px;cursor:pointer}
 #loading{display:none;text-align:center;padding:12px 0;color:#555;font-size:14px}
 .spinner{display:inline-block;margin-right:6px;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+#log{margin-top:10px;height:160px;overflow-y:auto;background:#f7f7f7;border:1px solid #ddd;border-radius:3px;padding:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;text-align:left}
 </style></head><body>
 <div id="form">
 <p>Select a subject line:</p>
@@ -366,24 +368,47 @@ button{padding:6px 16px;cursor:pointer}
 <button id="ok" onclick="doSubmit()">OK</button>
 </div>
 </div>
-<div id="loading"><span class="spinner">⏳</span>Sending emails — please wait…</div>
+<div id="loading">
+<div><span class="spinner">⏳</span>Sending emails — please wait…</div>
+<div id="log"></div>
+</div>
 <script>
 (function(){
 var options=${optionsJson};
 var topicMap=${topicMapJson};
 var sel=document.getElementById('s');
 var tin=document.getElementById('t');
+var logDiv=document.getElementById('log');
+var pollTimer=null;
 options.forEach(function(o){var el=document.createElement('option');el.value=o.value;el.textContent=o.label;sel.appendChild(el);});
 sel.addEventListener('change',function(){tin.value=topicMap[sel.value]||'';});
+function poll(){
+google.script.run
+.withSuccessHandler(function(lines){
+logDiv.textContent=(lines||[]).join('\\n');
+logDiv.scrollTop=logDiv.scrollHeight;
+})
+.withFailureHandler(function(){})
+.getSendProgress();
+}
 window.doSubmit=function(){
 var s=sel.value;
 if(!s){alert('Please select a subject line.');return;}
 var t=tin.value.trim()||topicMap[s]||'${DEFAULT_TOPIC}';
 document.getElementById('form').style.display='none';
 document.getElementById('loading').style.display='block';
+logDiv.textContent='';
+poll();
+pollTimer=setInterval(poll,1000);
 google.script.run
-.withSuccessHandler(function(){google.script.host.close();})
+.withSuccessHandler(function(){
+clearInterval(pollTimer);
+poll();
+setTimeout(function(){google.script.host.close();},600);
+})
 .withFailureHandler(function(e){
+clearInterval(pollTimer);
+poll();
 document.getElementById('loading').style.display='none';
 document.getElementById('form').style.display='block';
 alert(e.message);
@@ -403,7 +428,7 @@ const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
   const actionFn = action === 'send' ? 'doSendEmails' : 'doSendTestEmail';
   const html = HtmlService.createHtmlOutput(buildSubjectPickerHtml(options, actionFn))
     .setWidth(500)
-    .setHeight(220);
+    .setHeight(420);
   SpreadsheetApp.getUi().showModalDialog(html, 'Choose Subject');
 };
 
@@ -414,12 +439,15 @@ export const doSendTestEmail = (
   topic = DEFAULT_TOPIC,
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
+  clearProgress();
   const testRecipient = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.TEST_EMAIL);
   if (!testRecipient) {
+    pushProgress('TEST_EMAIL Script Property not set — aborting test send');
     Logger.log('TEST_EMAIL Script Property not set — aborting test send');
     return;
   }
 
+  pushProgress(`Starting test send: "${subject}"`);
   const emailTemplate = getGmailTemplateFromDrafts(subject);
   const data = sheet.getDataRange().getDisplayValues();
   const heads = data.shift() as string[];
@@ -429,16 +457,19 @@ export const doSendTestEmail = (
 
   const row = rows[0];
   if (!row) {
+    pushProgress('No data rows found in sheet — aborting test send');
     Logger.log('No data rows found in sheet — aborting test send');
     return;
   }
 
   row[COLS.RECIPIENT] = testRecipient;
+  pushProgress(`Sending to ${testRecipient}...`);
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
   const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
   // No follow-up reminder for test sends — the recipient is you.
   if (linkedin) handOffToExtension([linkedin]);
-  Logger.log('Test email sent to %s', testRecipient);
+  pushProgress(`Done — test email sent to ${testRecipient}`);
+  log('INFO', 'Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
 };
 
@@ -462,7 +493,9 @@ export const doSendEmails = (
   topic = DEFAULT_TOPIC,
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
-  Logger.log('Getting draft: %s', subject);
+  clearProgress();
+  pushProgress(`Starting send: "${subject}"`);
+  log('DEBUG', 'Getting draft: %s', subject);
   const emailTemplate = getGmailTemplateFromDrafts(subject);
   const data = sheet.getDataRange().getDisplayValues();
   const heads = data.shift() as string[];
@@ -487,8 +520,10 @@ export const doSendEmails = (
   const linkedInContacts: LinkedInContact[] = [];
   const reminders: ReminderPayload[] = [];
 
-  for (const row of rows) {
+  for (const [idx, row] of rows.entries()) {
+    const label = `Row ${idx + 1}/${rows.length}`;
     if (row[COLS.EMAIL_SENT] === '') {
+      pushProgress(`${label}: sending to ${row[COLS.RECIPIENT] || '(no recipient)'}...`);
       try {
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
         const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
@@ -498,13 +533,17 @@ export const doSendEmails = (
         reminders.push(buildFollowUpReminder(row, msgObj.subject));
         out.push([new Date()]);
         sentCount++;
+        pushProgress(`${label}: sent`);
+        log('DEBUG', '%s: sent to %s', label, row[COLS.RECIPIENT]);
       } catch (e) {
         if (e instanceof UnresolvedTemplateError) {
           // Nothing was sent — leave the cell blank so the row is retried once the cause is fixed.
           skipped.push(`${row[COLS.RECIPIENT] || '(no recipient)'} — ${e.message}`);
           out.push(['']);
+          pushProgress(`${label}: skipped — ${e.message}`);
         } else {
           out.push([(e as Error).message]);
+          pushProgress(`${label}: failed — ${(e as Error).message}`);
         }
       }
     } else {
@@ -516,10 +555,12 @@ export const doSendEmails = (
 
   if (skipped.length > 0) {
     log('WARN', 'Skipped %s row(s), left blank for retry:\n%s', skipped.length, skipped.join('\n'));
+    pushProgress(`Done — sent ${sentCount}, skipped ${skipped.length}`);
     SpreadsheetApp.getActive().toast(
       `Sent ${sentCount}, skipped ${skipped.length} — see logs`, '⚠️ Mail Merge Incomplete', 10
     );
   } else {
+    pushProgress(`Done — sent ${sentCount} email(s)`);
     SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
   }
 

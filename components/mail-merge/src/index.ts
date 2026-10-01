@@ -5,6 +5,7 @@ import { generateOutreachMessage, OutreachContext } from './services/message-gen
 import { sendEmails, sendTestEmail, queueEmails, doSendEmails, doSendTestEmail, createWarmupDrafts } from './services/gmail';
 import { fetchContactToSheet, getLinkedInUrlToSheet, pickRandomContacts } from './services/contacts';
 import { getJobMetadata, clearJobMetadataCache } from './services/job-metadata';
+import { getSendProgress } from './utils/progress';
 import { SCRIPT_PROPS, COLS, requireProp } from './config/settings';
 
 // ── Custom sheet functions — callable from cells as =blurb(), =resumeURL(jobId) ───
@@ -128,3 +129,4 @@ g['sendWarmup'] = sendWarmup;
 g['generateMessageForRow'] = generateMessageForRow;
 g['refreshJobMetadata'] = refreshJobMetadataFn;
 g['showJobMetadata'] = showJobMetadataFn;
+g['getSendProgress'] = getSendProgress;

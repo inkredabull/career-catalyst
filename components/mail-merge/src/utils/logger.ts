@@ -1,8 +1,10 @@
-// Leveled logger for GAS. Set LOG_LEVEL Script Property to DEBUG/INFO/WARN/ERROR (default: INFO).
+// Leveled logger for GAS. Set LOG_LEVEL Script Property to TRACE/DEBUG/INFO/WARN/ERROR (default: INFO).
+// TRACE is the most verbose — use it for chatty sub-step detail (e.g. SMS/LinkedIn branching)
+// that's too noisy for routine DEBUG output.
 
-type Level = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+type Level = 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
-const LEVELS: Record<Level, number> = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
+const LEVELS: Record<Level, number> = { TRACE: 0, DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 };
 
 const getMinLevel = (): number => {
   const prop = PropertiesService.getScriptProperties().getProperty('LOG_LEVEL') ?? 'INFO';
