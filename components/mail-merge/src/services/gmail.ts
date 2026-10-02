@@ -5,8 +5,8 @@ import { getJobMetadata, checkMetadataServer } from './job-metadata';
 import { log } from '../utils/logger';
 import { clearProgress, pushProgress } from '../utils/progress';
 import {
-  valediction, ideal, accomplishments, aboutMe, reciprocate,
-  who, why, cmf, ask, connection, intro, followup, personalization,
+  valediction, ideal, accomplishments, aboutMe, reciprocate, calendlyURL,
+  why, cmf, ask, connection, intro, followup, personalization,
 } from '../config/messages';
 import { PROFILE } from '../config/profile';
 import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
@@ -448,7 +448,9 @@ export const doSendTestEmail = (
   }
 
   pushProgress(`Starting test send: "${subject}"`);
+  pushProgress('Fetching draft template from Gmail…');
   const emailTemplate = getGmailTemplateFromDrafts(subject);
+  pushProgress('Template loaded — reading sheet data…');
   const data = sheet.getDataRange().getDisplayValues();
   const heads = data.shift() as string[];
   const rows = data.map(r =>
@@ -463,7 +465,7 @@ export const doSendTestEmail = (
   }
 
   row[COLS.RECIPIENT] = testRecipient;
-  pushProgress(`Sending to ${testRecipient}...`);
+  pushProgress(`Sending to ${testRecipient}…`);
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
   const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
   // No follow-up reminder for test sends — the recipient is you.
@@ -495,8 +497,10 @@ export const doSendEmails = (
 ): void => {
   clearProgress();
   pushProgress(`Starting send: "${subject}"`);
+  pushProgress('Fetching draft template from Gmail…');
   log('DEBUG', 'Getting draft: %s', subject);
   const emailTemplate = getGmailTemplateFromDrafts(subject);
+  pushProgress('Template loaded — scanning sheet…');
   const data = sheet.getDataRange().getDisplayValues();
   const heads = data.shift() as string[];
   const emailSentColIdx = heads.indexOf(COLS.EMAIL_SENT);
@@ -523,9 +527,10 @@ export const doSendEmails = (
   for (const [idx, row] of rows.entries()) {
     const label = `Row ${idx + 1}/${rows.length}`;
     if (row[COLS.EMAIL_SENT] === '') {
-      pushProgress(`${label}: sending to ${row[COLS.RECIPIENT] || '(no recipient)'}...`);
+      pushProgress(`${label}: ${row[COLS.RECIPIENT] || '(no recipient)'} — building email…`);
       try {
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
+        pushProgress(`${label}: sending via Gmail…`);
         const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
         if (linkedin) linkedInContacts.push(linkedin);
         // Queued only after sendViaGmail returns, so a throw above leaves no reminder for an
@@ -648,8 +653,9 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
     '{{Accomplishment3}}': accomplishments(3),
     '{{Accomplishment4}}': accomplishments(4),
     '{{AboutMe}}': aboutMe(),
+    '{{Company}}': data['Company'] || '',
     '{{Reciprocate}}': reciprocate(),
-    '{{Who}}': who(),
+    '{{CalendlyURL}}': calendlyURL(),
     '{{WhatAndWhere}}': aboutMe(),
     '{{Why}}': why(),
     '{{CMF}}': cmf(),
