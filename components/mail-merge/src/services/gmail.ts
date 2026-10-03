@@ -384,54 +384,54 @@ button{padding:6px 16px;cursor:pointer}
 <div id="log"></div>
 </div>
 <script>
-(function(){
-var sel=document.getElementById('s');
-var tin=document.getElementById('t');
+var _pollTimer=null;
+var _shownCount=0;
+function _appendNewLines(lines){
 var logDiv=document.getElementById('log');
-var pollTimer=null;
-var shownCount=0;
-function appendNewLines(lines){
+if(!logDiv)return;
 var all=lines||[];
-var fresh=all.slice(shownCount);
+var fresh=all.slice(_shownCount);
 if(!fresh.length)return;
-if(shownCount>0)logDiv.textContent+='\n';
+if(_shownCount>0)logDiv.textContent+='\n';
 logDiv.textContent+=fresh.join('\n');
-shownCount=all.length;
+_shownCount=all.length;
 logDiv.scrollTop=logDiv.scrollHeight;
 }
-function poll(){
+function _poll(){
 google.script.run
-.withSuccessHandler(appendNewLines)
+.withSuccessHandler(_appendNewLines)
 .withFailureHandler(function(){})
 .getSendProgress();
 }
-window.doSubmit=function(){
+function doSubmit(){
+var sel=document.getElementById('s');
+var tin=document.getElementById('t');
 var parts=sel.value.split('|||');
 var s=parts[0];
 if(!s){alert('Please select a subject line.');return;}
-var t=tin.value.trim()||parts[1]||'${DEFAULT_TOPIC}';
+var t=(tin.value||'').trim()||parts[1]||'${DEFAULT_TOPIC}';
+if(typeof google==='undefined'||!google.script){alert('GAS transport not ready — please reload the page and try again.');return;}
 document.getElementById('form').style.display='none';
 document.getElementById('loading').style.display='block';
-logDiv.textContent='';
-shownCount=0;
-poll();
-pollTimer=setInterval(poll,1000);
+document.getElementById('log').textContent='';
+_shownCount=0;
+_poll();
+_pollTimer=setInterval(_poll,1000);
 google.script.run
 .withSuccessHandler(function(){
-clearInterval(pollTimer);
-poll();
+clearInterval(_pollTimer);
+_poll();
 setTimeout(function(){google.script.host.close();},2000);
 })
 .withFailureHandler(function(e){
-clearInterval(pollTimer);
-poll();
+clearInterval(_pollTimer);
+_poll();
 document.getElementById('loading').style.display='none';
 document.getElementById('form').style.display='block';
 alert(e.message);
 })
 [${fnJson}](s,t);
-};
-})();
+}
 </script></body></html>`;
 };
 
