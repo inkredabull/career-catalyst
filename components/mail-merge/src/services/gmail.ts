@@ -347,15 +347,26 @@ const getSubjectOptionsForPicker = (): SubjectOption[] =>
   });
 
 const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
-  const fnJson = JSON.stringify(actionFn);
   const count = options.length;
-  // Pre-render options server-side so the dropdown is populated without JS.
-  // Topic is encoded into the value as "subject|||topic" so inline onchange can read it
-  // without relying on the IIFE script block executing.
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  // Pre-render options server-side; topic encoded in value as "subject|||topic"
   const optionEls = options
     .map(o => `<option value="${esc(o.value + '|||' + o.topic)}">${esc(o.label)}</option>`)
     .join('');
+  // doSubmit lives entirely in the onclick attribute — <script> blocks are stripped by GAS HtmlService.
+  // Uses direct method call (google.script.run.doSendEmails) instead of bracket notation.
+  const okOnclick = [
+    "var sel=document.getElementById('s');",
+    "var tin=document.getElementById('t');",
+    "var parts=sel.value.split('|||');",
+    "var s=parts[0];",
+    "if(!s){alert('Please select a subject line.');return;}",
+    "var t=(tin.value||'').trim()||parts[1]||'" + DEFAULT_TOPIC + "';",
+    "if(typeof google==='undefined'||!google.script){alert('GAS not ready — please reload.');return;}",
+    "document.getElementById('form').style.display='none';",
+    "document.getElementById('loading').style.display='block';",
+    `google.script.run.withSuccessHandler(function(){google.script.host.close();}).withFailureHandler(function(e){document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).${actionFn}(s,t);`,
+  ].join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
 p{margin:0 0 4px;font-size:13px}
@@ -376,63 +387,14 @@ button{padding:6px 16px;cursor:pointer}
 <input type="text" id="t" placeholder="${DEFAULT_TOPIC}">
 <div class="btns">
 <button id="cancel" onclick="google.script.host.close()">Cancel</button>
-<button id="ok" onclick="doSubmit()">OK</button>
+<button id="ok" onclick="${okOnclick}">OK</button>
 </div>
 </div>
 <div id="loading">
 <div><span class="spinner">⏳</span>Sending emails — please wait…</div>
 <div id="log"></div>
 </div>
-<script>
-var _pollTimer=null;
-var _shownCount=0;
-function _appendNewLines(lines){
-var logDiv=document.getElementById('log');
-if(!logDiv)return;
-var all=lines||[];
-var fresh=all.slice(_shownCount);
-if(!fresh.length)return;
-if(_shownCount>0)logDiv.textContent+='\n';
-logDiv.textContent+=fresh.join('\n');
-_shownCount=all.length;
-logDiv.scrollTop=logDiv.scrollHeight;
-}
-function _poll(){
-google.script.run
-.withSuccessHandler(_appendNewLines)
-.withFailureHandler(function(){})
-.getSendProgress();
-}
-function doSubmit(){
-var sel=document.getElementById('s');
-var tin=document.getElementById('t');
-var parts=sel.value.split('|||');
-var s=parts[0];
-if(!s){alert('Please select a subject line.');return;}
-var t=(tin.value||'').trim()||parts[1]||'${DEFAULT_TOPIC}';
-if(typeof google==='undefined'||!google.script){alert('GAS transport not ready — please reload the page and try again.');return;}
-document.getElementById('form').style.display='none';
-document.getElementById('loading').style.display='block';
-document.getElementById('log').textContent='';
-_shownCount=0;
-_poll();
-_pollTimer=setInterval(_poll,1000);
-google.script.run
-.withSuccessHandler(function(){
-clearInterval(_pollTimer);
-_poll();
-setTimeout(function(){google.script.host.close();},2000);
-})
-.withFailureHandler(function(e){
-clearInterval(_pollTimer);
-_poll();
-document.getElementById('loading').style.display='none';
-document.getElementById('form').style.display='block';
-alert(e.message);
-})
-[${fnJson}](s,t);
-}
-</script></body></html>`;
+</body></html>`;
 };
 
 const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
