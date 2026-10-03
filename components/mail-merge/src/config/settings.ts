@@ -11,7 +11,6 @@ export const SCRIPT_PROPS = {
   RESUME_URL: 'RESUME_URL',
   WARMUP_EXCLUDE_LABEL_PREFIXES: 'WARMUP_EXCLUDE_LABEL_PREFIXES',
   WARMUP_EXCLUDE_EMAILS: 'WARMUP_EXCLUDE_EMAILS',
-  HUBSPOT_BCC: 'HUBSPOT_BCC',
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */

@@ -12,6 +12,7 @@ import { PROFILE } from '../config/profile';
 import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
 import { getLinkedInUrlByName, WarmupContact } from './contacts';
 import { containsTokens, draftsMatchingSubject, hasUnresolvedTokens, selectTemplateDraft } from './draft-template';
+import { sendEmailWithSendGrid } from './sendgrid';
 
 interface MsgObj {
   subject: string;
@@ -20,9 +21,7 @@ interface MsgObj {
 }
 
 interface SendParams {
-  htmlBody: string;
   attachments?: GoogleAppsScript.Base.Blob[];
-  bcc?: string;
 }
 
 /** Thrown by fillInTemplateFromObject when a token would render blank. Always raised *before*
@@ -259,8 +258,7 @@ export const sendViaGmail = (
   // Use the original draft subject (with tokens) for flag lookup so template-based keys match
   const flags = getFlagsForSubject(draftSubject ?? subjectLine);
 
-  const hubspotBcc = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.HUBSPOT_BCC) ?? '';
-  const params: SendParams = { htmlBody: msgObj.html, ...(hubspotBcc ? { bcc: hubspotBcc } : {}) };
+  const params: SendParams = {};
 
   if (emailTemplate) {
     params.attachments = emailTemplate.attachments;
@@ -285,7 +283,11 @@ export const sendViaGmail = (
     }
   }
 
-  GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, params);
+  sendEmailWithSendGrid(
+    row[COLS.RECIPIENT],
+    { subject: subjectLine, html: msgObj.html, text: msgObj.text },
+    { attachments: params.attachments },
+  );
 
   const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';

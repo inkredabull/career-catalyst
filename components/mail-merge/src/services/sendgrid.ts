@@ -1,30 +1,38 @@
-// SendGrid email sending.
+// SendGrid email sending with open/click tracking.
 // API key must be set via GAS Script Properties: SENDGRID_API_KEY
-// (Never hardcode — the old key from Code.gs has been revoked.)
 
-import { COLS, SCRIPT_PROPS, requireProp } from '../config/settings';
-
-interface MsgObj {
-  subject: string;
-  html: string;
-}
+import { SCRIPT_PROPS, requireProp } from '../config/settings';
 
 export const sendEmailWithSendGrid = (
-  row: Record<string, string>,
-  msgObj: MsgObj
+  to: string,
+  msgObj: { subject: string; html: string; text: string },
+  opts: { attachments?: GoogleAppsScript.Base.Blob[] } = {}
 ): void => {
   const apiKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.SENDGRID_API_KEY);
-  if (!apiKey) {
-    Logger.log('SENDGRID_API_KEY not set in Script Properties');
-    return;
-  }
+  if (!apiKey) throw new Error('SENDGRID_API_KEY Script Property not set');
 
-  const payload = {
-    personalizations: [{ to: [{ email: row[COLS.RECIPIENT] }] }],
+  const attachments = (opts.attachments ?? []).map(blob => ({
+    content: Utilities.base64Encode(blob.getBytes()),
+    filename: blob.getName() ?? 'attachment',
+    type: blob.getContentType() ?? 'application/octet-stream',
+    disposition: 'attachment',
+  }));
+
+  const payload: Record<string, unknown> = {
+    personalizations: [{ to: [{ email: to }] }],
     from: { email: requireProp(SCRIPT_PROPS.MY_EMAIL) },
     subject: msgObj.subject,
-    content: [{ type: 'text/html', value: msgObj.html }],
+    content: [
+      { type: 'text/plain', value: msgObj.text || ' ' },
+      { type: 'text/html', value: msgObj.html },
+    ],
+    tracking_settings: {
+      click_tracking: { enable: true },
+      open_tracking: { enable: true },
+    },
   };
+
+  if (attachments.length > 0) payload.attachments = attachments;
 
   const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
     method: 'post',
@@ -34,15 +42,9 @@ export const sendEmailWithSendGrid = (
     muteHttpExceptions: true,
   };
 
-  try {
-    const response = UrlFetchApp.fetch('https://api.sendgrid.com/v3/mail/send', options);
-    Logger.log('Status Code: %s', response.getResponseCode());
-    if (response.getResponseCode() === 202) {
-      Logger.log('Email sent successfully!');
-    } else {
-      Logger.log('SendGrid error: %s', response.getContentText());
-    }
-  } catch (e) {
-    Logger.log('Error sending via SendGrid: %s', e);
+  const response = UrlFetchApp.fetch('https://api.sendgrid.com/v3/mail/send', options);
+  const code = response.getResponseCode();
+  if (code !== 202) {
+    throw new Error(`SendGrid error ${code}: ${response.getContentText()}`);
   }
 };
