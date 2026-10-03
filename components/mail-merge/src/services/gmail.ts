@@ -37,7 +37,7 @@ export class UnresolvedTemplateError extends Error {
 /** Tokens allowed to render empty. Everything else aborts the row — new columns are
  *  required by default, which is the point: an unfilled token must never reach a recipient. */
 const OPTIONAL_TOKENS = new Set([
-  'PersonName', 'PersonURL', 'ContactURL', 'LinkedIn', 'Cell', 'L', 'Recent', 'Subject','Zeitgeisty'
+  'PersonName', 'PersonURL', 'ContactURL', 'LinkedIn', 'Cell', 'L', 'Recent', 'Subject', 'Zeitgeisty', 'Company'
 ]);
 
 // ── LinkedIn DM modal ─────────────────────────────────────────────────────────
