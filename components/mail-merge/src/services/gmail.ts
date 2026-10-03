@@ -349,9 +349,12 @@ const getSubjectOptionsForPicker = (): SubjectOption[] =>
 const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
   const fnJson = JSON.stringify(actionFn);
   const count = options.length;
-  // Pre-render options server-side so the dropdown is populated without JS
+  // Pre-render options server-side so the dropdown is populated without JS.
+  // Topic is encoded into the value as "subject|||topic" so inline onchange can read it
+  // without relying on the IIFE script block executing.
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const optionEls = options
-    .map(o => `<option value="${o.value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" data-topic="${o.topic.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}">${o.label.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</option>`)
+    .map(o => `<option value="${esc(o.value + '|||' + o.topic)}">${esc(o.label)}</option>`)
     .join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -368,7 +371,7 @@ button{padding:6px 16px;cursor:pointer}
 </style></head><body>
 <div id="form">
 <p>Select a subject line (${count} loaded):</p>
-<select id="s"><option value="">-- Select --</option>${optionEls}</select>
+<select id="s" onchange="var p=this.value.split('|||');document.getElementById('t').value=p[1]||''"><option value="">-- Select --</option>${optionEls}</select>
 <p>Topic (used in SMS / LinkedIn message):</p>
 <input type="text" id="t" placeholder="${DEFAULT_TOPIC}">
 <div class="btns">
@@ -387,10 +390,6 @@ var tin=document.getElementById('t');
 var logDiv=document.getElementById('log');
 var pollTimer=null;
 var shownCount=0;
-if(sel)sel.addEventListener('change',function(){
-var opt=sel.options[sel.selectedIndex];
-tin.value=(opt&&opt.getAttribute('data-topic'))||'';
-});
 function appendNewLines(lines){
 var all=lines||[];
 var fresh=all.slice(shownCount);
@@ -407,10 +406,10 @@ google.script.run
 .getSendProgress();
 }
 window.doSubmit=function(){
-var s=sel.value;
+var parts=sel.value.split('|||');
+var s=parts[0];
 if(!s){alert('Please select a subject line.');return;}
-var opt=sel.options[sel.selectedIndex];
-var t=tin.value.trim()||(opt&&opt.getAttribute('data-topic'))||'${DEFAULT_TOPIC}';
+var t=tin.value.trim()||parts[1]||'${DEFAULT_TOPIC}';
 document.getElementById('form').style.display='none';
 document.getElementById('loading').style.display='block';
 logDiv.textContent='';
