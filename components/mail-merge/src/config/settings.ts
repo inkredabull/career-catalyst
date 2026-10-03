@@ -27,6 +27,7 @@ export const COLS = {
   RECIPIENT: 'Recipient',
   CELL: 'Cell',
   FIRST_NAME: 'First',
+  COMPANY: 'Company',
   FULL_NAME: 'Full Name',
   EMAIL_SENT: 'Email Sent',
   SUBJECT: 'Subject',

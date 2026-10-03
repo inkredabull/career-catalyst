@@ -347,9 +347,12 @@ const getSubjectOptionsForPicker = (): SubjectOption[] =>
   });
 
 const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
-  const optionsJson = JSON.stringify(options);
-  const topicMapJson = JSON.stringify(Object.fromEntries(options.map(o => [o.value, o.topic])));
-  const fnJson = JSON.stringify(actionFn);
+  // Encode data as HTML attributes to avoid any GAS HtmlService script-block sanitization.
+  // JSON.stringify values are HTML-attribute-encoded (" → &quot;) so they survive the attribute boundary.
+  const optionsAttr = JSON.stringify(options).replace(/"/g, '&quot;');
+  const topicMapAttr = JSON.stringify(Object.fromEntries(options.map(o => [o.value, o.topic]))).replace(/"/g, '&quot;');
+  const fnAttr = actionFn.replace(/"/g, '&quot;');
+  const count = options.length;
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
 p{margin:0 0 4px;font-size:13px}
@@ -363,8 +366,9 @@ button{padding:6px 16px;cursor:pointer}
 @keyframes spin{to{transform:rotate(360deg)}}
 #log{margin-top:10px;height:160px;overflow-y:auto;background:#f7f7f7;border:1px solid #ddd;border-radius:3px;padding:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;text-align:left}
 </style></head><body>
+<div id="cc-data" data-options="${optionsAttr}" data-topic-map="${topicMapAttr}" data-fn="${fnAttr}" style="display:none"></div>
 <div id="form">
-<p>Select a subject line:</p>
+<p>Select a subject line (${count} loaded):</p>
 <select id="s"><option value="">-- Select --</option></select>
 <p>Topic (used in SMS / LinkedIn message):</p>
 <input type="text" id="t" placeholder="${DEFAULT_TOPIC}">
@@ -379,14 +383,15 @@ button{padding:6px 16px;cursor:pointer}
 </div>
 <script>
 (function(){
-var options=${optionsJson};
-var topicMap=${topicMapJson};
+var dataEl=document.getElementById('cc-data');
+var options=JSON.parse(dataEl.getAttribute('data-options'));
+var topicMap=JSON.parse(dataEl.getAttribute('data-topic-map'));
+var fn=dataEl.getAttribute('data-fn');
 var sel=document.getElementById('s');
 var tin=document.getElementById('t');
 var logDiv=document.getElementById('log');
 var pollTimer=null;
 var shownCount=0;
-if(!sel){console.error('CC picker: #s not found');return;}
 options.forEach(function(o){var el=document.createElement('option');el.value=o.value;el.textContent=o.label;sel.appendChild(el);});
 sel.addEventListener('change',function(){tin.value=topicMap[sel.value]||'';});
 function appendNewLines(lines){
@@ -427,7 +432,7 @@ document.getElementById('loading').style.display='none';
 document.getElementById('form').style.display='block';
 alert(e.message);
 })
-[${fnJson}](s,t);
+[fn](s,t);
 };
 })();
 </script></body></html>`;
