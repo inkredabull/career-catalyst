@@ -22,6 +22,7 @@ interface MsgObj {
 interface SendParams {
   htmlBody: string;
   attachments?: GoogleAppsScript.Base.Blob[];
+  bcc?: string;
 }
 
 /** Thrown by fillInTemplateFromObject when a token would render blank. Always raised *before*
@@ -258,7 +259,8 @@ export const sendViaGmail = (
   // Use the original draft subject (with tokens) for flag lookup so template-based keys match
   const flags = getFlagsForSubject(draftSubject ?? subjectLine);
 
-  const params: SendParams = { htmlBody: msgObj.html };
+  const hubspotBcc = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.HUBSPOT_BCC) ?? '';
+  const params: SendParams = { htmlBody: msgObj.html, ...(hubspotBcc ? { bcc: hubspotBcc } : {}) };
 
   if (emailTemplate) {
     params.attachments = emailTemplate.attachments;

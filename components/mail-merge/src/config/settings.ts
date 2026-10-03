@@ -11,6 +11,7 @@ export const SCRIPT_PROPS = {
   RESUME_URL: 'RESUME_URL',
   WARMUP_EXCLUDE_LABEL_PREFIXES: 'WARMUP_EXCLUDE_LABEL_PREFIXES',
   WARMUP_EXCLUDE_EMAILS: 'WARMUP_EXCLUDE_EMAILS',
+  HUBSPOT_BCC: 'HUBSPOT_BCC',
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */
@@ -61,6 +62,11 @@ export const SUBJECT_LINE_CONFIG = [
   //   flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
   // },
   // { subject: 'Q2 2026 latest-and-greatest', defaultTopic: 'the latest', flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } },
+  {
+    subject: "2-week AI sprint for {{Company}}",
+    defaultTopic: 'checking in around AI-efficiencies',
+    flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
+  },
   {
     subject: "Need any add'l eng firepower?",
     defaultTopic: 'adding eng firepower',
