@@ -340,10 +340,7 @@ const getSubjectOptionsForPicker = (): SubjectOption[] =>
     const sms = flags.SEND_SMS ? '🟢' : '🔴';
     const resume = flags.ATTACH_RESUME ? '🟢' : '🔴';
     const photo = flags.ATTACH_PHOTO ? '🟢' : '🔴';
-    // Strip {{tokens}} from the display label — they look noisy and {{...}} in JSON inside
-    // a GAS HtmlService script block can be misinterpreted as template syntax.
-    const displaySubject = subject.replace(/\{\{[^}]*\}\}/g, '…');
-    return { value: subject, label: `${sms}📱 ${resume}📎 ${photo}🖼️  ${displaySubject}`, topic: getTopicForSubject(subject) };
+    return { value: subject, label: `${sms}📱 ${resume}📎 ${photo}🖼️  ${subject}`, topic: getTopicForSubject(subject) };
   });
 
 const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
@@ -353,8 +350,8 @@ const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): str
   const optionEls = options
     .map(o => `<option value="${esc(o.value + '|||' + o.topic)}">${esc(o.label)}</option>`)
     .join('');
-  // doSubmit lives entirely in the onclick attribute — <script> blocks are stripped by GAS HtmlService.
-  // Uses direct method call (google.script.run.doSendEmails) instead of bracket notation.
+  // All JS lives in inline event attributes — GAS HtmlService strips <script> blocks.
+  // window._* globals let the poll callback and the success/failure handlers share state.
   const okOnclick = [
     "var sel=document.getElementById('s');",
     "var tin=document.getElementById('t');",
@@ -365,7 +362,13 @@ const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): str
     "if(typeof google==='undefined'||!google.script){alert('GAS not ready — please reload.');return;}",
     "document.getElementById('form').style.display='none';",
     "document.getElementById('loading').style.display='block';",
-    `google.script.run.withSuccessHandler(function(){google.script.host.close();}).withFailureHandler(function(e){document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).${actionFn}(s,t);`,
+    "window._shownCount=0;",
+    "window._logDiv=document.getElementById('log');",
+    "window._logDiv.textContent='';",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress();};",
+    "window._poll();",
+    "window._timer=setInterval(window._poll,1000);",
+    `google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},2000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).${actionFn}(s,t);`,
   ].join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -644,6 +647,7 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
     '{{Blurb}}': data['Blurb'] || PROFILE.blurb[0],
     '{{Connection}}': connection(data['PersonName'], data['PersonURL']),
     '{{Intro}}': intro(data['PersonName'] ?? '', data['JobTitleActual'] ?? '', data['Blurb']),
+    '{{Company}}': data[COLS.COMPANY] || '',
   };
 
   for (const [token, value] of Object.entries(subs)) {
