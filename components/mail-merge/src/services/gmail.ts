@@ -340,7 +340,10 @@ const getSubjectOptionsForPicker = (): SubjectOption[] =>
     const sms = flags.SEND_SMS ? '🟢' : '🔴';
     const resume = flags.ATTACH_RESUME ? '🟢' : '🔴';
     const photo = flags.ATTACH_PHOTO ? '🟢' : '🔴';
-    return { value: subject, label: `${sms}📱 ${resume}📎 ${photo}🖼️  ${subject}`, topic: getTopicForSubject(subject) };
+    // Strip {{tokens}} from the display label — they look noisy and {{...}} in JSON inside
+    // a GAS HtmlService script block can be misinterpreted as template syntax.
+    const displaySubject = subject.replace(/\{\{[^}]*\}\}/g, '…');
+    return { value: subject, label: `${sms}📱 ${resume}📎 ${photo}🖼️  ${displaySubject}`, topic: getTopicForSubject(subject) };
   });
 
 const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): string => {
@@ -383,6 +386,7 @@ var tin=document.getElementById('t');
 var logDiv=document.getElementById('log');
 var pollTimer=null;
 var shownCount=0;
+if(!sel){console.error('CC picker: #s not found');return;}
 options.forEach(function(o){var el=document.createElement('option');el.value=o.value;el.textContent=o.label;sel.appendChild(el);});
 sel.addEventListener('change',function(){tin.value=topicMap[sel.value]||'';});
 function appendNewLines(lines){
