@@ -283,11 +283,19 @@ export const sendViaGmail = (
     }
   }
 
-  sendEmailWithSendGrid(
-    row[COLS.RECIPIENT],
-    { subject: subjectLine, html: msgObj.html, text: msgObj.text },
-    { attachments: params.attachments },
-  );
+  const emailProvider = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.EMAIL_PROVIDER) ?? 'sendgrid';
+  if (emailProvider === 'gmail') {
+    GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, {
+      htmlBody: msgObj.html,
+      attachments: params.attachments,
+    });
+  } else {
+    sendEmailWithSendGrid(
+      row[COLS.RECIPIENT],
+      { subject: subjectLine, html: msgObj.html, text: msgObj.text },
+      { attachments: params.attachments },
+    );
+  }
 
   const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';

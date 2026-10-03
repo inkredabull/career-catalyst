@@ -11,6 +11,7 @@ export const SCRIPT_PROPS = {
   RESUME_URL: 'RESUME_URL',
   WARMUP_EXCLUDE_LABEL_PREFIXES: 'WARMUP_EXCLUDE_LABEL_PREFIXES',
   WARMUP_EXCLUDE_EMAILS: 'WARMUP_EXCLUDE_EMAILS',
+  EMAIL_PROVIDER: 'EMAIL_PROVIDER', // 'sendgrid' (default) | 'gmail'
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */
