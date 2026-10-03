@@ -382,14 +382,21 @@ var sel=document.getElementById('s');
 var tin=document.getElementById('t');
 var logDiv=document.getElementById('log');
 var pollTimer=null;
+var shownCount=0;
 options.forEach(function(o){var el=document.createElement('option');el.value=o.value;el.textContent=o.label;sel.appendChild(el);});
 sel.addEventListener('change',function(){tin.value=topicMap[sel.value]||'';});
+function appendNewLines(lines){
+var all=lines||[];
+var fresh=all.slice(shownCount);
+if(!fresh.length)return;
+if(shownCount>0)logDiv.textContent+='\n';
+logDiv.textContent+=fresh.join('\n');
+shownCount=all.length;
+logDiv.scrollTop=logDiv.scrollHeight;
+}
 function poll(){
 google.script.run
-.withSuccessHandler(function(lines){
-logDiv.textContent=(lines||[]).join('\\n');
-logDiv.scrollTop=logDiv.scrollHeight;
-})
+.withSuccessHandler(appendNewLines)
 .withFailureHandler(function(){})
 .getSendProgress();
 }
@@ -400,13 +407,14 @@ var t=tin.value.trim()||topicMap[s]||'${DEFAULT_TOPIC}';
 document.getElementById('form').style.display='none';
 document.getElementById('loading').style.display='block';
 logDiv.textContent='';
+shownCount=0;
 poll();
 pollTimer=setInterval(poll,1000);
 google.script.run
 .withSuccessHandler(function(){
 clearInterval(pollTimer);
 poll();
-setTimeout(function(){google.script.host.close();},600);
+setTimeout(function(){google.script.host.close();},2000);
 })
 .withFailureHandler(function(e){
 clearInterval(pollTimer);
@@ -655,7 +663,6 @@ export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, 
     '{{Accomplishment3}}': accomplishments(3),
     '{{Accomplishment4}}': accomplishments(4),
     '{{AboutMe}}': aboutMe(),
-    '{{Company}}': data['Company'] || '',
     '{{Reciprocate}}': reciprocate(),
     '{{CalendlyURL}}': calendlyURL(),
     '{{WhatAndWhere}}': aboutMe(),
