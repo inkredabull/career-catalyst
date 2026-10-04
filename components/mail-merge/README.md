@@ -72,9 +72,10 @@ In the GAS editor (Extensions → Apps Script → Project Settings → Script Pr
 |-----|-------|
 | `ANTHROPIC_API_KEY` | Your Anthropic API key |
 | `SENDGRID_API_KEY` | Your SendGrid API key (create a new one — never use old keys) |
-| `MY_EMAIL` | Your sending email address |
+| `MY_EMAIL` | Your sending email address (must be a verified sender in SendGrid) |
 | `MY_PHONE` | Your phone number (for SMS warmup) |
 | `NGROK_SMS_URL` | Your ngrok tunnel URL (optional, only if using SMS) |
+| `EMAIL_PROVIDER` | `sendgrid` (default) or `gmail` — see [Email provider toggle](#email-provider-toggle) |
 
 ---
 
@@ -187,6 +188,23 @@ drafts with that subject, the **oldest one that still contains `{{tokens}}`** �
 oldest match if none do. Keep the original template draft around; deleting it and leaving only
 personalized copies makes Morning Warmup abort with a "no drafts created" notice rather than send
 everyone the same first name.
+
+---
+
+## Email provider toggle
+
+All sends route through **SendGrid by default**, which injects open/click tracking pixels automatically. The `EMAIL_PROVIDER` Script Property lets you switch back to Gmail (e.g. for local testing or if SendGrid isn't configured yet).
+
+| `EMAIL_PROVIDER` value | Behaviour |
+|------------------------|-----------|
+| `sendgrid` (default, or unset) | Sends via SendGrid Web API (`/v3/mail/send`); open and click events appear in the SendGrid Activity dashboard |
+| `gmail` | Sends via `GmailApp.sendEmail`; no tracking, behaves like the original implementation |
+
+**SendGrid requirements when using `sendgrid`:**
+- `SENDGRID_API_KEY` must be set (full "Mail Send" permission)
+- `MY_EMAIL` must be a **Verified Sender** in SendGrid (Settings → Sender Authentication); unverified senders get a 403
+
+To switch: open the GAS editor → Project Settings → Script Properties → set `EMAIL_PROVIDER` to `gmail` or `sendgrid`.
 
 ---
 
