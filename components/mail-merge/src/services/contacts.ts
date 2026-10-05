@@ -87,34 +87,22 @@ const getMostRecentInteractionDate = (email: string): GoogleAppsScript.Base.Date
 // ── Do Lookup dialog ──────────────────────────────────────────────────────────
 
 const buildDoLookupHtml = (): string => {
-  const runOnclick = [
-    "document.getElementById('form').style.display='none';",
-    "document.getElementById('loading').style.display='block';",
+  const runNow = [
     "window._shownCount=0;",
     "window._logDiv=document.getElementById('log');",
     "window._logDiv.textContent='';",
     "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress();};",
     "window._poll();",
     "window._timer=setInterval(window._poll,1000);",
-    "google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},3000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).doFetchContactToSheet();",
+    "google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},3000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).doFetchContactToSheet();",
   ].join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
-p{margin:0 0 12px;font-size:13px;color:#444}
-.btns{display:flex;gap:8px;justify-content:flex-end}
-button{padding:6px 16px;cursor:pointer}
-#loading{display:none;text-align:center;padding:8px 0;color:#555;font-size:14px}
+#loading{text-align:center;padding:8px 0;color:#555;font-size:14px}
 .spinner{display:inline-block;margin-right:6px;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #log{margin-top:10px;height:200px;overflow-y:auto;background:#f7f7f7;border:1px solid #ddd;border-radius:3px;padding:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;text-align:left}
-</style></head><body>
-<div id="form">
-<p>Fill Email, Cell, LinkedIn, Company, Recent, and Zeitgeisty from Google Contacts for all rows on the active sheet.</p>
-<div class="btns">
-<button onclick="google.script.host.close()">Cancel</button>
-<button onclick="${runOnclick}">Run</button>
-</div>
-</div>
+</style></head><body onload="${runNow}">
 <div id="loading">
 <div><span class="spinner">⏳</span>Running lookup — please wait…</div>
 <div id="log"></div>
@@ -179,6 +167,7 @@ export const doFetchContactToSheet = (): void => {
     const existingEmail = String(row[recipientIdx] ?? '').trim();
 
     if (existingEmail) {
+      logAndPush(`[Do Lookup] Row ${i + 1}: email already set (${existingEmail}), checking recent interaction`);
       if (recentIdx !== -1) {
         const lastDate = getMostRecentInteractionDate(existingEmail);
         if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
