@@ -13,6 +13,14 @@ export interface ContactDetails {
   company: string;
 }
 
+export interface ZeitgeistyCandidate {
+  sheetRow: number;
+  postText: string;
+  postUrl: string;
+  prompt: string;
+  suggestion: string;
+}
+
 // ── LinkedIn URL lookup ────────────────────────────────────────────────────────
 
 export const getLinkedInUrlByName = (fullName: string): string | null => {
@@ -94,7 +102,10 @@ const buildDoLookupHtml = (): string => {
     "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress();};",
     "window._poll();",
     "window._timer=setInterval(window._poll,1000);",
-    "google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},3000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).doFetchContactToSheet();",
+    "window._renderCandidate=function(){var c=window._candidates[window._idx];document.getElementById('reviewCount').textContent='Reviewing '+(window._idx+1)+' of '+window._candidates.length;document.getElementById('postText').textContent=c.postText;var link=document.getElementById('postUrl');link.href=c.postUrl;link.textContent=c.postUrl;document.getElementById('suggestion').textContent=c.suggestion;document.getElementById('prompt').textContent=c.prompt;document.getElementById('edit').value=c.suggestion;};",
+    "window._advance=function(){window._idx++;if(window._idx>=window._candidates.length){google.script.host.close();}else{window._renderCandidate();}};",
+    "window._submitRow=function(){var c=window._candidates[window._idx];google.script.run.withSuccessHandler(window._advance).withFailureHandler(function(e){alert(e.message);}).applyZeitgeistyToRow(c.sheetRow,document.getElementById('edit').value);};",
+    "google.script.run.withSuccessHandler(function(result){clearInterval(window._timer);window._poll();var candidates=(result&&result.candidates)||[];if(candidates.length===0){setTimeout(function(){google.script.host.close();},3000);}else{window._candidates=candidates;window._idx=0;document.getElementById('loading').style.display='none';document.getElementById('review').style.display='block';window._renderCandidate();}}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).doFetchContactToSheet();",
   ].join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -102,10 +113,35 @@ body{font-family:sans-serif;padding:16px;min-width:320px}
 .spinner{display:inline-block;margin-right:6px;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #log{margin-top:10px;height:200px;overflow-y:auto;background:#f7f7f7;border:1px solid #ddd;border-radius:3px;padding:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;text-align:left}
+#review{display:none}
+#review h4{margin:10px 0 4px;font-size:12px;color:#666;text-transform:uppercase}
+#review .box{background:#f7f7f7;border:1px solid #ddd;border-radius:3px;padding:6px;font-size:12px;white-space:pre-wrap;max-height:90px;overflow-y:auto}
+#prompt{font-family:monospace;font-size:10px}
+#edit{width:100%;box-sizing:border-box;font-size:13px;padding:6px;min-height:60px}
+#reviewCount{font-weight:bold;margin-bottom:6px}
+.review-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.review-btns button{padding:6px 16px;cursor:pointer}
 </style></head><body>
 <div id="loading">
 <div><span class="spinner">⏳</span>Running lookup — please wait…</div>
 <div id="log"></div>
+</div>
+<div id="review">
+<div id="reviewCount"></div>
+<h4>Most recent LinkedIn post</h4>
+<div id="postText" class="box"></div>
+<h4>Post URL</h4>
+<div class="box"><a id="postUrl" href="#" target="_blank"></a></div>
+<h4>Claude's suggestion</h4>
+<div id="suggestion" class="box"></div>
+<h4>Prompt sent to Claude</h4>
+<div id="prompt" class="box"></div>
+<h4>Zeitgeisty (editable)</h4>
+<textarea id="edit"></textarea>
+<div class="review-btns">
+<button onclick="window._advance()">Skip</button>
+<button onclick="window._submitRow()">Submit &amp; Next</button>
+</div>
 </div>
 <script>${runNow}</script>
 </body></html>`;
@@ -113,12 +149,21 @@ body{font-family:sans-serif;padding:16px;min-width:320px}
 
 /** Menu entry: shows the Do Lookup progress dialog. */
 export const fetchContactToSheet = (): void => {
-  const html = HtmlService.createHtmlOutput(buildDoLookupHtml()).setWidth(500).setHeight(340);
+  const html = HtmlService.createHtmlOutput(buildDoLookupHtml()).setWidth(560).setHeight(560);
   SpreadsheetApp.getUi().showModalDialog(html, 'Do Lookup');
 };
 
+/** Writes reviewed/edited Zeitgeisty text into a specific sheet row. */
+export const applyZeitgeistyToRow = (sheetRow: number, text: string): void => {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] as string[];
+  const zeitgeistyIdx = headers.indexOf(COLS.ZEITGEISTY);
+  if (zeitgeistyIdx === -1) throw new Error(`No "${COLS.ZEITGEISTY}" column found.`);
+  sheet.getRange(sheetRow, zeitgeistyIdx + 1).setValue(text);
+};
+
 /** Called by the dialog; does the actual work with progress logging. */
-export const doFetchContactToSheet = (): void => {
+export const doFetchContactToSheet = (): { filled: number; candidates: ZeitgeistyCandidate[] } => {
   clearProgress();
   const sheet = SpreadsheetApp.getActiveSheet();
   const data = sheet.getDataRange().getValues() as string[][];
@@ -139,6 +184,8 @@ export const doFetchContactToSheet = (): void => {
   const zeitgeistyEnabled =
     PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ZEITGEISTY_ENABLED) === 'true';
 
+  const candidates: ZeitgeistyCandidate[] = [];
+
   const enrichZeitgeisty = (rowIdx: number, linkedInUrl: string, firstName: string): void => {
     logAndPush(`[Zeitgeisty] Row ${rowIdx + 1}: enabled=${zeitgeistyEnabled} colIdx=${zeitgeistyIdx} hasUrl=${!!linkedInUrl}`);
     if (!zeitgeistyEnabled) { logAndPush('[Zeitgeisty] skip: ZEITGEISTY_ENABLED not true'); return; }
@@ -147,13 +194,19 @@ export const doFetchContactToSheet = (): void => {
     const existing = String(data[rowIdx]?.[zeitgeistyIdx] ?? '').trim();
     if (existing) { logAndPush(`[Zeitgeisty] skip: already filled "${existing.slice(0, 40)}"`); return; }
     try {
-      const postText = fetchMostRecentPost(linkedInUrl);
-      logAndPush(`[Zeitgeisty] postText (${postText.length} chars): "${postText.slice(0, 200)}"`);
-      if (!postText) { logAndPush('[Zeitgeisty] skip: no post text from browser scraper'); return; }
-      const zeitgeist = generateZeitgeistyString(postText, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
+      const post = fetchMostRecentPost(linkedInUrl);
+      logAndPush(`[Zeitgeisty] postText (${post.text.length} chars): "${post.text.slice(0, 200)}"`);
+      if (!post.text) { logAndPush('[Zeitgeisty] skip: no post text from browser scraper'); return; }
+      const { prompt, result: zeitgeist } = generateZeitgeistyString(post.text, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
       if (zeitgeist) {
-        logAndPush(`[Zeitgeisty] Row ${rowIdx + 1} written: "${zeitgeist.slice(0, 80)}"`);
-        sheet.getRange(rowIdx + 2, zeitgeistyIdx + 1).setValue(zeitgeist);
+        logAndPush(`[Zeitgeisty] Row ${rowIdx + 1} ready for review: "${zeitgeist.slice(0, 80)}"`);
+        candidates.push({
+          sheetRow: rowIdx + 2,
+          postText: post.text,
+          postUrl: post.url,
+          prompt,
+          suggestion: zeitgeist,
+        });
       } else {
         logAndPush('[Zeitgeisty] skip: Claude returned empty string');
       }
@@ -213,6 +266,7 @@ export const doFetchContactToSheet = (): void => {
 
   logAndPush(`Done — ${filled} row(s) updated`);
   SpreadsheetApp.getActive().toast(`${filled} row(s) updated`, '✅ Lookup Complete', 4);
+  return { filled, candidates };
 };
 
 export const getLinkedInUrlToSheet = (): void => {

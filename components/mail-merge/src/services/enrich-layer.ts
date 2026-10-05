@@ -39,19 +39,25 @@ const fetchMostRecentPostViaBrowser = (
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
-/** Returns the most recent LinkedIn post text for Zeitgeisty enrichment, or '' to skip. */
-export const fetchMostRecentPost = (linkedInUrl: string): string => {
+export interface RecentPost {
+  text: string;
+  url: string;
+}
+
+/** Returns the most recent LinkedIn post (text + URL) for Zeitgeisty enrichment, or empty strings to skip. */
+export const fetchMostRecentPost = (linkedInUrl: string): RecentPost => {
+  const empty: RecentPost = { text: '', url: '' };
   const browser = fetchMostRecentPostViaBrowser(linkedInUrl);
   if (!browser?.text) {
     console.log('[BrowserScraper] no result — skipping Zeitgeisty');
-    return '';
+    return empty;
   }
 
   const ageDays = activityAgeDays(browser.activityUrl);
   if (ageDays !== null) {
     if (ageDays > 30) {
       console.log(`[BrowserScraper] most recent post is ${ageDays}d old — skipping Zeitgeisty`);
-      return '';
+      return empty;
     }
     console.log(`[BrowserScraper] post is ${ageDays}d old`);
   }
@@ -59,20 +65,25 @@ export const fetchMostRecentPost = (linkedInUrl: string): string => {
   randomSleep(LINKEDIN_PACING_MS.min, LINKEDIN_PACING_MS.max);
 
   console.log(`[BrowserScraper] url=${browser.activityUrl} text="${browser.text.slice(0, 150)}"`);
-  return browser.text;
+  return { text: browser.text, url: browser.activityUrl };
 };
 
 // ── Claude Zeitgeisty generator ───────────────────────────────────────────────
+
+export interface ZeitgeistyGeneration {
+  prompt: string;
+  result: string;
+}
 
 /** Calls Claude Haiku to produce a single-sentence comment or question based on a recent post. */
 export const generateZeitgeistyString = (
   postText: string,
   firstName: string,
   fetchFn: FetchFn,
-): string => {
+): ZeitgeistyGeneration => {
   const apiKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ANTHROPIC_API_KEY);
   console.log(`[Claude] generating for ${firstName} apiKey=${apiKey ? 'set' : 'MISSING'} postLen=${postText.length}`);
-  if (!apiKey || !postText) return '';
+  if (!apiKey || !postText) return { prompt: '', result: '' };
 
   const prompt = `Based on this recent LinkedIn post by ${firstName}, write a single sentence — a genuine comment or question of anywhere between 45 and 75 characters — to open a conversation. Sound curious and human, not salesy.\n\nPost: "${postText}"\n\nReturn only the single sentence, nothing else.`;
 
@@ -94,5 +105,5 @@ export const generateZeitgeistyString = (
   const data = JSON.parse(resp.getContentText()) as { content: { text: string }[] };
   const result = data.content?.[0]?.text?.trim() ?? '';
   console.log(`[Claude] result: "${result}"`);
-  return result;
+  return { prompt, result };
 };
