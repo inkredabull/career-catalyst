@@ -102,11 +102,12 @@ body{font-family:sans-serif;padding:16px;min-width:320px}
 .spinner{display:inline-block;margin-right:6px;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #log{margin-top:10px;height:200px;overflow-y:auto;background:#f7f7f7;border:1px solid #ddd;border-radius:3px;padding:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;text-align:left}
-</style></head><body onload="${runNow}">
+</style></head><body>
 <div id="loading">
 <div><span class="spinner">⏳</span>Running lookup — please wait…</div>
 <div id="log"></div>
 </div>
+<script>${runNow}</script>
 </body></html>`;
 };
 
