@@ -13,6 +13,6 @@ const getMinLevel = (): number => {
 
 export const log = (level: Level, msg: string, ...args: unknown[]): void => {
   if (LEVELS[level] >= getMinLevel()) {
-    Logger.log(`[${level}] ${msg}`, ...args);
+    console.log(`[${level}] ${msg}`, ...args);
   }
 };

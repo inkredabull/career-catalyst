@@ -28,7 +28,7 @@ export const getLinkedInUrlByName = (fullName: string): string | null => {
     }
   }
 
-  Logger.log('No LinkedIn URL found for %s', fullName);
+  console.log(`No LinkedIn URL found for ${fullName}`);
   return null;
 };
 
@@ -44,7 +44,7 @@ export const getContactDetails = (fullName: string): ContactDetails => {
   const result: ContactDetails = { email: '', mobile: '', linkedin: '', company: '' };
 
   if (!response.results?.length) {
-    Logger.log('No contacts found for: %s', fullName);
+    console.log(`No contacts found for: ${fullName}`);
     return result;
   }
 
@@ -133,9 +133,15 @@ export const fetchContactToSheet = (): void => {
     }
 
     if (!row[fullNameIdx]) continue;
-    const contact = getContactDetails(String(row[fullNameIdx]));
-    if (!contact.email) continue;
+    const fullName = String(row[fullNameIdx]);
+    console.log(`[Do Lookup] Row ${i + 1}: looking up "${fullName}"`);
+    const contact = getContactDetails(fullName);
+    if (!contact.email) {
+      console.log(`[Do Lookup] Row ${i + 1}: no email found for "${fullName}"`);
+      continue;
+    }
 
+    console.log(`[Do Lookup] Row ${i + 1}: found email=${contact.email} linkedin=${contact.linkedin || '(none)'} company=${contact.company || '(none)'}`);
     sheet.getRange(i + 2, recipientIdx + 1).setValue(contact.email);
     if (cellIdx !== -1 && !row[cellIdx] && contact.mobile)
       sheet.getRange(i + 2, cellIdx + 1).setValue(contact.mobile);
@@ -301,9 +307,9 @@ export const reclassifySingleOtherAsHome = (): void => {
           person.resourceName as string,
           { updatePersonFields: 'emailAddresses' }
         );
-        Logger.log('Updated %s to "home" email', person.resourceName);
+        console.log(`Updated ${person.resourceName} to "home" email`);
       } catch (e) {
-        Logger.log('Error updating %s: %s', person.resourceName, e);
+        console.log(`Error updating ${person.resourceName}: ${e}`);
       }
     }
 

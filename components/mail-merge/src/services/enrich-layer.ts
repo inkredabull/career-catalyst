@@ -7,7 +7,7 @@ type FetchFn = (url: string, opts: object) => { getContentText(): string };
 /** Fetches the LinkedIn profile via EnrichLayer and returns the most recent post text, or ''. */
 export const fetchMostRecentPost = (linkedInUrl: string): string => {
   const apiKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ENRICH_LAYER_API_KEY);
-  if (!apiKey) { Logger.log('ENRICH_LAYER_API_KEY not set'); return ''; }
+  if (!apiKey) { console.log('ENRICH_LAYER_API_KEY not set'); return ''; }
 
   const url = `https://enrichlayer.com/api/v2/profile?profile_url=${encodeURIComponent(linkedInUrl)}&fallback_to_cache=on-error`;
   const resp = UrlFetchApp.fetch(url, {
@@ -17,7 +17,7 @@ export const fetchMostRecentPost = (linkedInUrl: string): string => {
   });
 
   if (resp.getResponseCode() !== 200) {
-    Logger.log('EnrichLayer %s: %s', resp.getResponseCode(), resp.getContentText());
+    console.log(`EnrichLayer ${resp.getResponseCode()}: ${resp.getContentText()}`);
     return '';
   }
 
