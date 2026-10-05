@@ -37,6 +37,7 @@ export const generateZeitgeistyString = (
   fetchFn: FetchFn,
 ): string => {
   const apiKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ANTHROPIC_API_KEY);
+  console.log(`[Claude] generating for ${firstName} apiKey=${apiKey ? 'set' : 'MISSING'} postLen=${postText.length}`);
   if (!apiKey || !postText) return '';
 
   const prompt = `Based on this recent LinkedIn post by ${firstName}, write a single sentence — a genuine comment or question — to open a conversation. Sound curious and human, not salesy.\n\nPost: "${postText}"\n\nReturn only the single sentence, nothing else.`;
@@ -56,6 +57,8 @@ export const generateZeitgeistyString = (
     muteHttpExceptions: true,
   });
 
-  const data = JSON.parse(resp.getContentText()) as { content: { text: string }[] };
+  const rawResp = resp.getContentText();
+  console.log(`[Claude] response (first 300 chars): ${rawResp.slice(0, 300)}`);
+  const data = JSON.parse(rawResp) as { content: { text: string }[] };
   return data.content?.[0]?.text?.trim() ?? '';
 };
