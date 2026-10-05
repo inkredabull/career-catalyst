@@ -111,12 +111,19 @@ export const fetchContactToSheet = (): void => {
     if (!linkedInUrl) { console.log('[Zeitgeisty] skip: no LinkedIn URL'); return; }
     const existing = String(data[rowIdx]?.[zeitgeistyIdx] ?? '').trim();
     if (existing) { console.log(`[Zeitgeisty] skip: already filled "${existing.slice(0, 40)}"`); return; }
-    const postText = fetchMostRecentPost(linkedInUrl);
-    if (!postText) { console.log('[Zeitgeisty] skip: no activity text from EnrichLayer'); return; }
-    const zeitgeist = generateZeitgeistyString(postText, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
-    if (zeitgeist) {
-      console.log(`[Zeitgeisty] Row ${rowIdx + 1} written: "${zeitgeist.slice(0, 80)}"`);
-      sheet.getRange(rowIdx + 2, zeitgeistyIdx + 1).setValue(zeitgeist);
+    try {
+      const postText = fetchMostRecentPost(linkedInUrl);
+      console.log(`[Zeitgeisty] postText length=${postText.length}`);
+      if (!postText) { console.log('[Zeitgeisty] skip: no activity text from EnrichLayer'); return; }
+      const zeitgeist = generateZeitgeistyString(postText, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
+      if (zeitgeist) {
+        console.log(`[Zeitgeisty] Row ${rowIdx + 1} written: "${zeitgeist.slice(0, 80)}"`);
+        sheet.getRange(rowIdx + 2, zeitgeistyIdx + 1).setValue(zeitgeist);
+      } else {
+        console.log('[Zeitgeisty] skip: Claude returned empty string');
+      }
+    } catch (e) {
+      console.log(`[Zeitgeisty] ERROR: ${e}`);
     }
   };
 
