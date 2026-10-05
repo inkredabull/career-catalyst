@@ -113,7 +113,7 @@ export const fetchContactToSheet = (): void => {
     if (existing) { console.log(`[Zeitgeisty] skip: already filled "${existing.slice(0, 40)}"`); return; }
     try {
       const postText = fetchMostRecentPost(linkedInUrl);
-      console.log(`[Zeitgeisty] postText length=${postText.length}`);
+      console.log(`[Zeitgeisty] postText (${postText.length} chars): "${postText.slice(0, 200)}"`);
       if (!postText) { console.log('[Zeitgeisty] skip: no activity text from EnrichLayer'); return; }
       const zeitgeist = generateZeitgeistyString(postText, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
       if (zeitgeist) {
