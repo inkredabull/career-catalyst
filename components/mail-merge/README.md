@@ -75,7 +75,8 @@ In the GAS editor (Extensions → Apps Script → Project Settings → Script Pr
 | `MY_EMAIL` | Your sending email address (must be a verified sender in SendGrid) |
 | `MY_PHONE` | Your phone number (for SMS warmup) |
 | `NGROK_SMS_URL` | Your ngrok tunnel URL (optional, only if using SMS) |
-| `EMAIL_PROVIDER` | `sendgrid` (default) or `gmail` — see [Email provider toggle](#email-provider-toggle) |
+| `EMAIL_PROVIDER` | `sendgrid` (default), `resend`, or `gmail` — see [Email provider toggle](#email-provider-toggle) |
+| `RESEND_API_KEY` | Resend API key (only required when `EMAIL_PROVIDER=resend`) |
 
 ---
 
@@ -198,13 +199,18 @@ All sends route through **SendGrid by default**, which injects open/click tracki
 | `EMAIL_PROVIDER` value | Behaviour |
 |------------------------|-----------|
 | `sendgrid` (default, or unset) | Sends via SendGrid Web API (`/v3/mail/send`); open and click events appear in the SendGrid Activity dashboard |
+| `resend` | Sends via Resend API (`/emails`); open and click tracking enabled by default; same vendor used by `components/alerts` |
 | `gmail` | Sends via `GmailApp.sendEmail`; no tracking, behaves like the original implementation |
 
-**SendGrid requirements when using `sendgrid`:**
+**SendGrid requirements (`EMAIL_PROVIDER=sendgrid`):**
 - `SENDGRID_API_KEY` must be set (full "Mail Send" permission)
-- `MY_EMAIL` must be a **Verified Sender** in SendGrid (Settings → Sender Authentication); unverified senders get a 403
+- `MY_EMAIL` must be a **Verified Sender** in SendGrid (Settings → Sender Authentication)
 
-To switch: open the GAS editor → Project Settings → Script Properties → set `EMAIL_PROVIDER` to `gmail` or `sendgrid`.
+**Resend requirements (`EMAIL_PROVIDER=resend`):**
+- `RESEND_API_KEY` must be set (create at resend.com/api-keys)
+- `MY_EMAIL` domain must be verified in Resend (Domains → Add Domain); same domain auth as SendGrid but set up separately in Resend's dashboard
+
+To switch: open the GAS editor → Project Settings → Script Properties → set `EMAIL_PROVIDER` to `sendgrid`, `resend`, or `gmail`.
 
 ---
 

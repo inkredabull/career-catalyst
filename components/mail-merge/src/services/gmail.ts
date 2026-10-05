@@ -13,6 +13,7 @@ import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
 import { getLinkedInUrlByName, WarmupContact } from './contacts';
 import { containsTokens, draftsMatchingSubject, hasUnresolvedTokens, selectTemplateDraft } from './draft-template';
 import { sendEmailWithSendGrid } from './sendgrid';
+import { sendEmailWithResend } from './resend';
 
 interface MsgObj {
   subject: string;
@@ -296,6 +297,12 @@ export const sendViaGmail = (
       htmlBody: msgObj.html,
       attachments: params.attachments,
     });
+  } else if (emailProvider === 'resend') {
+    sendEmailWithResend(
+      row[COLS.RECIPIENT],
+      { subject: subjectLine, html: msgObj.html, text: msgObj.text },
+      { attachments: params.attachments },
+    );
   } else {
     sendEmailWithSendGrid(
       row[COLS.RECIPIENT],
