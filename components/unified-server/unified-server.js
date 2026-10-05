@@ -1952,7 +1952,7 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
     context = await chromium.launchPersistentContext(LINKEDIN_PROFILE_DIR, { headless: true });
     const page = await context.newPage();
     await page.goto(`${profileUrl.replace(/\/$/, '')}/recent-activity/all/`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
     await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 15000 });
