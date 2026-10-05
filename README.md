@@ -2013,6 +2013,52 @@ The unified server consolidates what was previously separate services into a sin
 **ngrok tunnel (optional):**
 If `NGROK_AUTHTOKEN` is set in `.env`, the unified server automatically opens an ngrok tunnel on startup, prints the public URL, and writes it to `NGROK_TUNNEL_URL` in `.env`. The tunnel is torn down cleanly when the server exits (Ctrl+C / SIGTERM). No separate tunnel process is needed. The `start:tunnel` script (`npm run start:tunnel`) is available as a standalone alternative if you want a tunnel without running the full server.
 
+### Third-Party Services Architecture
+
+This section exists as institutional memory — to prevent re-doing setup work that has already been done and to document why certain providers were chosen or retired.
+
+#### Email — canonical provider: **Resend**
+
+**Use Resend for any new email functionality.** It is the single source of truth for outbound email across the monorepo:
+
+| Component | How it uses Resend |
+|-----------|-------------------|
+| `components/alerts` | npm `resend` package; sends daily job-alert digests |
+| `components/mail-merge` | REST API via `UrlFetchApp` (GAS can't import npm packages); open/click tracking enabled by default |
+
+Resend's free tier covers 3,000 emails/month and 100/day — sufficient for both components at typical volume. API keys live at resend.com/api-keys. Domain verification (DNS records in Bluehost for `bluxomelabs.com`) is required for the `from` address to be deliverable.
+
+**Why not SendGrid?**
+SendGrid was used in a previous incarnation of this project. When returning to it, the account was found suspended. Re-activating it required going through domain authentication setup from scratch, the free trial has a hard cap on total emails (not daily — once it's gone, it's gone), and it offers nothing over Resend for this use case. The `SENDGRID_API_KEY` Script Property and `sendgrid` provider value are kept in `components/mail-merge` as a fallback toggle, but Resend is the default and preferred path.
+
+**`EMAIL_PROVIDER` toggle (mail-merge only)**
+
+The `EMAIL_PROVIDER` GAS Script Property lets you switch the send path without a code deploy:
+
+| Value | Provider | Tracking |
+|-------|----------|----------|
+| `resend` | Resend REST API | ✅ open + click (default on) |
+| `sendgrid` | SendGrid Web API | ✅ open + click (configured in payload) |
+| `gmail` | GmailApp.sendEmail | ❌ none |
+
+Default when unset: `sendgrid` (legacy). Set it to `resend` on any fresh setup.
+
+#### SMS / Phone — historical provider: **Twilio**
+
+Twilio has been used in the past for SMS and phone number functionality. In `components/mail-merge`, SMS warmup sends go through an ngrok tunnel to a local server (`NGROK_SMS_URL` Script Property), which in prior setups proxied to a Twilio endpoint. If SMS functionality needs to be re-activated or extended, Twilio is the established provider for this repo — credentials and phone numbers may still exist in the Twilio console under the `bluxomelabs.com` account.
+
+#### Summary: provider decisions at a glance
+
+| Capability | Provider | Notes |
+|------------|----------|-------|
+| Transactional email | **Resend** | Canonical — use for all new email work |
+| Email tracking (open/click) | **Resend** | Built-in, no config needed |
+| Email (fallback) | SendGrid | Kept as toggle option; do not default to it |
+| Email (no tracking needed) | Gmail / GmailApp | Available via toggle; zero setup |
+| SMS / phone | **Twilio** | Historical; reactivate if SMS work resumes |
+
+---
+
 ### Python Dependencies (Optional)
 
 For evaluation and testing features, this project includes Python dependencies. Due to modern Python environment management, these should be installed in a virtual environment:
