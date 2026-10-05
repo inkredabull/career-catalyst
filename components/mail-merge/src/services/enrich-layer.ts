@@ -21,20 +21,12 @@ export const fetchMostRecentPost = (linkedInUrl: string): string => {
     return '';
   }
 
-  const rawText = resp.getContentText();
-  const data = JSON.parse(rawText) as Record<string, unknown>;
-  console.log(`[EnrichLayer] top-level keys: ${Object.keys(data).join(', ')}`);
-  // Try field names in order of likelihood — adjust after first real API response
-  const posts = (data.posts ?? data.activity ?? data.updates ?? []) as Record<string, unknown>[];
-  console.log(`[EnrichLayer] posts array length: ${posts.length}`);
-  if (!posts.length) {
-    console.log(`[EnrichLayer] no posts found; raw response (first 500 chars): ${rawText.slice(0, 500)}`);
-    return '';
-  }
+  const data = JSON.parse(resp.getContentText()) as Record<string, unknown>;
+  const activities = (data.activities ?? []) as Record<string, unknown>[];
+  if (!activities.length) return '';
 
-  const latest = posts[0]!;
-  console.log(`[EnrichLayer] latest post keys: ${Object.keys(latest).join(', ')}`);
-  return String(latest.text ?? latest.body ?? latest.content ?? '').trim();
+  const latest = activities[0]!;
+  return String(latest.title ?? '').trim();
 };
 
 /** Calls Claude Haiku to produce a single-sentence comment or question based on a recent post. */
