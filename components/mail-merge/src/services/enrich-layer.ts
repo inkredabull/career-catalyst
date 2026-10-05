@@ -27,8 +27,22 @@ export const fetchMostRecentPost = (linkedInUrl: string): string => {
   if (!activities.length) return '';
 
   const latest = activities[0]!;
+  const link = String(latest.link ?? '');
+
+  // Activity IDs are Unix-epoch snowflakes: id >> 22 = ms since 1970-01-01.
+  const idMatch = link.match(/activity[:-](\d+)/);
+  if (idMatch?.[1]) {
+    const postDate = new Date(Number(BigInt(idMatch[1]) >> 22n));
+    const ageDays = Math.floor((Date.now() - postDate.getTime()) / 86400000);
+    if (ageDays > 30) {
+      console.log(`[EnrichLayer] most recent post is ${ageDays}d old — skipping Zeitgeisty`);
+      return '';
+    }
+    console.log(`[EnrichLayer] most recent post is ${ageDays}d old`);
+  }
+
   const postText = String(latest.title ?? '').trim();
-  console.log(`[EnrichLayer] post url=${latest.link ?? 'none'} text="${postText.slice(0, 150)}"`);
+  console.log(`[EnrichLayer] post url=${link || 'none'} text="${postText.slice(0, 150)}"`);
   return postText;
 };
 
