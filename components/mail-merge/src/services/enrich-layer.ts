@@ -57,8 +57,8 @@ export const generateZeitgeistyString = (
     muteHttpExceptions: true,
   });
 
-  const rawResp = resp.getContentText();
-  console.log(`[Claude] response (first 300 chars): ${rawResp.slice(0, 300)}`);
-  const data = JSON.parse(rawResp) as { content: { text: string }[] };
-  return data.content?.[0]?.text?.trim() ?? '';
+  const data = JSON.parse(resp.getContentText()) as { content: { text: string }[] };
+  const result = data.content?.[0]?.text?.trim() ?? '';
+  console.log(`[Claude] result: "${result}"`);
+  return result;
 };
