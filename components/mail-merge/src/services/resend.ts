@@ -19,6 +19,9 @@ export const sendEmailWithResend = (
   const payload: Record<string, unknown> = {
     from: requireProp(SCRIPT_PROPS.MY_EMAIL),
     to: [to],
+    // BCC self so Gmail ingests a copy and associates the thread with the contact,
+    // since Resend's SMTP relay never touches Gmail's servers.
+    bcc: [requireProp(SCRIPT_PROPS.MY_EMAIL)],
     subject: msgObj.subject,
     html: msgObj.html,
     text: msgObj.text || ' ',
