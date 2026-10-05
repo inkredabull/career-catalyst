@@ -331,19 +331,18 @@ export const sendViaGmail = (
       log('TRACE', 'Sending SMS to: %s', cellValue);
       notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, topic ?? draftSubject ?? subjectLine);
     }
-
-    // Queue LinkedIn regardless of whether SMS was sent — they are independent outreach channels.
-    if (isSelfEmailVariant(row[COLS.RECIPIENT], myEmail)) {
-      log('TRACE', 'Recipient "%s" is a self-test variant of MY_EMAIL — skipping LinkedIn tab', row[COLS.RECIPIENT]);
-      return null;
-    }
-    const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
-    const resolvedTopic = topic ?? draftSubject ?? subjectLine;
-    const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], resolvedTopic);
-    log('TRACE', 'Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
-    return { url: linkedInUrl, message, firstName };
   }
-  return null;
+
+  // Always open LinkedIn profile after send, regardless of SMS flag.
+  if (isSelfEmailVariant(row[COLS.RECIPIENT], myEmail)) {
+    log('TRACE', 'Recipient "%s" is a self-test variant of MY_EMAIL — skipping LinkedIn tab', row[COLS.RECIPIENT]);
+    return null;
+  }
+  const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
+  const resolvedTopic = topic ?? draftSubject ?? subjectLine;
+  const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], resolvedTopic);
+  log('TRACE', 'Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
+  return { url: linkedInUrl, message, firstName };
 };
 
 // ── Queue / bulk send ─────────────────────────────────────────────────────────
