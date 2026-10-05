@@ -1939,6 +1939,7 @@ app.post('/api/linkedin/follow', requireFollowAuth, followHandler);
 // directory does not exist yet.
 app.post('/get-most-recent-linkedin-post', async (req, res) => {
   const { profileUrl } = req.body;
+  console.log(`[get-most-recent-linkedin-post] profileUrl=${profileUrl}`);
   if (!profileUrl) return res.status(400).json({ error: 'profileUrl required' });
 
   if (!fs.existsSync(LINKEDIN_PROFILE_DIR)) {
@@ -1960,11 +1961,18 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
     const result = await page.evaluate(() => {
       const item = document.querySelector('[data-view-name="feed-full-update"]');
       if (!item) return null;
-      const urn = item.getAttribute('data-urn') ?? '';
-      const activityId = urn.match(/activity:(\d+)/)?.[1] ?? '';
-      const activityUrl = activityId
-        ? `https://www.linkedin.com/feed/update/urn:li:activity:${activityId}/`
-        : '';
+
+      // URN lives in data-view-tracking-scope as JSON: [{ updateUrn: "urn:li:activity:NNN" }]
+      let activityUrl = '';
+      try {
+        const scope = JSON.parse(item.getAttribute('data-view-tracking-scope') ?? '[]');
+        const updateUrn = scope[0]?.updateUrn ?? '';
+        const activityId = updateUrn.match(/activity:(\d+)/)?.[1] ?? '';
+        if (activityId) {
+          activityUrl = `https://www.linkedin.com/feed/update/urn:li:activity:${activityId}/`;
+        }
+      } catch (_) {}
+
       const textEl = item.querySelector(
         '.feed-shared-text span[dir="ltr"], .update-components-text span[dir="ltr"]',
       );
