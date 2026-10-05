@@ -105,13 +105,17 @@ export const fetchContactToSheet = (): void => {
     PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ZEITGEISTY_ENABLED) === 'true';
 
   const enrichZeitgeisty = (rowIdx: number, linkedInUrl: string, firstName: string): void => {
-    if (!zeitgeistyEnabled || zeitgeistyIdx === -1 || !linkedInUrl) return;
-    if (String(data[rowIdx]?.[zeitgeistyIdx] ?? '').trim()) return;
+    console.log(`[Zeitgeisty] Row ${rowIdx + 1}: enabled=${zeitgeistyEnabled} colIdx=${zeitgeistyIdx} hasUrl=${!!linkedInUrl}`);
+    if (!zeitgeistyEnabled) { console.log('[Zeitgeisty] skip: ZEITGEISTY_ENABLED not true'); return; }
+    if (zeitgeistyIdx === -1) { console.log('[Zeitgeisty] skip: no Zeitgeisty column in sheet'); return; }
+    if (!linkedInUrl) { console.log('[Zeitgeisty] skip: no LinkedIn URL'); return; }
+    const existing = String(data[rowIdx]?.[zeitgeistyIdx] ?? '').trim();
+    if (existing) { console.log(`[Zeitgeisty] skip: already filled "${existing.slice(0, 40)}"`); return; }
     const postText = fetchMostRecentPost(linkedInUrl);
-    if (!postText) return;
+    if (!postText) { console.log('[Zeitgeisty] skip: no activity text from EnrichLayer'); return; }
     const zeitgeist = generateZeitgeistyString(postText, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
     if (zeitgeist) {
-      console.log(`[Zeitgeisty] Row ${rowIdx + 1}: "${zeitgeist.slice(0, 80)}"`);
+      console.log(`[Zeitgeisty] Row ${rowIdx + 1} written: "${zeitgeist.slice(0, 80)}"`);
       sheet.getRange(rowIdx + 2, zeitgeistyIdx + 1).setValue(zeitgeist);
     }
   };
