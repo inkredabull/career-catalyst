@@ -1,11 +1,41 @@
 // EnrichLayer profile enrichment + Claude-powered Zeitgeisty string generation.
 
+import { NGROK_TUNNEL_URL } from '../config/env';
 import { SCRIPT_PROPS } from '../config/settings';
 
 type FetchFn = (url: string, opts: object) => { getContentText(): string };
 
-/** Fetches the LinkedIn profile via EnrichLayer and returns the most recent post text, or ''. */
-export const fetchMostRecentPost = (linkedInUrl: string): string => {
+// ── Staleness guard ───────────────────────────────────────────────────────────
+
+const activityAgeDays = (activityUrl: string): number | null => {
+  const idMatch = activityUrl.match(/activity[:/](\d+)/);
+  if (!idMatch?.[1]) return null;
+  // Activity IDs are Unix-epoch snowflakes: id / 4194304 = ms since 1970-01-01.
+  return Math.floor((Date.now() - Math.floor(parseFloat(idMatch[1]) / 4194304)) / 86400000);
+};
+
+// ── Browser scraper (primary) ─────────────────────────────────────────────────
+
+const fetchMostRecentPostViaBrowser = (
+  linkedInUrl: string,
+): { text: string; activityUrl: string } | null => {
+  if (!NGROK_TUNNEL_URL) return null;
+  const resp = UrlFetchApp.fetch(`${NGROK_TUNNEL_URL}/get-most-recent-linkedin-post`, {
+    method: 'post',
+    headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+    payload: JSON.stringify({ profileUrl: linkedInUrl }),
+    muteHttpExceptions: true,
+  });
+  if (resp.getResponseCode() !== 200) {
+    console.log(`[BrowserScraper] ${resp.getResponseCode()}: ${resp.getContentText().slice(0, 200)}`);
+    return null;
+  }
+  return JSON.parse(resp.getContentText()) as { text: string; activityUrl: string };
+};
+
+// ── EnrichLayer fallback ──────────────────────────────────────────────────────
+
+const fetchMostRecentPostViaEnrichLayer = (linkedInUrl: string): string => {
   const apiKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ENRICH_LAYER_API_KEY);
   console.log(`[EnrichLayer] fetching for ${linkedInUrl} apiKey=${apiKey ? 'set' : 'MISSING'}`);
   if (!apiKey) { console.log('ENRICH_LAYER_API_KEY not set'); return ''; }
@@ -28,12 +58,8 @@ export const fetchMostRecentPost = (linkedInUrl: string): string => {
 
   const latest = activities[0]!;
   const link = String(latest.link ?? '');
-
-  // Activity IDs are Unix-epoch snowflakes: id >> 22 = ms since 1970-01-01.
-  const idMatch = link.match(/activity[:-](\d+)/);
-  if (idMatch?.[1]) {
-    const postDate = new Date(Math.floor(parseFloat(idMatch[1]) / 4194304));
-    const ageDays = Math.floor((Date.now() - postDate.getTime()) / 86400000);
+  const ageDays = activityAgeDays(link);
+  if (ageDays !== null) {
     if (ageDays > 30) {
       console.log(`[EnrichLayer] most recent post is ${ageDays}d old — skipping Zeitgeisty`);
       return '';
@@ -44,6 +70,29 @@ export const fetchMostRecentPost = (linkedInUrl: string): string => {
   const postText = String(latest.title ?? '').trim();
   console.log(`[EnrichLayer] post url=${link || 'none'} text="${postText.slice(0, 150)}"`);
   return postText;
+};
+
+// ── Public entry point ────────────────────────────────────────────────────────
+
+/** Returns the most recent LinkedIn post text for enrichment, or '' to skip. */
+export const fetchMostRecentPost = (linkedInUrl: string): string => {
+  // Primary: browser scrape via unified-server (full post text)
+  const browser = fetchMostRecentPostViaBrowser(linkedInUrl);
+  if (browser?.text) {
+    const ageDays = activityAgeDays(browser.activityUrl);
+    if (ageDays !== null) {
+      if (ageDays > 30) {
+        console.log(`[BrowserScraper] most recent post is ${ageDays}d old — skipping Zeitgeisty`);
+        return '';
+      }
+      console.log(`[BrowserScraper] post is ${ageDays}d old`);
+    }
+    console.log(`[BrowserScraper] url=${browser.activityUrl} text="${browser.text.slice(0, 150)}"`);
+    return browser.text;
+  }
+  // Fallback: EnrichLayer (truncated title; works without unified-server running)
+  console.log('[BrowserScraper] no result — falling back to EnrichLayer');
+  return fetchMostRecentPostViaEnrichLayer(linkedInUrl);
 };
 
 /** Calls Claude Haiku to produce a single-sentence comment or question based on a recent post. */

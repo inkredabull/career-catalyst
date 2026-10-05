@@ -12,6 +12,8 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { handleSend, requireSendAuth } = require('@inkredabull/career-catalyst-sms-bridge');
 const ngrok = require('@ngrok/ngrok');
 const { requireFollowAuth, followHandler, startFollowWorker, stopFollowWorker } = require('./linkedin-follow');
+const { chromium } = require('playwright');
+const LINKEDIN_PROFILE_DIR = path.join(__dirname, '.linkedin-profile');
 
 // Load .env from project root (two levels up from packages/unified-server)
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
@@ -1931,6 +1933,54 @@ app.post('/send', requireSendAuth, handleSend);
 // via a rate-limited worker. See linkedin-follow.js for provider/config details.
 app.post('/api/linkedin/follow', requireFollowAuth, followHandler);
 
+// Scrape the most recent LinkedIn post for a given profile URL.
+// Uses a persistent Playwright browser profile (.linkedin-profile/) seeded via
+// `npm run setup-linkedin`. Falls back gracefully (returns 503) if the profile
+// directory does not exist yet.
+app.post('/get-most-recent-linkedin-post', async (req, res) => {
+  const { profileUrl } = req.body;
+  if (!profileUrl) return res.status(400).json({ error: 'profileUrl required' });
+
+  if (!fs.existsSync(LINKEDIN_PROFILE_DIR)) {
+    return res.status(503).json({
+      error: 'LinkedIn session not set up. Run: npm run setup-linkedin',
+    });
+  }
+
+  let context;
+  try {
+    context = await chromium.launchPersistentContext(LINKEDIN_PROFILE_DIR, { headless: true });
+    const page = await context.newPage();
+    await page.goto(`${profileUrl.replace(/\/$/, '')}/recent-activity/all/`, {
+      waitUntil: 'networkidle',
+      timeout: 30000,
+    });
+    await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 15000 });
+
+    const result = await page.evaluate(() => {
+      const item = document.querySelector('[data-view-name="feed-full-update"]');
+      if (!item) return null;
+      const urn = item.getAttribute('data-urn') ?? '';
+      const activityId = urn.match(/activity:(\d+)/)?.[1] ?? '';
+      const activityUrl = activityId
+        ? `https://www.linkedin.com/feed/update/urn:li:activity:${activityId}/`
+        : '';
+      const textEl = item.querySelector(
+        '.feed-shared-text span[dir="ltr"], .update-components-text span[dir="ltr"]',
+      );
+      return { text: textEl?.textContent?.trim() ?? '', activityUrl };
+    });
+
+    if (!result?.text) return res.status(404).json({ error: 'No post text found' });
+    return res.json(result);
+  } catch (err) {
+    console.error('[get-most-recent-linkedin-post]', err);
+    return res.status(500).json({ error: String(err) });
+  } finally {
+    await context?.close();
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log('🚀 Unified Career Catalyst Server');
@@ -1952,6 +2002,7 @@ app.listen(PORT, () => {
   console.log(`  • GET  /llm?jobID=<id>  - Job info lookup (title, URL, company, blurb)`);
   console.log(`  • POST /send             - Send SMS/iMessage via Messages.app`);
   console.log(`  • POST /api/linkedin/follow - Queue a LinkedIn follow intent`);
+  console.log(`  • POST /get-most-recent-linkedin-post - Scrape most recent post for a profile`);
   console.log('');
   startFollowWorker();
   console.log('💡 Usage:');
