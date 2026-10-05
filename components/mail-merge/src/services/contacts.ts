@@ -8,6 +8,7 @@ export interface ContactDetails {
   email: string;
   mobile: string;
   linkedin: string;
+  company: string;
 }
 
 // ── LinkedIn URL lookup ────────────────────────────────────────────────────────
@@ -36,10 +37,10 @@ export const getContactDetails = (fullName: string): ContactDetails => {
   const response = People.People!.searchContacts({
     query: fullName,
     pageSize: 1,
-    readMask: 'emailAddresses,phoneNumbers,urls',
+    readMask: 'emailAddresses,phoneNumbers,urls,organizations',
   });
 
-  const result: ContactDetails = { email: '', mobile: '', linkedin: '' };
+  const result: ContactDetails = { email: '', mobile: '', linkedin: '', company: '' };
 
   if (!response.results?.length) {
     Logger.log('No contacts found for: %s', fullName);
@@ -65,6 +66,12 @@ export const getContactDetails = (fullName: string): ContactDetails => {
     result.linkedin = li?.value ?? '';
   }
 
+  if ((person as unknown as Record<string, unknown>).organizations) {
+    const orgs = (person as unknown as { organizations: { name?: string; current?: boolean }[] }).organizations;
+    const current = orgs.find(o => o.current !== false) ?? orgs[0];
+    result.company = current?.name ?? '';
+  }
+
   return result;
 };
 
@@ -84,6 +91,7 @@ export const fetchContactToSheet = (): void => {
   const fullNameIdx  = heads.indexOf(COLS.FULL_NAME);
   const cellIdx      = heads.indexOf(COLS.CELL);
   const linkedInIdx  = heads.indexOf(COLS.LINKEDIN);
+  const companyIdx   = heads.indexOf(COLS.COMPANY);
 
   if (recipientIdx === -1 || fullNameIdx === -1) {
     SpreadsheetApp.getUi().alert(`Sheet must have columns "${COLS.RECIPIENT}" and "${COLS.FULL_NAME}".`);
@@ -113,6 +121,8 @@ export const fetchContactToSheet = (): void => {
       sheet.getRange(i + 2, cellIdx + 1).setValue(contact.mobile);
     if (linkedInIdx !== -1 && !row[linkedInIdx] && contact.linkedin)
       sheet.getRange(i + 2, linkedInIdx + 1).setValue(contact.linkedin);
+    if (companyIdx !== -1 && !row[companyIdx] && contact.company)
+      sheet.getRange(i + 2, companyIdx + 1).setValue(contact.company);
     if (recentIdx !== -1) {
       const lastDate = getMostRecentInteractionDate(contact.email);
       if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
