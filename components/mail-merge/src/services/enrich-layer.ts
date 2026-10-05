@@ -1,25 +1,29 @@
-// EnrichLayer profile enrichment + Claude-powered Zeitgeisty string generation.
+// LinkedIn activity scraper (via unified-server Playwright route) + Claude Zeitgeisty generator.
 
 import { NGROK_TUNNEL_URL } from '../config/env';
 import { SCRIPT_PROPS } from '../config/settings';
+import { randomSleep, LINKEDIN_PACING_MS } from '../utils/delay';
 
 type FetchFn = (url: string, opts: object) => { getContentText(): string };
 
-// ── Staleness guard ───────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Activity IDs are Unix-epoch snowflakes: id / 4194304 = ms since 1970-01-01.
 const activityAgeDays = (activityUrl: string): number | null => {
   const idMatch = activityUrl.match(/activity[:/](\d+)/);
   if (!idMatch?.[1]) return null;
-  // Activity IDs are Unix-epoch snowflakes: id / 4194304 = ms since 1970-01-01.
   return Math.floor((Date.now() - Math.floor(parseFloat(idMatch[1]) / 4194304)) / 86400000);
 };
 
-// ── Browser scraper (primary) ─────────────────────────────────────────────────
+// ── Browser scraper ───────────────────────────────────────────────────────────
 
 const fetchMostRecentPostViaBrowser = (
   linkedInUrl: string,
 ): { text: string; activityUrl: string } | null => {
-  if (!NGROK_TUNNEL_URL) return null;
+  if (!NGROK_TUNNEL_URL) {
+    console.log('[BrowserScraper] NGROK_TUNNEL_URL not set — rebuild required');
+    return null;
+  }
   const resp = UrlFetchApp.fetch(`${NGROK_TUNNEL_URL}/get-most-recent-linkedin-post`, {
     method: 'post',
     headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
@@ -33,67 +37,32 @@ const fetchMostRecentPostViaBrowser = (
   return JSON.parse(resp.getContentText()) as { text: string; activityUrl: string };
 };
 
-// ── EnrichLayer fallback ──────────────────────────────────────────────────────
+// ── Public entry point ────────────────────────────────────────────────────────
 
-const fetchMostRecentPostViaEnrichLayer = (linkedInUrl: string): string => {
-  const apiKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ENRICH_LAYER_API_KEY);
-  console.log(`[EnrichLayer] fetching for ${linkedInUrl} apiKey=${apiKey ? 'set' : 'MISSING'}`);
-  if (!apiKey) { console.log('ENRICH_LAYER_API_KEY not set'); return ''; }
-
-  const url = `https://enrichlayer.com/api/v2/profile?profile_url=${encodeURIComponent(linkedInUrl)}&fallback_to_cache=on-error`;
-  const resp = UrlFetchApp.fetch(url, {
-    method: 'get',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    muteHttpExceptions: true,
-  });
-
-  if (resp.getResponseCode() !== 200) {
-    console.log(`EnrichLayer ${resp.getResponseCode()}: ${resp.getContentText()}`);
+/** Returns the most recent LinkedIn post text for Zeitgeisty enrichment, or '' to skip. */
+export const fetchMostRecentPost = (linkedInUrl: string): string => {
+  const browser = fetchMostRecentPostViaBrowser(linkedInUrl);
+  if (!browser?.text) {
+    console.log('[BrowserScraper] no result — skipping Zeitgeisty');
     return '';
   }
 
-  const data = JSON.parse(resp.getContentText()) as Record<string, unknown>;
-  const activities = (data.activities ?? []) as Record<string, unknown>[];
-  if (!activities.length) return '';
-
-  const latest = activities[0]!;
-  const link = String(latest.link ?? '');
-  const ageDays = activityAgeDays(link);
+  const ageDays = activityAgeDays(browser.activityUrl);
   if (ageDays !== null) {
     if (ageDays > 30) {
-      console.log(`[EnrichLayer] most recent post is ${ageDays}d old — skipping Zeitgeisty`);
+      console.log(`[BrowserScraper] most recent post is ${ageDays}d old — skipping Zeitgeisty`);
       return '';
     }
-    console.log(`[EnrichLayer] most recent post is ${ageDays}d old`);
+    console.log(`[BrowserScraper] post is ${ageDays}d old`);
   }
 
-  const postText = String(latest.title ?? '').trim();
-  console.log(`[EnrichLayer] post url=${link || 'none'} text="${postText.slice(0, 150)}"`);
-  return postText;
+  randomSleep(LINKEDIN_PACING_MS.min, LINKEDIN_PACING_MS.max);
+
+  console.log(`[BrowserScraper] url=${browser.activityUrl} text="${browser.text.slice(0, 150)}"`);
+  return browser.text;
 };
 
-// ── Public entry point ────────────────────────────────────────────────────────
-
-/** Returns the most recent LinkedIn post text for enrichment, or '' to skip. */
-export const fetchMostRecentPost = (linkedInUrl: string): string => {
-  // Primary: browser scrape via unified-server (full post text)
-  const browser = fetchMostRecentPostViaBrowser(linkedInUrl);
-  if (browser?.text) {
-    const ageDays = activityAgeDays(browser.activityUrl);
-    if (ageDays !== null) {
-      if (ageDays > 30) {
-        console.log(`[BrowserScraper] most recent post is ${ageDays}d old — skipping Zeitgeisty`);
-        return '';
-      }
-      console.log(`[BrowserScraper] post is ${ageDays}d old`);
-    }
-    console.log(`[BrowserScraper] url=${browser.activityUrl} text="${browser.text.slice(0, 150)}"`);
-    return browser.text;
-  }
-  // Fallback: EnrichLayer (truncated title; works without unified-server running)
-  console.log('[BrowserScraper] no result — falling back to EnrichLayer');
-  return fetchMostRecentPostViaEnrichLayer(linkedInUrl);
-};
+// ── Claude Zeitgeisty generator ───────────────────────────────────────────────
 
 /** Calls Claude Haiku to produce a single-sentence comment or question based on a recent post. */
 export const generateZeitgeistyString = (
