@@ -1,6 +1,7 @@
 // Google Contacts / People API helpers.
 
 import { COLS, SCRIPT_PROPS } from '../config/settings';
+import { fetchMostRecentPost, generateZeitgeistyString } from './enrich-layer';
 
 type PersonResource = GoogleAppsScript.People.Schema.Person;
 
@@ -86,17 +87,31 @@ export const fetchContactToSheet = (): void => {
   const sheet = SpreadsheetApp.getActiveSheet();
   const data = sheet.getDataRange().getValues() as string[][];
   const heads = data.shift() as string[];
-  const recipientIdx = heads.indexOf(COLS.RECIPIENT);
-  const recentIdx    = heads.indexOf(COLS.RECENT);
-  const fullNameIdx  = heads.indexOf(COLS.FULL_NAME);
-  const cellIdx      = heads.indexOf(COLS.CELL);
-  const linkedInIdx  = heads.indexOf(COLS.LINKEDIN);
-  const companyIdx   = heads.indexOf(COLS.COMPANY);
+  const recipientIdx  = heads.indexOf(COLS.RECIPIENT);
+  const recentIdx     = heads.indexOf(COLS.RECENT);
+  const fullNameIdx   = heads.indexOf(COLS.FULL_NAME);
+  const firstNameIdx  = heads.indexOf(COLS.FIRST_NAME);
+  const cellIdx       = heads.indexOf(COLS.CELL);
+  const linkedInIdx   = heads.indexOf(COLS.LINKEDIN);
+  const companyIdx    = heads.indexOf(COLS.COMPANY);
+  const zeitgeistyIdx = heads.indexOf(COLS.ZEITGEISTY);
 
   if (recipientIdx === -1 || fullNameIdx === -1) {
     SpreadsheetApp.getUi().alert(`Sheet must have columns "${COLS.RECIPIENT}" and "${COLS.FULL_NAME}".`);
     return;
   }
+
+  const zeitgeistyEnabled =
+    PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ZEITGEISTY_ENABLED) === 'true';
+
+  const enrichZeitgeisty = (rowIdx: number, linkedInUrl: string, firstName: string): void => {
+    if (!zeitgeistyEnabled || zeitgeistyIdx === -1 || !linkedInUrl) return;
+    if (String(data[rowIdx]?.[zeitgeistyIdx] ?? '').trim()) return;
+    const postText = fetchMostRecentPost(linkedInUrl);
+    if (!postText) return;
+    const zeitgeist = generateZeitgeistyString(postText, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
+    if (zeitgeist) sheet.getRange(rowIdx + 2, zeitgeistyIdx + 1).setValue(zeitgeist);
+  };
 
   let filled = 0;
   for (let i = 0; i < data.length; i++) {
@@ -108,6 +123,11 @@ export const fetchContactToSheet = (): void => {
         const lastDate = getMostRecentInteractionDate(existingEmail);
         if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
       }
+      enrichZeitgeisty(
+        i,
+        String(row[linkedInIdx] ?? '').trim(),
+        String(row[firstNameIdx] ?? '').trim(),
+      );
       filled++;
       continue;
     }
@@ -127,6 +147,11 @@ export const fetchContactToSheet = (): void => {
       const lastDate = getMostRecentInteractionDate(contact.email);
       if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
     }
+    enrichZeitgeisty(
+      i,
+      contact.linkedin || String(row[linkedInIdx] ?? '').trim(),
+      contact.email.split('@')[0],
+    );
     filled++;
   }
 

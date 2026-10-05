@@ -13,6 +13,8 @@ export const SCRIPT_PROPS = {
   WARMUP_EXCLUDE_LABEL_PREFIXES: 'WARMUP_EXCLUDE_LABEL_PREFIXES',
   WARMUP_EXCLUDE_EMAILS: 'WARMUP_EXCLUDE_EMAILS',
   EMAIL_PROVIDER: 'EMAIL_PROVIDER', // 'sendgrid' (default) | 'gmail'
+  ENRICH_LAYER_API_KEY: 'ENRICH_LAYER_API_KEY',
+  ZEITGEISTY_ENABLED: 'ZEITGEISTY_ENABLED', // set to 'true' to enable Zeitgeisty enrichment
 } as const;
 
 /** Read a required Script Property — throws with a clear message if not set. */
@@ -34,6 +36,7 @@ export const COLS = {
   SUBJECT: 'Subject',
   JOB_ID: 'JobID',
   LINKEDIN: 'LinkedIn',
+  ZEITGEISTY: 'Zeitgeisty',
 } as const;
 
 // Sheet names — update to match your spreadsheet
