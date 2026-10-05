@@ -229,6 +229,13 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
 
 // ── Core send ─────────────────────────────────────────────────────────────────
 
+const time = <T>(label: string, fn: () => T): T => {
+  const start = Date.now();
+  const result = fn();
+  pushProgress(`${label} — ${Date.now() - start}ms`);
+  return result;
+};
+
 export const emailDrivePdf = (driveUrl: string): GoogleAppsScript.Base.Blob => {
   const match = driveUrl.match(/[-\w]{25,}/);
   if (!match) throw new Error(`Could not extract Drive file ID from: ${driveUrl}`);
@@ -439,10 +446,8 @@ export const doSendTestEmail = (
   }
 
   pushProgress(`Starting test send: "${subject}"`);
-  pushProgress('Fetching draft template from Gmail…');
-  const emailTemplate = getGmailTemplateFromDrafts(subject);
-  pushProgress('Template loaded — reading sheet data…');
-  const data = sheet.getDataRange().getDisplayValues();
+  const emailTemplate = time('Fetched draft template from Gmail', () => getGmailTemplateFromDrafts(subject));
+  const data = time('Read sheet data', () => sheet.getDataRange().getDisplayValues());
   const heads = data.shift() as string[];
   const rows = data.map(r =>
     heads.reduce<Record<string, string>>((o, k, i) => { o[k] = r[i] ?? ''; return o; }, {})
@@ -456,9 +461,8 @@ export const doSendTestEmail = (
   }
 
   row[COLS.RECIPIENT] = testRecipient;
-  pushProgress(`Sending to ${testRecipient}…`);
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-  const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
+  const linkedin = time(`Sent to ${testRecipient}`, () => sendViaGmail(row, msgObj, emailTemplate, subject, topic));
   // No follow-up reminder for test sends — the recipient is you.
   if (linkedin) handOffToExtension([linkedin]);
   pushProgress(`Done — test email sent to ${testRecipient}`);
@@ -488,11 +492,9 @@ export const doSendEmails = (
 ): void => {
   clearProgress();
   pushProgress(`Starting send: "${subject}"`);
-  pushProgress('Fetching draft template from Gmail…');
   log('DEBUG', 'Getting draft: %s', subject);
-  const emailTemplate = getGmailTemplateFromDrafts(subject);
-  pushProgress('Template loaded — scanning sheet…');
-  const data = sheet.getDataRange().getDisplayValues();
+  const emailTemplate = time('Fetched draft template from Gmail', () => getGmailTemplateFromDrafts(subject));
+  const data = time('Read sheet data', () => sheet.getDataRange().getDisplayValues());
   const heads = data.shift() as string[];
   const emailSentColIdx = heads.indexOf(COLS.EMAIL_SENT);
 
@@ -505,7 +507,7 @@ export const doSendEmails = (
   // picker's withFailureHandler show it and re-display the form.
   const needsMetadata = rows.some(r => r[COLS.EMAIL_SENT] === '' && r[COLS.JOB_ID]);
   if (needsMetadata) {
-    const unhealthy = checkMetadataServer();
+    const unhealthy = time('Checked metadata server', () => checkMetadataServer());
     if (unhealthy) throw new Error(`Aborted before sending — ${unhealthy}`);
   }
 
@@ -521,15 +523,15 @@ export const doSendEmails = (
       pushProgress(`${label}: ${row[COLS.RECIPIENT] || '(no recipient)'} — building email…`);
       try {
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-        pushProgress(`${label}: sending via Gmail…`);
-        const linkedin = sendViaGmail(row, msgObj, emailTemplate, subject, topic);
+        const linkedin = time(`${label}: sent to ${row[COLS.RECIPIENT]}`, () =>
+          sendViaGmail(row, msgObj, emailTemplate, subject, topic)
+        );
         if (linkedin) linkedInContacts.push(linkedin);
         // Queued only after sendViaGmail returns, so a throw above leaves no reminder for an
         // email that never went out. Dated from the actual send, not from when the row was added.
         reminders.push(buildFollowUpReminder(row, msgObj.subject));
         out.push([new Date()]);
         sentCount++;
-        pushProgress(`${label}: sent`);
         log('DEBUG', '%s: sent to %s', label, row[COLS.RECIPIENT]);
       } catch (e) {
         if (e instanceof UnresolvedTemplateError) {
