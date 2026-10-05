@@ -21,12 +21,19 @@ export const fetchMostRecentPost = (linkedInUrl: string): string => {
     return '';
   }
 
-  const data = JSON.parse(resp.getContentText()) as Record<string, unknown>;
+  const rawText = resp.getContentText();
+  const data = JSON.parse(rawText) as Record<string, unknown>;
+  console.log(`[EnrichLayer] top-level keys: ${Object.keys(data).join(', ')}`);
   // Try field names in order of likelihood — adjust after first real API response
   const posts = (data.posts ?? data.activity ?? data.updates ?? []) as Record<string, unknown>[];
-  if (!posts.length) return '';
+  console.log(`[EnrichLayer] posts array length: ${posts.length}`);
+  if (!posts.length) {
+    console.log(`[EnrichLayer] no posts found; raw response (first 500 chars): ${rawText.slice(0, 500)}`);
+    return '';
+  }
 
-  const latest = posts[0];
+  const latest = posts[0]!;
+  console.log(`[EnrichLayer] latest post keys: ${Object.keys(latest).join(', ')}`);
   return String(latest.text ?? latest.body ?? latest.content ?? '').trim();
 };
 
