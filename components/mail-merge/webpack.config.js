@@ -50,10 +50,11 @@ module.exports = {
   ],
   optimization: {
     minimize: false,
-    // concatenateModules triggers a webpack scope-hoisting bug with this module graph —
-    // it emits "unused harmony import specifier" vars that are referenced but never
-    // assigned, producing "X is not a function" at runtime in GAS (e.g. contacts_clearProgress).
-    concatenateModules: false,
+    // usedExports (tree-shaking) was producing dead "unused harmony import specifier"
+    // bindings that are referenced but never assigned, causing "X is not a function" at
+    // runtime in GAS (e.g. contacts_clearProgress). concatenateModules stays on since GAS's
+    // onOpen simple-trigger detection appears to need the flat single-scope bundle it produces.
+    concatenateModules: true,
     usedExports: false,
   },
   devtool: false,
