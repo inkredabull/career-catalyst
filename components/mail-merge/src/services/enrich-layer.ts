@@ -27,7 +27,9 @@ export const fetchMostRecentPost = (linkedInUrl: string): string => {
   if (!activities.length) return '';
 
   const latest = activities[0]!;
-  return String(latest.title ?? '').trim();
+  const postText = String(latest.title ?? '').trim();
+  console.log(`[EnrichLayer] post url=${latest.link ?? 'none'} text="${postText.slice(0, 150)}"`);
+  return postText;
 };
 
 /** Calls Claude Haiku to produce a single-sentence comment or question based on a recent post. */
@@ -40,7 +42,7 @@ export const generateZeitgeistyString = (
   console.log(`[Claude] generating for ${firstName} apiKey=${apiKey ? 'set' : 'MISSING'} postLen=${postText.length}`);
   if (!apiKey || !postText) return '';
 
-  const prompt = `Based on this recent LinkedIn post by ${firstName}, write a single sentence — a genuine comment or question — to open a conversation. Sound curious and human, not salesy.\n\nPost: "${postText}"\n\nReturn only the single sentence, nothing else.`;
+  const prompt = `Based on this recent LinkedIn post by ${firstName}, write a single sentence — a genuine comment or question of anywhere between 45 and 75 characters — to open a conversation. Sound curious and human, not salesy.\n\nPost: "${postText}"\n\nReturn only the single sentence, nothing else.`;
 
   const resp = fetchFn('https://api.anthropic.com/v1/messages', {
     method: 'post',
