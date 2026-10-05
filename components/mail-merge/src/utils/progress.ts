@@ -22,3 +22,9 @@ export const getSendProgress = (): string[] => {
   const cached = CacheService.getUserCache().get(CACHE_KEY);
   return cached ? (JSON.parse(cached) as string[]) : [];
 };
+
+/** Write to both Cloud Logging and the progress cache so the dialog sees it. */
+export const logAndPush = (msg: string): void => {
+  console.log(msg);
+  pushProgress(msg);
+};

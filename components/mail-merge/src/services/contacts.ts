@@ -2,6 +2,7 @@
 
 import { COLS, SCRIPT_PROPS } from '../config/settings';
 import { fetchMostRecentPost, generateZeitgeistyString } from './enrich-layer';
+import { clearProgress, logAndPush } from '../utils/progress';
 
 type PersonResource = GoogleAppsScript.People.Schema.Person;
 
@@ -83,7 +84,53 @@ const getMostRecentInteractionDate = (email: string): GoogleAppsScript.Base.Date
   return threads.length > 0 ? threads[0].getLastMessageDate() : null;
 };
 
+// ── Do Lookup dialog ──────────────────────────────────────────────────────────
+
+const buildDoLookupHtml = (): string => {
+  const runOnclick = [
+    "document.getElementById('form').style.display='none';",
+    "document.getElementById('loading').style.display='block';",
+    "window._shownCount=0;",
+    "window._logDiv=document.getElementById('log');",
+    "window._logDiv.textContent='';",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress();};",
+    "window._poll();",
+    "window._timer=setInterval(window._poll,1000);",
+    "google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},3000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).doFetchContactToSheet();",
+  ].join('');
+  return `<!DOCTYPE html><html><head><base target="_top"><style>
+body{font-family:sans-serif;padding:16px;min-width:320px}
+p{margin:0 0 12px;font-size:13px;color:#444}
+.btns{display:flex;gap:8px;justify-content:flex-end}
+button{padding:6px 16px;cursor:pointer}
+#loading{display:none;text-align:center;padding:8px 0;color:#555;font-size:14px}
+.spinner{display:inline-block;margin-right:6px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#log{margin-top:10px;height:200px;overflow-y:auto;background:#f7f7f7;border:1px solid #ddd;border-radius:3px;padding:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;text-align:left}
+</style></head><body>
+<div id="form">
+<p>Fill Email, Cell, LinkedIn, Company, Recent, and Zeitgeisty from Google Contacts for all rows on the active sheet.</p>
+<div class="btns">
+<button onclick="google.script.host.close()">Cancel</button>
+<button onclick="${runOnclick}">Run</button>
+</div>
+</div>
+<div id="loading">
+<div><span class="spinner">⏳</span>Running lookup — please wait…</div>
+<div id="log"></div>
+</div>
+</body></html>`;
+};
+
+/** Menu entry: shows the Do Lookup progress dialog. */
 export const fetchContactToSheet = (): void => {
+  const html = HtmlService.createHtmlOutput(buildDoLookupHtml()).setWidth(500).setHeight(340);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Do Lookup');
+};
+
+/** Called by the dialog; does the actual work with progress logging. */
+export const doFetchContactToSheet = (): void => {
+  clearProgress();
   const sheet = SpreadsheetApp.getActiveSheet();
   const data = sheet.getDataRange().getValues() as string[][];
   const heads = data.shift() as string[];
@@ -97,33 +144,32 @@ export const fetchContactToSheet = (): void => {
   const zeitgeistyIdx = heads.indexOf(COLS.ZEITGEISTY);
 
   if (recipientIdx === -1 || fullNameIdx === -1) {
-    SpreadsheetApp.getUi().alert(`Sheet must have columns "${COLS.RECIPIENT}" and "${COLS.FULL_NAME}".`);
-    return;
+    throw new Error(`Sheet must have columns "${COLS.RECIPIENT}" and "${COLS.FULL_NAME}".`);
   }
 
   const zeitgeistyEnabled =
     PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.ZEITGEISTY_ENABLED) === 'true';
 
   const enrichZeitgeisty = (rowIdx: number, linkedInUrl: string, firstName: string): void => {
-    console.log(`[Zeitgeisty] Row ${rowIdx + 1}: enabled=${zeitgeistyEnabled} colIdx=${zeitgeistyIdx} hasUrl=${!!linkedInUrl}`);
-    if (!zeitgeistyEnabled) { console.log('[Zeitgeisty] skip: ZEITGEISTY_ENABLED not true'); return; }
-    if (zeitgeistyIdx === -1) { console.log('[Zeitgeisty] skip: no Zeitgeisty column in sheet'); return; }
-    if (!linkedInUrl) { console.log('[Zeitgeisty] skip: no LinkedIn URL'); return; }
+    logAndPush(`[Zeitgeisty] Row ${rowIdx + 1}: enabled=${zeitgeistyEnabled} colIdx=${zeitgeistyIdx} hasUrl=${!!linkedInUrl}`);
+    if (!zeitgeistyEnabled) { logAndPush('[Zeitgeisty] skip: ZEITGEISTY_ENABLED not true'); return; }
+    if (zeitgeistyIdx === -1) { logAndPush('[Zeitgeisty] skip: no Zeitgeisty column in sheet'); return; }
+    if (!linkedInUrl) { logAndPush('[Zeitgeisty] skip: no LinkedIn URL'); return; }
     const existing = String(data[rowIdx]?.[zeitgeistyIdx] ?? '').trim();
-    if (existing) { console.log(`[Zeitgeisty] skip: already filled "${existing.slice(0, 40)}"`); return; }
+    if (existing) { logAndPush(`[Zeitgeisty] skip: already filled "${existing.slice(0, 40)}"`); return; }
     try {
       const postText = fetchMostRecentPost(linkedInUrl);
-      console.log(`[Zeitgeisty] postText (${postText.length} chars): "${postText.slice(0, 200)}"`);
-      if (!postText) { console.log('[Zeitgeisty] skip: no activity text from EnrichLayer'); return; }
+      logAndPush(`[Zeitgeisty] postText (${postText.length} chars): "${postText.slice(0, 200)}"`);
+      if (!postText) { logAndPush('[Zeitgeisty] skip: no post text from browser scraper'); return; }
       const zeitgeist = generateZeitgeistyString(postText, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
       if (zeitgeist) {
-        console.log(`[Zeitgeisty] Row ${rowIdx + 1} written: "${zeitgeist.slice(0, 80)}"`);
+        logAndPush(`[Zeitgeisty] Row ${rowIdx + 1} written: "${zeitgeist.slice(0, 80)}"`);
         sheet.getRange(rowIdx + 2, zeitgeistyIdx + 1).setValue(zeitgeist);
       } else {
-        console.log('[Zeitgeisty] skip: Claude returned empty string');
+        logAndPush('[Zeitgeisty] skip: Claude returned empty string');
       }
     } catch (e) {
-      console.log(`[Zeitgeisty] ERROR: ${e}`);
+      logAndPush(`[Zeitgeisty] ERROR: ${e}`);
     }
   };
 
@@ -148,14 +194,14 @@ export const fetchContactToSheet = (): void => {
 
     if (!row[fullNameIdx]) continue;
     const fullName = String(row[fullNameIdx]);
-    console.log(`[Do Lookup] Row ${i + 1}: looking up "${fullName}"`);
+    logAndPush(`[Do Lookup] Row ${i + 1}: looking up "${fullName}"`);
     const contact = getContactDetails(fullName);
     if (!contact.email) {
-      console.log(`[Do Lookup] Row ${i + 1}: no email found for "${fullName}"`);
+      logAndPush(`[Do Lookup] Row ${i + 1}: no email found for "${fullName}"`);
       continue;
     }
 
-    console.log(`[Do Lookup] Row ${i + 1}: found email=${contact.email} linkedin=${contact.linkedin || '(none)'} company=${contact.company || '(none)'}`);
+    logAndPush(`[Do Lookup] Row ${i + 1}: found email=${contact.email} linkedin=${contact.linkedin || '(none)'} company=${contact.company || '(none)'}`);
     sheet.getRange(i + 2, recipientIdx + 1).setValue(contact.email);
     if (cellIdx !== -1 && !row[cellIdx] && contact.mobile)
       sheet.getRange(i + 2, cellIdx + 1).setValue(contact.mobile);
@@ -175,6 +221,7 @@ export const fetchContactToSheet = (): void => {
     filled++;
   }
 
+  logAndPush(`Done — ${filled} row(s) updated`);
   SpreadsheetApp.getActive().toast(`${filled} row(s) updated`, '✅ Lookup Complete', 4);
 };
 
