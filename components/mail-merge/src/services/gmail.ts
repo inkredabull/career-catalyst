@@ -233,7 +233,7 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
 const time = <T>(label: string, fn: () => T): T => {
   const start = Date.now();
   const result = fn();
-  pushProgress(`${label} — ${Date.now() - start}ms`);
+  pushProgress('send', `${label} — ${Date.now() - start}ms`);
   return result;
 };
 
@@ -388,7 +388,7 @@ const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): str
     "window._shownCount=0;",
     "window._logDiv=document.getElementById('log');",
     "window._logDiv.textContent='';",
-    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress();};",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('send');};",
     "window._poll();",
     "window._timer=setInterval(window._poll,1000);",
     `google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},2000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).${actionFn}(s,t);`,
@@ -443,15 +443,15 @@ export const doSendTestEmail = (
   topic = DEFAULT_TOPIC,
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
-  clearProgress();
+  clearProgress('send');
   const testRecipient = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.TEST_EMAIL);
   if (!testRecipient) {
-    pushProgress('TEST_EMAIL Script Property not set — aborting test send');
+    pushProgress('send', 'TEST_EMAIL Script Property not set — aborting test send');
     Logger.log('TEST_EMAIL Script Property not set — aborting test send');
     return;
   }
 
-  pushProgress(`Starting test send: "${subject}"`);
+  pushProgress('send', `Starting test send: "${subject}"`);
   const emailTemplate = time('Fetched draft template from Gmail', () => getGmailTemplateFromDrafts(subject));
   const data = time('Read sheet data', () => sheet.getDataRange().getDisplayValues());
   const heads = data.shift() as string[];
@@ -461,7 +461,7 @@ export const doSendTestEmail = (
 
   const row = rows[0];
   if (!row) {
-    pushProgress('No data rows found in sheet — aborting test send');
+    pushProgress('send', 'No data rows found in sheet — aborting test send');
     Logger.log('No data rows found in sheet — aborting test send');
     return;
   }
@@ -471,7 +471,7 @@ export const doSendTestEmail = (
   const linkedin = time(`Sent to ${testRecipient}`, () => sendViaGmail(row, msgObj, emailTemplate, subject, topic));
   // No follow-up reminder for test sends — the recipient is you.
   if (linkedin) handOffToExtension([linkedin]);
-  pushProgress(`Done — test email sent to ${testRecipient}`);
+  pushProgress('send', `Done — test email sent to ${testRecipient}`);
   log('INFO', 'Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
 };
@@ -496,8 +496,8 @@ export const doSendEmails = (
   topic = DEFAULT_TOPIC,
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
-  clearProgress();
-  pushProgress(`Starting send: "${subject}"`);
+  clearProgress('send');
+  pushProgress('send', `Starting send: "${subject}"`);
   log('DEBUG', 'Getting draft: %s', subject);
   const emailTemplate = time('Fetched draft template from Gmail', () => getGmailTemplateFromDrafts(subject));
   const data = time('Read sheet data', () => sheet.getDataRange().getDisplayValues());
@@ -526,7 +526,7 @@ export const doSendEmails = (
   for (const [idx, row] of rows.entries()) {
     const label = `Row ${idx + 1}/${rows.length}`;
     if (row[COLS.EMAIL_SENT] === '') {
-      pushProgress(`${label}: ${row[COLS.RECIPIENT] || '(no recipient)'} — building email…`);
+      pushProgress('send', `${label}: ${row[COLS.RECIPIENT] || '(no recipient)'} — building email…`);
       try {
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
         const linkedin = time(`${label}: sent to ${row[COLS.RECIPIENT]}`, () =>
@@ -544,10 +544,10 @@ export const doSendEmails = (
           // Nothing was sent — leave the cell blank so the row is retried once the cause is fixed.
           skipped.push(`${row[COLS.RECIPIENT] || '(no recipient)'} — ${e.message}`);
           out.push(['']);
-          pushProgress(`${label}: skipped — ${e.message}`);
+          pushProgress('send', `${label}: skipped — ${e.message}`);
         } else {
           out.push([(e as Error).message]);
-          pushProgress(`${label}: failed — ${(e as Error).message}`);
+          pushProgress('send', `${label}: failed — ${(e as Error).message}`);
         }
       }
     } else {
@@ -559,12 +559,12 @@ export const doSendEmails = (
 
   if (skipped.length > 0) {
     log('WARN', 'Skipped %s row(s), left blank for retry:\n%s', skipped.length, skipped.join('\n'));
-    pushProgress(`Done — sent ${sentCount}, skipped ${skipped.length}`);
+    pushProgress('send', `Done — sent ${sentCount}, skipped ${skipped.length}`);
     SpreadsheetApp.getActive().toast(
       `Sent ${sentCount}, skipped ${skipped.length} — see logs`, '⚠️ Mail Merge Incomplete', 10
     );
   } else {
-    pushProgress(`Done — sent ${sentCount} email(s)`);
+    pushProgress('send', `Done — sent ${sentCount} email(s)`);
     SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
   }
 
