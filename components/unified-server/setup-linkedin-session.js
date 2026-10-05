@@ -19,6 +19,7 @@ const PROFILE_DIR = path.join(__dirname, '.linkedin-profile');
   const page = await context.newPage();
   await page.goto('https://www.linkedin.com/login');
 
-  await context.waitForEvent('close');
+  // timeout: 0 = wait indefinitely until the user closes the browser window
+  await context.waitForEvent('close', { timeout: 0 });
   console.log('Session saved. You can now start the unified-server normally.');
 })();
