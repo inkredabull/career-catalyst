@@ -1993,11 +1993,13 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
       }
     };
 
-    // LinkedIn's feed can legitimately take longer than you'd expect to hydrate, especially on a
-    // retry's fresh reload — confirmed via a failure screenshot showing a fully-rendered page
-    // after our selector wait had already timed out. Generous per-attempt timeouts so a real
-    // slow load succeeds outright, with the retry as a safety net for genuine stalls/blocks.
+    // We only ever read the FIRST post, and a prior run's DOM snapshot proved the real problem:
+    // the activity page renders 20 posts, and the first post's own container uses
+    // `display:contents` (0x0 bounding box) — which Playwright's default `visible` check can
+    // NEVER pass, no matter how long we wait. That's the "never seems finished" symptom. Scope to
+    // .first() explicitly and wait for 'attached' (exists in DOM) instead of 'visible'.
     const t0 = Date.now();
+    const firstPost = page.locator('[data-view-name="feed-full-update"]').first();
     let navErr;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
@@ -2006,16 +2008,12 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
           timeout: 30000,
         });
         console.log(`[get-most-recent-linkedin-post] attempt ${attempt}: domcontentloaded at +${Date.now() - t0}ms`);
-        await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 30000 });
-        console.log(`[get-most-recent-linkedin-post] attempt ${attempt}: container visible at +${Date.now() - t0}ms`);
-        // The container renders before its text hydrates — wait for the actual post text too,
-        // or evaluate() below can run against a still-empty post and come back with nothing.
-        await page.waitForSelector(
-          '[data-view-name="feed-full-update"] .feed-shared-text span[dir="ltr"], ' +
-          '[data-view-name="feed-full-update"] .update-components-text span[dir="ltr"]',
-          { timeout: 20000 },
-        );
-        console.log(`[get-most-recent-linkedin-post] attempt ${attempt}: text visible at +${Date.now() - t0}ms`);
+        await firstPost.waitFor({ state: 'attached', timeout: 15000 });
+        console.log(`[get-most-recent-linkedin-post] attempt ${attempt}: first post attached at +${Date.now() - t0}ms`);
+        // No separate wait for a specific text selector inside the post — a prior run showed
+        // textElCount: 0 on a post with embedded code blocks, meaning the narrow selector doesn't
+        // match that post's markup at all (not a timing issue a longer wait would ever resolve).
+        // evaluate() below falls back to the post's raw text when the narrow selector misses.
         navErr = null;
         break;
       } catch (err) {
@@ -2058,10 +2056,25 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
       const textEl = item.querySelector(
         '.feed-shared-text span[dir="ltr"], .update-components-text span[dir="ltr"]',
       );
-      return { text: textEl?.textContent?.trim() ?? '', activityUrl };
+      let text = textEl?.textContent?.trim() ?? '';
+      let usedFallback = false;
+      if (!text) {
+        // Narrow selector missed (e.g. a post with embedded code blocks uses different markup) —
+        // fall back to the post's raw text, stripped of common UI chrome (reaction counts, the
+        // Like/Comment/Share bar, trailing "...more").
+        usedFallback = true;
+        text = (item.innerText || '')
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line && !/^(Like|Comment|Share|Send|\.\.\.more|see more)$/i.test(line))
+          .join('\n')
+          .trim()
+          .slice(0, 2000);
+      }
+      return { text, activityUrl, usedFallback };
     });
 
-    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} activityUrl=${result?.activityUrl || '(none)'}`);
+    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} usedFallback=${result?.usedFallback ?? false} activityUrl=${result?.activityUrl || '(none)'}`);
     if (!result?.text) {
       await diagnoseSelectorState('post-wait evaluate() empty');
       return res.status(404).json({ error: 'No post text found' });
