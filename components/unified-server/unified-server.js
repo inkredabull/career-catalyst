@@ -1948,10 +1948,14 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
     });
   }
 
+  // Set LINKEDIN_SCRAPER_HEADFUL=true (and restart the server) to watch the actual browser
+  // window live — useful for checking whether LinkedIn is showing a login/checkpoint/empty-
+  // activity screen instead of the expected feed.
+  const HEADFUL = process.env.LINKEDIN_SCRAPER_HEADFUL === 'true';
   const MAX_ATTEMPTS = 2;
   let context;
   try {
-    context = await chromium.launchPersistentContext(LINKEDIN_PROFILE_DIR, { headless: true });
+    context = await chromium.launchPersistentContext(LINKEDIN_PROFILE_DIR, { headless: !HEADFUL });
     const page = await context.newPage();
 
     // LinkedIn's feed occasionally renders slowly enough to blow the 15s selector wait even
@@ -1971,7 +1975,21 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
         console.warn(`[get-most-recent-linkedin-post] attempt ${attempt}/${MAX_ATTEMPTS} failed: ${err.message}`);
       }
     }
-    if (navErr) throw navErr;
+    if (navErr) {
+      // Self-diagnosing forensics: capture what LinkedIn actually showed (login wall, checkpoint,
+      // empty activity, etc.) so a one-off failure doesn't need to be caught live to debug.
+      try {
+        const debugDir = path.join(__dirname, 'logs', 'linkedin-scraper-failures');
+        fs.mkdirSync(debugDir, { recursive: true });
+        const slug = profileUrl.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+        const shotPath = path.join(debugDir, `${slug}-${Date.now()}.png`);
+        await page.screenshot({ path: shotPath, fullPage: true });
+        console.warn(`[get-most-recent-linkedin-post] saved failure screenshot: ${shotPath}`);
+      } catch (shotErr) {
+        console.warn(`[get-most-recent-linkedin-post] failed to capture debug screenshot: ${shotErr.message}`);
+      }
+      throw navErr;
+    }
 
     const result = await page.evaluate(() => {
       const item = document.querySelector('[data-view-name="feed-full-update"]');
