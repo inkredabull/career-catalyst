@@ -1958,8 +1958,10 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
     context = await chromium.launchPersistentContext(LINKEDIN_PROFILE_DIR, { headless: !HEADFUL });
     const page = await context.newPage();
 
-    // LinkedIn's feed occasionally renders slowly enough to blow the 15s selector wait even
-    // though the profile loads fine — one retry (fresh navigation) clears most of these.
+    // LinkedIn's feed can legitimately take longer than you'd expect to hydrate, especially on a
+    // retry's fresh reload — confirmed via a failure screenshot showing a fully-rendered page
+    // after our selector wait had already timed out. Generous per-attempt timeouts so a real
+    // slow load succeeds outright, with the retry as a safety net for genuine stalls/blocks.
     let navErr;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
@@ -1967,13 +1969,13 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
           waitUntil: 'domcontentloaded',
           timeout: 30000,
         });
-        await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 15000 });
+        await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 30000 });
         // The container renders before its text hydrates — wait for the actual post text too,
         // or evaluate() below can run against a still-empty post and come back with nothing.
         await page.waitForSelector(
           '[data-view-name="feed-full-update"] .feed-shared-text span[dir="ltr"], ' +
           '[data-view-name="feed-full-update"] .update-components-text span[dir="ltr"]',
-          { timeout: 10000 },
+          { timeout: 20000 },
         );
         navErr = null;
         break;
