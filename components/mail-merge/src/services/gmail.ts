@@ -230,10 +230,10 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
 
 // ── Core send ─────────────────────────────────────────────────────────────────
 
-const time = <T>(label: string, fn: () => T): T => {
+const time = <T>(scope: string, label: string, fn: () => T): T => {
   const start = Date.now();
   const result = fn();
-  pushProgress('send', `${label} — ${Date.now() - start}ms`);
+  pushProgress(scope, `${label} — ${Date.now() - start}ms`);
   return result;
 };
 
@@ -385,13 +385,16 @@ const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): str
     "if(typeof google==='undefined'||!google.script){alert('GAS not ready — please reload.');return;}",
     "document.getElementById('form').style.display='none';",
     "document.getElementById('loading').style.display='block';",
+    // A fresh, never-before-used token per send means the first poll can never see a prior run's
+    // leftover progress lines — no shared/static key to race against clearProgress() on the server.
+    "var runToken=String(Date.now())+'-'+Math.random().toString(36).slice(2);",
     "window._shownCount=0;",
     "window._logDiv=document.getElementById('log');",
     "window._logDiv.textContent='';",
-    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('send');};",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('send:'+runToken);};",
     "window._poll();",
     "window._timer=setInterval(window._poll,1000);",
-    `google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},2000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).${actionFn}(s,t);`,
+    `google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},2000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).${actionFn}(s,t,runToken);`,
   ].join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -441,19 +444,21 @@ const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
 export const doSendTestEmail = (
   subject: string,
   topic = DEFAULT_TOPIC,
+  runToken = '',
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
-  clearProgress('send');
+  const scope = `send:${runToken}`;
+  clearProgress(scope);
   const testRecipient = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.TEST_EMAIL);
   if (!testRecipient) {
-    pushProgress('send', 'TEST_EMAIL Script Property not set — aborting test send');
+    pushProgress(scope, 'TEST_EMAIL Script Property not set — aborting test send');
     Logger.log('TEST_EMAIL Script Property not set — aborting test send');
     return;
   }
 
-  pushProgress('send', `Starting test send: "${subject}"`);
-  const emailTemplate = time('Fetched draft template from Gmail', () => getGmailTemplateFromDrafts(subject));
-  const data = time('Read sheet data', () => sheet.getDataRange().getDisplayValues());
+  pushProgress(scope, `Starting test send: "${subject}"`);
+  const emailTemplate = time(scope, 'Fetched draft template from Gmail', () => getGmailTemplateFromDrafts(subject));
+  const data = time(scope, 'Read sheet data', () => sheet.getDataRange().getDisplayValues());
   const heads = data.shift() as string[];
   const rows = data.map(r =>
     heads.reduce<Record<string, string>>((o, k, i) => { o[k] = r[i] ?? ''; return o; }, {})
@@ -461,17 +466,17 @@ export const doSendTestEmail = (
 
   const row = rows[0];
   if (!row) {
-    pushProgress('send', 'No data rows found in sheet — aborting test send');
+    pushProgress(scope, 'No data rows found in sheet — aborting test send');
     Logger.log('No data rows found in sheet — aborting test send');
     return;
   }
 
   row[COLS.RECIPIENT] = testRecipient;
   const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-  const linkedin = time(`Sent to ${testRecipient}`, () => sendViaGmail(row, msgObj, emailTemplate, subject, topic));
+  const linkedin = time(scope, `Sent to ${testRecipient}`, () => sendViaGmail(row, msgObj, emailTemplate, subject, topic));
   // No follow-up reminder for test sends — the recipient is you.
   if (linkedin) handOffToExtension([linkedin]);
-  pushProgress('send', `Done — test email sent to ${testRecipient}`);
+  pushProgress(scope, `Done — test email sent to ${testRecipient}`);
   log('INFO', 'Test email sent to %s', testRecipient);
   SpreadsheetApp.getActive().toast(`Test sent to ${testRecipient}`, '✅ Test Email Sent', 5);
 };
@@ -494,13 +499,15 @@ export const queueEmails = (
 export const doSendEmails = (
   subject: string,
   topic = DEFAULT_TOPIC,
+  runToken = '',
   sheet = SpreadsheetApp.getActiveSheet()
 ): void => {
-  clearProgress('send');
-  pushProgress('send', `Starting send: "${subject}"`);
+  const scope = `send:${runToken}`;
+  clearProgress(scope);
+  pushProgress(scope, `Starting send: "${subject}"`);
   log('DEBUG', 'Getting draft: %s', subject);
-  const emailTemplate = time('Fetched draft template from Gmail', () => getGmailTemplateFromDrafts(subject));
-  const data = time('Read sheet data', () => sheet.getDataRange().getDisplayValues());
+  const emailTemplate = time(scope, 'Fetched draft template from Gmail', () => getGmailTemplateFromDrafts(subject));
+  const data = time(scope, 'Read sheet data', () => sheet.getDataRange().getDisplayValues());
   const heads = data.shift() as string[];
   const emailSentColIdx = heads.indexOf(COLS.EMAIL_SENT);
 
@@ -513,7 +520,7 @@ export const doSendEmails = (
   // picker's withFailureHandler show it and re-display the form.
   const needsMetadata = rows.some(r => r[COLS.EMAIL_SENT] === '' && r[COLS.JOB_ID]);
   if (needsMetadata) {
-    const unhealthy = time('Checked metadata server', () => checkMetadataServer());
+    const unhealthy = time(scope, 'Checked metadata server', () => checkMetadataServer());
     if (unhealthy) throw new Error(`Aborted before sending — ${unhealthy}`);
   }
 
@@ -526,10 +533,10 @@ export const doSendEmails = (
   for (const [idx, row] of rows.entries()) {
     const label = `Row ${idx + 1}/${rows.length}`;
     if (row[COLS.EMAIL_SENT] === '') {
-      pushProgress('send', `${label}: ${row[COLS.RECIPIENT] || '(no recipient)'} — building email…`);
+      pushProgress(scope, `${label}: ${row[COLS.RECIPIENT] || '(no recipient)'} — building email…`);
       try {
         const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-        const linkedin = time(`${label}: sent to ${row[COLS.RECIPIENT]}`, () =>
+        const linkedin = time(scope, `${label}: sent to ${row[COLS.RECIPIENT]}`, () =>
           sendViaGmail(row, msgObj, emailTemplate, subject, topic)
         );
         if (linkedin) linkedInContacts.push(linkedin);
@@ -544,10 +551,10 @@ export const doSendEmails = (
           // Nothing was sent — leave the cell blank so the row is retried once the cause is fixed.
           skipped.push(`${row[COLS.RECIPIENT] || '(no recipient)'} — ${e.message}`);
           out.push(['']);
-          pushProgress('send', `${label}: skipped — ${e.message}`);
+          pushProgress(scope, `${label}: skipped — ${e.message}`);
         } else {
           out.push([(e as Error).message]);
-          pushProgress('send', `${label}: failed — ${(e as Error).message}`);
+          pushProgress(scope, `${label}: failed — ${(e as Error).message}`);
         }
       }
     } else {
@@ -559,12 +566,12 @@ export const doSendEmails = (
 
   if (skipped.length > 0) {
     log('WARN', 'Skipped %s row(s), left blank for retry:\n%s', skipped.length, skipped.join('\n'));
-    pushProgress('send', `Done — sent ${sentCount}, skipped ${skipped.length}`);
+    pushProgress(scope, `Done — sent ${sentCount}, skipped ${skipped.length}`);
     SpreadsheetApp.getActive().toast(
       `Sent ${sentCount}, skipped ${skipped.length} — see logs`, '⚠️ Mail Merge Incomplete', 10
     );
   } else {
-    pushProgress('send', `Done — sent ${sentCount} email(s)`);
+    pushProgress(scope, `Done — sent ${sentCount} email(s)`);
     SpreadsheetApp.getActive().toast(`Sent ${sentCount} email(s)`, '✅ Mail Merge Complete', 5);
   }
 

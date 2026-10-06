@@ -96,16 +96,21 @@ const getMostRecentInteractionDate = (email: string): GoogleAppsScript.Base.Date
 
 const buildDoLookupHtml = (): string => {
   const runNow = [
+    // A fresh, never-before-used token per dialog open means the very first poll can never see
+    // another run's leftover progress lines — there's no key collision to race against, unlike a
+    // shared/static scope where clearProgress() on the server might lose the race with the
+    // client's immediate first poll.
+    "window._runToken=String(Date.now())+'-'+Math.random().toString(36).slice(2);",
     "window._shownCount=0;",
     "window._logDiv=document.getElementById('log');",
     "window._logDiv.textContent='';",
-    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('lookup');};",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('lookup:'+window._runToken);};",
     "window._poll();",
     "window._timer=setInterval(window._poll,1000);",
     "window._renderCandidate=function(){var c=window._candidates[window._idx];document.getElementById('reviewCount').textContent='Reviewing '+(window._idx+1)+' of '+window._candidates.length;document.getElementById('postText').textContent=c.postText;var link=document.getElementById('postUrl');if(c.postUrl){link.href=c.postUrl;link.textContent=c.postUrl;link.style.display='inline';}else{link.removeAttribute('href');link.textContent='(no URL found for this post)';link.style.display='inline';}document.getElementById('suggestion').textContent=c.suggestion;document.getElementById('prompt').textContent=c.prompt;document.getElementById('edit').value=c.suggestion;};",
     "window._advance=function(){window._idx++;if(window._idx>=window._candidates.length){google.script.host.close();}else{window._renderCandidate();}};",
     "window._submitRow=function(){var c=window._candidates[window._idx];google.script.run.withSuccessHandler(window._advance).withFailureHandler(function(e){alert(e.message);}).applyZeitgeistyToRow(c.sheetRow,document.getElementById('edit').value);};",
-    "google.script.run.withSuccessHandler(function(result){clearInterval(window._timer);window._poll();var candidates=(result&&result.candidates)||[];if(candidates.length===0){setTimeout(function(){google.script.host.close();},3000);}else{window._candidates=candidates;window._idx=0;document.getElementById('loading').style.display='none';document.getElementById('review').style.display='block';window._renderCandidate();}}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).doFetchContactToSheet();",
+    "google.script.run.withSuccessHandler(function(result){clearInterval(window._timer);window._poll();var candidates=(result&&result.candidates)||[];if(candidates.length===0){setTimeout(function(){google.script.host.close();},3000);}else{window._candidates=candidates;window._idx=0;document.getElementById('loading').style.display='none';document.getElementById('review').style.display='block';window._renderCandidate();}}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).doFetchContactToSheet(window._runToken);",
   ].join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -163,8 +168,9 @@ export const applyZeitgeistyToRow = (sheetRow: number, text: string): void => {
 };
 
 /** Called by the dialog; does the actual work with progress logging. */
-export const doFetchContactToSheet = (): { filled: number; candidates: ZeitgeistyCandidate[] } => {
-  clearProgress('lookup');
+export const doFetchContactToSheet = (runToken: string): { filled: number; candidates: ZeitgeistyCandidate[] } => {
+  const scope = `lookup:${runToken}`;
+  clearProgress(scope);
   const sheet = SpreadsheetApp.getActiveSheet();
   const data = sheet.getDataRange().getValues() as string[][];
   const heads = data.shift() as string[];
@@ -187,19 +193,19 @@ export const doFetchContactToSheet = (): { filled: number; candidates: Zeitgeist
   const candidates: ZeitgeistyCandidate[] = [];
 
   const enrichZeitgeisty = (rowIdx: number, linkedInUrl: string, firstName: string): void => {
-    logAndPush('lookup', `[Zeitgeisty] Row ${rowIdx + 1}: enabled=${zeitgeistyEnabled} colIdx=${zeitgeistyIdx} hasUrl=${!!linkedInUrl}`);
-    if (!zeitgeistyEnabled) { logAndPush('lookup', '[Zeitgeisty] skip: ZEITGEISTY_ENABLED not true'); return; }
-    if (zeitgeistyIdx === -1) { logAndPush('lookup', '[Zeitgeisty] skip: no Zeitgeisty column in sheet'); return; }
-    if (!linkedInUrl) { logAndPush('lookup', '[Zeitgeisty] skip: no LinkedIn URL'); return; }
+    logAndPush(scope, `[Zeitgeisty] Row ${rowIdx + 1}: enabled=${zeitgeistyEnabled} colIdx=${zeitgeistyIdx} hasUrl=${!!linkedInUrl}`);
+    if (!zeitgeistyEnabled) { logAndPush(scope, '[Zeitgeisty] skip: ZEITGEISTY_ENABLED not true'); return; }
+    if (zeitgeistyIdx === -1) { logAndPush(scope, '[Zeitgeisty] skip: no Zeitgeisty column in sheet'); return; }
+    if (!linkedInUrl) { logAndPush(scope, '[Zeitgeisty] skip: no LinkedIn URL'); return; }
     const existing = String(data[rowIdx]?.[zeitgeistyIdx] ?? '').trim();
-    if (existing) { logAndPush('lookup', `[Zeitgeisty] skip: already filled "${existing.slice(0, 40)}"`); return; }
+    if (existing) { logAndPush(scope, `[Zeitgeisty] skip: already filled "${existing.slice(0, 40)}"`); return; }
     try {
       const post = fetchMostRecentPost(linkedInUrl);
-      logAndPush('lookup', `[Zeitgeisty] postText (${post.text.length} chars): "${post.text.slice(0, 200)}"`);
-      if (!post.text) { logAndPush('lookup', '[Zeitgeisty] skip: no post text from browser scraper'); return; }
+      logAndPush(scope, `[Zeitgeisty] postText (${post.text.length} chars): "${post.text.slice(0, 200)}"`);
+      if (!post.text) { logAndPush(scope, '[Zeitgeisty] skip: no post text from browser scraper'); return; }
       const { prompt, result: zeitgeist } = generateZeitgeistyString(post.text, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
       if (zeitgeist) {
-        logAndPush('lookup', `[Zeitgeisty] Row ${rowIdx + 1} ready for review: "${zeitgeist.slice(0, 80)}"`);
+        logAndPush(scope, `[Zeitgeisty] Row ${rowIdx + 1} ready for review: "${zeitgeist.slice(0, 80)}"`);
         candidates.push({
           sheetRow: rowIdx + 2,
           postText: post.text,
@@ -208,10 +214,10 @@ export const doFetchContactToSheet = (): { filled: number; candidates: Zeitgeist
           suggestion: zeitgeist,
         });
       } else {
-        logAndPush('lookup', '[Zeitgeisty] skip: Claude returned empty string');
+        logAndPush(scope, '[Zeitgeisty] skip: Claude returned empty string');
       }
     } catch (e) {
-      logAndPush('lookup', `[Zeitgeisty] ERROR: ${e}`);
+      logAndPush(scope, `[Zeitgeisty] ERROR: ${e}`);
     }
   };
 
@@ -221,7 +227,7 @@ export const doFetchContactToSheet = (): { filled: number; candidates: Zeitgeist
     const existingEmail = String(row[recipientIdx] ?? '').trim();
 
     if (existingEmail) {
-      logAndPush('lookup', `[Do Lookup] Row ${i + 1}: email already set (${existingEmail}), checking recent interaction`);
+      logAndPush(scope, `[Do Lookup] Row ${i + 1}: email already set (${existingEmail}), checking recent interaction`);
       if (recentIdx !== -1) {
         const lastDate = getMostRecentInteractionDate(existingEmail);
         if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
@@ -237,14 +243,14 @@ export const doFetchContactToSheet = (): { filled: number; candidates: Zeitgeist
 
     if (!row[fullNameIdx]) continue;
     const fullName = String(row[fullNameIdx]);
-    logAndPush('lookup', `[Do Lookup] Row ${i + 1}: looking up "${fullName}"`);
+    logAndPush(scope, `[Do Lookup] Row ${i + 1}: looking up "${fullName}"`);
     const contact = getContactDetails(fullName);
     if (!contact.email) {
-      logAndPush('lookup', `[Do Lookup] Row ${i + 1}: no email found for "${fullName}"`);
+      logAndPush(scope, `[Do Lookup] Row ${i + 1}: no email found for "${fullName}"`);
       continue;
     }
 
-    logAndPush('lookup', `[Do Lookup] Row ${i + 1}: found email=${contact.email} linkedin=${contact.linkedin || '(none)'} company=${contact.company || '(none)'}`);
+    logAndPush(scope, `[Do Lookup] Row ${i + 1}: found email=${contact.email} linkedin=${contact.linkedin || '(none)'} company=${contact.company || '(none)'}`);
     sheet.getRange(i + 2, recipientIdx + 1).setValue(contact.email);
     if (cellIdx !== -1 && !row[cellIdx] && contact.mobile)
       sheet.getRange(i + 2, cellIdx + 1).setValue(contact.mobile);
@@ -264,7 +270,7 @@ export const doFetchContactToSheet = (): { filled: number; candidates: Zeitgeist
     filled++;
   }
 
-  logAndPush('lookup', `Done — ${filled} row(s) updated`);
+  logAndPush(scope, `Done — ${filled} row(s) updated`);
   SpreadsheetApp.getActive().toast(`${filled} row(s) updated`, '✅ Lookup Complete', 4);
   return { filled, candidates };
 };
