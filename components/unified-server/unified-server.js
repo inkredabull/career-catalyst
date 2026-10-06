@@ -1968,6 +1968,13 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
           timeout: 30000,
         });
         await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 15000 });
+        // The container renders before its text hydrates — wait for the actual post text too,
+        // or evaluate() below can run against a still-empty post and come back with nothing.
+        await page.waitForSelector(
+          '[data-view-name="feed-full-update"] .feed-shared-text span[dir="ltr"], ' +
+          '[data-view-name="feed-full-update"] .update-components-text span[dir="ltr"]',
+          { timeout: 10000 },
+        );
         navErr = null;
         break;
       } catch (err) {
