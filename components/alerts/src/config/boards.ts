@@ -53,6 +53,7 @@ export const COMPANY_TARGETS: CompanyTarget[] = [
   { name: "Baseten", ats: "ashby", token: "baseten", geo: "sf" },
   { name: "Databricks", ats: "greenhouse", token: "databricks", geo: "sf" },
   { name: "Modal", ats: "ashby", token: "modal", geo: "us" },
+  { name: "CodeRabbit", ats: "ashby", token: "coderabbit", geo: "sf" },
 
   // --- Product / fintech ---------------------------------------------------
   { name: "Stripe", ats: "greenhouse", token: "stripe", geo: "sf" },
