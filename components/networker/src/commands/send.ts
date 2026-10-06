@@ -11,10 +11,14 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { parseEventFromFileName } from '../eventParser.js';
+import { parseEventFromFileName, getEventPhase, EventPhase } from '../eventParser.js';
 
 const _projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
-const EVENT_TEMPLATE = resolve(_projectRoot, 'templates', 'linkedin-event.txt');
+const EVENT_TEMPLATES: Record<EventPhase, string> = {
+  before: resolve(_projectRoot, 'templates', 'linkedin-event-before.txt'),
+  'day-of': resolve(_projectRoot, 'templates', 'linkedin-event-day-of.txt'),
+  after: resolve(_projectRoot, 'templates', 'linkedin-event-after.txt'),
+};
 import { loadAllCachedProfiles, markConnectionSent } from '../cache.js';
 import { openMessageModal, getChromeFrontWindowTabCount } from '../services/linkedin.js';
 import { DiscoveredProfile, ContactPriorityTier } from '../types.js';
@@ -58,8 +62,11 @@ export function registerSend(program: Command): void {
       const sendTier = normalizeTier(opts.sendTier);
       const maxSends = parseInt(opts.maxSends ?? `${BATCH.DEFAULT_MAX_SENDS}`, 10);
       const eventInfo = parseEventFromFileName(filePath);
+      const phase = getEventPhase(eventInfo.eventDate);
+      const eventTemplate = EVENT_TEMPLATES[phase];
 
       console.log(`Event:     ${eventInfo.eventName}`);
+      console.log(`Event date: ${eventInfo.eventDate?.toLocaleDateString() ?? '(none parsed)'} → phase: ${phase}`);
       console.log(`Send tier: ${sendTier === 'NONE' ? 'ALL' : sendTier}`);
       console.log(`Max sends: ${maxSends}\n`);
 
@@ -112,7 +119,7 @@ export function registerSend(program: Command): void {
       for (let i = 0; i < candidates.length; i++) {
         const profile = candidates[i];
         const tabIndex = startTabCount + i + 1;
-        const outcome = await openMessageModal(profile, tabIndex, eventInfo.eventName, undefined, EVENT_TEMPLATE);
+        const outcome = await openMessageModal(profile, tabIndex, eventInfo.eventName, undefined, eventTemplate);
         if (outcome === 'pending') pendingCount++;
         else if (outcome === 'started') startedCount++;
 

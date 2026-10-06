@@ -1,0 +1,1 @@
+Hi {{firstName}}, I'm also slated to go to {{event}}. Are you heading there too? {{#condensedSummary}}Seems you're a go-to for {{condensedSummary}}. {{/condensedSummary}}How are you meeting great minds in the city: Shack15? SFIRL? Cerebral Valley?
