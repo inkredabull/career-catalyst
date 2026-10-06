@@ -68,6 +68,7 @@ export interface DiscoveredProfile {
   condensedSummary?: string;
   error?: string;
   connectionSent?: boolean;
+  alreadyConnected?: boolean;
 }
 
 // ---------------------------------------------------------------------------

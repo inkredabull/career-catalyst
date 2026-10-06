@@ -68,7 +68,8 @@ export function saveLookupToCache(
   }
 }
 
-export function markConnectionSent(
+function markCacheField(
+  field: 'connectionSent' | 'alreadyConnected',
   firstName: string,
   lastName: string,
   eventName: string
@@ -82,11 +83,11 @@ export function markConnectionSent(
     if (existsSync(file)) {
       try {
         const data = JSON.parse(readFileSync(file, 'utf-8'));
-        data.connectionSent = true;
+        data[field] = true;
         writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
         return true;
       } catch {
-        console.warn(`  Warning: could not mark connectionSent for ${firstName} ${lastName}`);
+        console.warn(`  Warning: could not mark ${field} for ${firstName} ${lastName}`);
         return false;
       }
     }
@@ -94,6 +95,22 @@ export function markConnectionSent(
 
   console.warn(`  Warning: cache file not found for ${firstName} ${lastName} (key: ${key})`);
   return false;
+}
+
+export function markConnectionSent(
+  firstName: string,
+  lastName: string,
+  eventName: string
+): boolean {
+  return markCacheField('connectionSent', firstName, lastName, eventName);
+}
+
+export function markAlreadyConnected(
+  firstName: string,
+  lastName: string,
+  eventName: string
+): boolean {
+  return markCacheField('alreadyConnected', firstName, lastName, eventName);
 }
 
 export function loadAllCachedProfiles(eventName: string): DiscoveredProfile[] {

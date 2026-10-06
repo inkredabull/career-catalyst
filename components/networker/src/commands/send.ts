@@ -18,7 +18,7 @@ const EVENT_TEMPLATES: Record<EventPhase, string> = {
   before: resolve(_projectRoot, 'templates', 'linkedin-event-before.txt'),
   after: resolve(_projectRoot, 'templates', 'linkedin-event-after.txt'),
 };
-import { loadAllCachedProfiles, markConnectionSent } from '../cache.js';
+import { loadAllCachedProfiles, markConnectionSent, markAlreadyConnected } from '../cache.js';
 import { openMessageModal, getChromeFrontWindowTabCount } from '../services/linkedin.js';
 import { DiscoveredProfile, ContactPriorityTier } from '../types.js';
 import { BATCH } from '../config.js';
@@ -84,14 +84,17 @@ export function registerSend(program: Command): void {
       const alreadySent = targets.filter(p => p.connectionSent).length;
       if (alreadySent > 0) console.log(`Skipping ${alreadySent} already-sent connection(s)`);
 
-      const pending = targets.filter(p => p.linkedInUrl && !p.connectionSent);
+      const alreadyConnected = targets.filter(p => p.alreadyConnected).length;
+      if (alreadyConnected > 0) console.log(`Skipping ${alreadyConnected} existing 1st-degree connection(s)`);
+
+      const pending = targets.filter(p => p.linkedInUrl && !p.connectionSent && !p.alreadyConnected);
       const pendingByTier = (['TIER_1', 'TIER_2', 'TIER_3'] as ContactPriorityTier[])
         .map(t => `${t}=${pending.filter(p => p.priorityTier === t).length}`)
         .join('  ');
       console.log(`Pending by tier: ${pendingByTier}`);
 
       const candidates = targets
-        .filter(p => p.linkedInUrl && isTierSelected(p.priorityTier, sendTier) && !p.connectionSent)
+        .filter(p => p.linkedInUrl && isTierSelected(p.priorityTier, sendTier) && !p.connectionSent && !p.alreadyConnected)
         .sort((a, b) => tierRank(a.priorityTier) - tierRank(b.priorityTier))
         .slice(0, maxSends);
 
@@ -115,24 +118,33 @@ export function registerSend(program: Command): void {
       console.log('\nOpening message modals…\n');
       let pendingCount = 0;
       let startedCount = 0;
+      let connectedCount = 0;
       for (let i = 0; i < candidates.length; i++) {
         const profile = candidates[i];
         const tabIndex = startTabCount + i + 1;
         const outcome = await openMessageModal(profile, tabIndex, eventInfo.eventName, undefined, eventTemplate);
         if (outcome === 'pending') pendingCount++;
         else if (outcome === 'started') startedCount++;
+        else if (outcome === 'connected') connectedCount++;
 
-        // Already pending or newly started both mean the invite is out — mark either way.
         const nameParts = profile.name.trim().split(/\s+/);
-        const sent = markConnectionSent(
-          profile.firstName ?? nameParts[0] ?? '',
-          profile.lastName ?? nameParts[nameParts.length - 1] ?? '',
-          eventInfo.eventName
-        );
-        if (sent) console.log(`  Marked ${profile.name} as connection sent`);
-        else console.warn(`  Could not mark ${profile.name} as connection sent — cache file not updated`);
+        const firstName = profile.firstName ?? nameParts[0] ?? '';
+        const lastName = profile.lastName ?? nameParts[nameParts.length - 1] ?? '';
 
-        if (outcome !== 'unknown') {
+        if (outcome === 'connected') {
+          // Already a 1st-degree connection — no invite was sent, just record it
+          // so future runs skip this contact without reopening a tab.
+          const marked = markAlreadyConnected(firstName, lastName, eventInfo.eventName);
+          if (marked) console.log(`  Marked ${profile.name} as already connected`);
+          else console.warn(`  Could not mark ${profile.name} as already connected — cache file not updated`);
+        } else {
+          // Already pending or newly started both mean the invite is out — mark either way.
+          const sent = markConnectionSent(firstName, lastName, eventInfo.eventName);
+          if (sent) console.log(`  Marked ${profile.name} as connection sent`);
+          else console.warn(`  Could not mark ${profile.name} as connection sent — cache file not updated`);
+        }
+
+        if (outcome === 'started' || outcome === 'pending') {
           try {
             await appendFctoLeadRow({
               name: profile.name,
@@ -149,6 +161,6 @@ export function registerSend(program: Command): void {
         if (i < candidates.length - 1) await randomDelay(800, 1500);
       }
 
-      console.log(`\n✅ Done: ${startedCount} modal(s) opened for review, ${pendingCount} already pending (no modal needed).`);
+      console.log(`\n✅ Done: ${startedCount} modal(s) opened for review, ${pendingCount} already pending, ${connectedCount} already 1st-degree (no modal needed).`);
     });
 }

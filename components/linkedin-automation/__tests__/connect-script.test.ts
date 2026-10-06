@@ -34,6 +34,12 @@ describe('generateConnectScript', () => {
     expect(generateConnectScript('x')).toContain("'pending'");
   });
 
+  it('includes a 1st-degree connection guard that returns CONNECTED', () => {
+    const script = generateConnectScript('x');
+    expect(script).toContain("'1st'");
+    expect(script).toContain("return 'CONNECTED';");
+  });
+
   it('includes "Add a note" polling logic', () => {
     expect(generateConnectScript('x')).toContain('add a note');
   });

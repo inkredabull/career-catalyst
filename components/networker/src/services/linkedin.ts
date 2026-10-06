@@ -46,7 +46,7 @@ import {
   injectScript,
 } from '@inkredabull/career-catalyst-linkedin-automation';
 
-export type ConnectOutcome = 'pending' | 'started' | 'unknown';
+export type ConnectOutcome = 'pending' | 'started' | 'unknown' | 'connected';
 
 export async function openMessageModal(
   profile: DiscoveredProfile,
@@ -63,6 +63,10 @@ export async function openMessageModal(
     round:            '',
   });
   const raw = injectScript(tabIndex, generateConnectScript(message)).trim();
+  if (raw === 'CONNECTED') {
+    console.log(`  ${profile.name}: already a 1st-degree connection — skipping connect request`);
+    return 'connected';
+  }
   if (raw === 'PENDING') {
     console.log(`  ${profile.name}: connection already pending on LinkedIn — skipping modal`);
     return 'pending';
