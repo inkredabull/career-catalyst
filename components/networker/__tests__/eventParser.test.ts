@@ -42,10 +42,10 @@ describe('getEventPhase', () => {
     expect(getEventPhase(new Date(2026, 7, 26), today)).toBe('before');
   });
 
-  it('returns "day-of" when eventDate is the same calendar day, regardless of time', () => {
+  it('returns "before" when eventDate is the same calendar day, regardless of time', () => {
     const eventDate = new Date(2026, 7, 25, 23, 59);
     const now = new Date(2026, 7, 25, 0, 1);
-    expect(getEventPhase(eventDate, now)).toBe('day-of');
+    expect(getEventPhase(eventDate, now)).toBe('before');
   });
 
   it('returns "after" when eventDate is before today', () => {

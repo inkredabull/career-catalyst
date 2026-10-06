@@ -1,1 +1,0 @@
-Hi {{firstName}}, I'm also headed to {{event}} today. Will I catch you there? {{#condensedSummary}}Seems you're a go-to for {{condensedSummary}}. {{/condensedSummary}}How are you meeting great minds in the city: Shack15? SFIRL? Cerebral Valley?

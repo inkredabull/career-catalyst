@@ -16,7 +16,6 @@ import { parseEventFromFileName, getEventPhase, EventPhase } from '../eventParse
 const _projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const EVENT_TEMPLATES: Record<EventPhase, string> = {
   before: resolve(_projectRoot, 'templates', 'linkedin-event-before.txt'),
-  'day-of': resolve(_projectRoot, 'templates', 'linkedin-event-day-of.txt'),
   after: resolve(_projectRoot, 'templates', 'linkedin-event-after.txt'),
 };
 import { loadAllCachedProfiles, markConnectionSent } from '../cache.js';

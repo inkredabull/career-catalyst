@@ -8,7 +8,7 @@ export interface EventInfo {
   eventDate: Date | undefined;
 }
 
-export type EventPhase = 'before' | 'day-of' | 'after';
+export type EventPhase = 'before' | 'after';
 
 /**
  * Parse event name from filename.
@@ -46,6 +46,8 @@ export function parseEventFromFileName(filePath: string): EventInfo {
 
 /**
  * Classify `eventDate` relative to `today` by calendar day (time-of-day ignored).
+ * 'before' covers any day up to and including the event's calendar day — the "I won't
+ * be able to make it after all" message reads the same whether sent days out or day-of.
  * No parseable date is treated as 'after' — preserves the single-template behavior
  * that existed before phase-based template selection, for any filename that doesn't
  * match the date pattern.
@@ -55,7 +57,5 @@ export function getEventPhase(eventDate: Date | undefined, today: Date = new Dat
   const toDayNumber = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const eventDay = toDayNumber(eventDate);
   const todayDay = toDayNumber(today);
-  if (todayDay < eventDay) return 'before';
-  if (todayDay === eventDay) return 'day-of';
-  return 'after';
+  return todayDay <= eventDay ? 'before' : 'after';
 }
