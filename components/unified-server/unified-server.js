@@ -2042,16 +2042,36 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
       const item = document.querySelector('[data-view-name="feed-full-update"]');
       if (!item) return null;
 
-      // URN lives in data-view-tracking-scope as JSON: [{ updateUrn: "urn:li:activity:NNN" }]
+      // URN lives in data-view-tracking-scope as JSON: [{ updateUrn: "urn:li:activity:NNN" }].
+      // The attribute isn't always on this exact node — item can be a display:contents wrapper —
+      // so check it and its descendants before giving up on the JSON approach.
       let activityUrl = '';
-      try {
-        const scope = JSON.parse(item.getAttribute('data-view-tracking-scope') ?? '[]');
-        const updateUrn = scope[0]?.updateUrn ?? '';
-        const activityId = updateUrn.match(/activity:(\d+)/)?.[1] ?? '';
-        if (activityId) {
-          activityUrl = `https://www.linkedin.com/feed/update/urn:li:activity:${activityId}/`;
+      let activityIdSource = 'none';
+      for (const el of [item, ...item.querySelectorAll('[data-view-tracking-scope]')]) {
+        try {
+          const scope = JSON.parse(el.getAttribute('data-view-tracking-scope') ?? '[]');
+          const updateUrn = scope[0]?.updateUrn ?? '';
+          const activityId = updateUrn.match(/activity:(\d+)/)?.[1] ?? '';
+          if (activityId) {
+            activityUrl = `https://www.linkedin.com/feed/update/urn:li:activity:${activityId}/`;
+            activityIdSource = 'tracking-scope';
+            break;
+          }
+        } catch (_) {}
+      }
+      if (!activityUrl) {
+        // Fallback: scan for a permalink anchor (LinkedIn typically wraps the post's timestamp,
+        // e.g. "3w", in a link to the post itself) rather than relying on tracking-scope JSON.
+        for (const a of item.querySelectorAll('a[href]')) {
+          const href = a.getAttribute('href') || '';
+          const m = href.match(/activity[:-](\d+)/) || href.match(/\/posts\/[^/]+-(\d+)-/);
+          if (m?.[1]) {
+            activityUrl = `https://www.linkedin.com/feed/update/urn:li:activity:${m[1]}/`;
+            activityIdSource = 'permalink-anchor';
+            break;
+          }
         }
-      } catch (_) {}
+      }
 
       const textEl = item.querySelector(
         '.feed-shared-text span[dir="ltr"], .update-components-text span[dir="ltr"]',
@@ -2071,10 +2091,10 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
           .trim()
           .slice(0, 2000);
       }
-      return { text, activityUrl, usedFallback };
+      return { text, activityUrl, usedFallback, activityIdSource };
     });
 
-    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} usedFallback=${result?.usedFallback ?? false} activityUrl=${result?.activityUrl || '(none)'}`);
+    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} usedFallback=${result?.usedFallback ?? false} activityUrl=${result?.activityUrl || '(none)'} activityIdSource=${result?.activityIdSource ?? 'none'}`);
     if (!result?.text) {
       await diagnoseSelectorState('post-wait evaluate() empty');
       return res.status(404).json({ error: 'No post text found' });
