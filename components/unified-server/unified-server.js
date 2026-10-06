@@ -1958,10 +1958,46 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
     context = await chromium.launchPersistentContext(LINKEDIN_PROFILE_DIR, { headless: !HEADFUL });
     const page = await context.newPage();
 
+    // Snapshot of DOM state at the moment a wait times out — tells us apart "not there yet" from
+    // "there, but failing Playwright's visibility check for some other reason" (covered by an
+    // overlay, zero-size, opacity:0 mid-animation, etc).
+    const diagnoseSelectorState = async (label) => {
+      try {
+        const info = await page.evaluate(() => {
+          const containers = document.querySelectorAll('[data-view-name="feed-full-update"]');
+          const textEls = document.querySelectorAll(
+            '[data-view-name="feed-full-update"] .feed-shared-text span[dir="ltr"], ' +
+            '[data-view-name="feed-full-update"] .update-components-text span[dir="ltr"]',
+          );
+          const c = containers[0];
+          const t = textEls[0];
+          const cRect = c ? c.getBoundingClientRect() : null;
+          const cStyle = c ? getComputedStyle(c) : null;
+          return {
+            readyState: document.readyState,
+            containerCount: containers.length,
+            textElCount: textEls.length,
+            firstContainer: c ? {
+              width: Math.round(cRect.width),
+              height: Math.round(cRect.height),
+              display: cStyle.display,
+              visibility: cStyle.visibility,
+              opacity: cStyle.opacity,
+            } : null,
+            firstTextPreview: t ? (t.textContent || '').slice(0, 80) : null,
+          };
+        });
+        console.log(`[get-most-recent-linkedin-post] ${label} DOM snapshot: ${JSON.stringify(info)}`);
+      } catch (snapErr) {
+        console.warn(`[get-most-recent-linkedin-post] ${label} DOM snapshot failed: ${snapErr.message}`);
+      }
+    };
+
     // LinkedIn's feed can legitimately take longer than you'd expect to hydrate, especially on a
     // retry's fresh reload — confirmed via a failure screenshot showing a fully-rendered page
     // after our selector wait had already timed out. Generous per-attempt timeouts so a real
     // slow load succeeds outright, with the retry as a safety net for genuine stalls/blocks.
+    const t0 = Date.now();
     let navErr;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
@@ -1969,7 +2005,9 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
           waitUntil: 'domcontentloaded',
           timeout: 30000,
         });
+        console.log(`[get-most-recent-linkedin-post] attempt ${attempt}: domcontentloaded at +${Date.now() - t0}ms`);
         await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 30000 });
+        console.log(`[get-most-recent-linkedin-post] attempt ${attempt}: container visible at +${Date.now() - t0}ms`);
         // The container renders before its text hydrates — wait for the actual post text too,
         // or evaluate() below can run against a still-empty post and come back with nothing.
         await page.waitForSelector(
@@ -1977,11 +2015,13 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
           '[data-view-name="feed-full-update"] .update-components-text span[dir="ltr"]',
           { timeout: 20000 },
         );
+        console.log(`[get-most-recent-linkedin-post] attempt ${attempt}: text visible at +${Date.now() - t0}ms`);
         navErr = null;
         break;
       } catch (err) {
         navErr = err;
-        console.warn(`[get-most-recent-linkedin-post] attempt ${attempt}/${MAX_ATTEMPTS} failed: ${err.message}`);
+        console.warn(`[get-most-recent-linkedin-post] attempt ${attempt}/${MAX_ATTEMPTS} failed at +${Date.now() - t0}ms: ${err.message}`);
+        await diagnoseSelectorState(`attempt ${attempt} failure`);
       }
     }
     if (navErr) {
@@ -2021,7 +2061,11 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
       return { text: textEl?.textContent?.trim() ?? '', activityUrl };
     });
 
-    if (!result?.text) return res.status(404).json({ error: 'No post text found' });
+    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} activityUrl=${result?.activityUrl || '(none)'}`);
+    if (!result?.text) {
+      await diagnoseSelectorState('post-wait evaluate() empty');
+      return res.status(404).json({ error: 'No post text found' });
+    }
     return res.json(result);
   } catch (err) {
     console.error('[get-most-recent-linkedin-post]', err);
