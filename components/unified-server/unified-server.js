@@ -2018,6 +2018,9 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
     console.error('[get-most-recent-linkedin-post]', err);
     return res.status(500).json({ error: String(err) });
   } finally {
+    // Headful mode is for watching the page, so let it linger on screen for a beat before the
+    // window closes instead of vanishing the instant the request resolves.
+    if (HEADFUL) await new Promise(resolve => setTimeout(resolve, 1000));
     await context?.close();
   }
 });
