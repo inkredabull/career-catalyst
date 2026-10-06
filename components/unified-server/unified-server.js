@@ -2086,7 +2086,12 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
         text = (item.innerText || '')
           .split('\n')
           .map(line => line.trim())
-          .filter(line => line && !/^(Like|Comment|Share|Send|\.\.\.more|see more)$/i.test(line))
+          .filter(line => line && !(
+            /^(Like|Comment|Share|Send|Repost|\.\.\.more|see more|Feed post)$/i.test(line) ||
+            /^•?\s*(1st|2nd|3rd)$/i.test(line) ||           // connection-degree bullet
+            /^\d+[smhdwy](\s*(ago)?)?$/i.test(line) ||      // bare post age, e.g. "3w", "2d ago"
+            /^\d+[smhdwy]o$/i.test(line)                    // months, e.g. "5mo"
+          ))
           .join('\n')
           .trim()
           .slice(0, 2000);
