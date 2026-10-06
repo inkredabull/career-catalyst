@@ -1948,15 +1948,30 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
     });
   }
 
+  const MAX_ATTEMPTS = 2;
   let context;
   try {
     context = await chromium.launchPersistentContext(LINKEDIN_PROFILE_DIR, { headless: true });
     const page = await context.newPage();
-    await page.goto(`${profileUrl.replace(/\/$/, '')}/recent-activity/all/`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30000,
-    });
-    await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 15000 });
+
+    // LinkedIn's feed occasionally renders slowly enough to blow the 15s selector wait even
+    // though the profile loads fine — one retry (fresh navigation) clears most of these.
+    let navErr;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        await page.goto(`${profileUrl.replace(/\/$/, '')}/recent-activity/all/`, {
+          waitUntil: 'domcontentloaded',
+          timeout: 30000,
+        });
+        await page.waitForSelector('[data-view-name="feed-full-update"]', { timeout: 15000 });
+        navErr = null;
+        break;
+      } catch (err) {
+        navErr = err;
+        console.warn(`[get-most-recent-linkedin-post] attempt ${attempt}/${MAX_ATTEMPTS} failed: ${err.message}`);
+      }
+    }
+    if (navErr) throw navErr;
 
     const result = await page.evaluate(() => {
       const item = document.querySelector('[data-view-name="feed-full-update"]');
