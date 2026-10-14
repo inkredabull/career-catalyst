@@ -1961,13 +1961,22 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
     // Snapshot of DOM state at the moment a wait times out — tells us apart "not there yet" from
     // "there, but failing Playwright's visibility check for some other reason" (covered by an
     // overlay, zero-size, opacity:0 mid-animation, etc).
+    //
+    // Selector note (Oct 2026): LinkedIn removed `data-view-name` entirely from this page (a live
+    // DOM dump confirmed zero matches, including inside shadow roots) in favor of hashed atomic CSS
+    // classes with no stable names. `[data-testid^="ProfileRecentActivityAll-"]` — the activity
+    // list's own `role="list"` container — survived the rewrite and is a testid LinkedIn presumably
+    // maintains deliberately, unlike the hashed classes. Its `role="listitem"` children are each a
+    // post (confirmed: exactly 20 matches, same as the known page size, for both original posts and
+    // reposts). Prefer this over `.feed-shared-update-v2`/`article`/`[data-urn]`, which a live check
+    // also found to be gone from the page.
+    const POST_LIST_SELECTOR = '[role="list"][data-testid^="ProfileRecentActivityAll-"] [role="listitem"]';
     const diagnoseSelectorState = async (label) => {
       try {
-        const info = await page.evaluate(() => {
-          const containers = document.querySelectorAll('[data-view-name="feed-full-update"]');
+        const info = await page.evaluate((sel) => {
+          const containers = document.querySelectorAll(sel);
           const textEls = document.querySelectorAll(
-            '[data-view-name="feed-full-update"] .feed-shared-text span[dir="ltr"], ' +
-            '[data-view-name="feed-full-update"] .update-components-text span[dir="ltr"]',
+            `${sel} .feed-shared-text span[dir="ltr"], ${sel} .update-components-text span[dir="ltr"]`,
           );
           const c = containers[0];
           const t = textEls[0];
@@ -1986,20 +1995,19 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
             } : null,
             firstTextPreview: t ? (t.textContent || '').slice(0, 80) : null,
           };
-        });
+        }, POST_LIST_SELECTOR);
         console.log(`[get-most-recent-linkedin-post] ${label} DOM snapshot: ${JSON.stringify(info)}`);
       } catch (snapErr) {
         console.warn(`[get-most-recent-linkedin-post] ${label} DOM snapshot failed: ${snapErr.message}`);
       }
     };
 
-    // We only ever read the FIRST post, and a prior run's DOM snapshot proved the real problem:
-    // the activity page renders 20 posts, and the first post's own container uses
-    // `display:contents` (0x0 bounding box) — which Playwright's default `visible` check can
-    // NEVER pass, no matter how long we wait. That's the "never seems finished" symptom. Scope to
-    // .first() explicitly and wait for 'attached' (exists in DOM) instead of 'visible'.
+    // We only ever read the FIRST post. Scope to .first() explicitly and wait for 'attached'
+    // (exists in DOM) rather than 'visible' — some wrapper divs in this markup use
+    // `display:contents` (0x0 bounding box), which Playwright's default `visible` check can never
+    // pass no matter how long we wait.
     const t0 = Date.now();
-    const firstPost = page.locator('[data-view-name="feed-full-update"]').first();
+    const firstPost = page.locator(POST_LIST_SELECTOR).first();
     let navErr;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
@@ -2038,13 +2046,17 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
       throw navErr;
     }
 
-    const result = await page.evaluate(() => {
-      const item = document.querySelector('[data-view-name="feed-full-update"]');
+    const result = await page.evaluate((sel) => {
+      const item = document.querySelector(sel);
       if (!item) return null;
 
       // URN lives in data-view-tracking-scope as JSON: [{ updateUrn: "urn:li:activity:NNN" }].
       // The attribute isn't always on this exact node — item can be a display:contents wrapper —
       // so check it and its descendants before giving up on the JSON approach.
+      // Note (Oct 2026): a live check found neither this attribute nor a permalink anchor in the
+      // current markup, so activityUrl now comes back empty/'none' in practice — both strategies
+      // are kept as cheap best-effort attempts in case LinkedIn's markup shifts back or varies by
+      // post type, but don't rely on activityUrl being populated right now.
       let activityUrl = '';
       let activityIdSource = 'none';
       for (const el of [item, ...item.querySelectorAll('[data-view-tracking-scope]')]) {
@@ -2073,6 +2085,15 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
         }
       }
 
+      // LinkedIn's relative post-age indicator (e.g. "3w", "2d ago", "5mo") — used both to strip
+      // it out of the scraped text (chrome, not content) and to flag posts a month or older.
+      const AGE_RE = /^(\d+)(mo|[smhdwy])(\s*ago)?(\s*•)?\s*$/i;
+      const ageLine = (item.innerText || '').split('\n').map(l => l.trim()).find(l => AGE_RE.test(l));
+      const ageUnit = ageLine?.match(AGE_RE)?.[2]?.toLowerCase();
+      // LinkedIn only switches from "w" (weeks) to "mo" (months) once a post is roughly a month
+      // old, so treating any "mo"/"y" reading as "older than a month" matches that cutover.
+      const isOutdated = ageUnit === 'mo' || ageUnit === 'y';
+
       const textEl = item.querySelector(
         '.feed-shared-text span[dir="ltr"], .update-components-text span[dir="ltr"]',
       );
@@ -2089,17 +2110,17 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
           .filter(line => line && !(
             /^(Like|Comment|Share|Send|Repost|\.\.\.more|see more|Feed post)$/i.test(line) ||
             /^•?\s*(1st|2nd|3rd)$/i.test(line) ||           // connection-degree bullet
-            /^\d+[smhdwy](\s*(ago)?)?$/i.test(line) ||      // bare post age, e.g. "3w", "2d ago"
-            /^\d+[smhdwy]o$/i.test(line)                    // months, e.g. "5mo"
+            AGE_RE.test(line)                               // bare post age, e.g. "3w", "2d ago", "5mo"
           ))
           .join('\n')
           .trim()
           .slice(0, 2000);
       }
-      return { text, activityUrl, usedFallback, activityIdSource };
-    });
+      if (isOutdated) text = 'Outdated content';
+      return { text, activityUrl, usedFallback, activityIdSource, isOutdated };
+    }, POST_LIST_SELECTOR);
 
-    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} usedFallback=${result?.usedFallback ?? false} activityUrl=${result?.activityUrl || '(none)'} activityIdSource=${result?.activityIdSource ?? 'none'}`);
+    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} usedFallback=${result?.usedFallback ?? false} isOutdated=${result?.isOutdated ?? false} activityUrl=${result?.activityUrl || '(none)'} activityIdSource=${result?.activityIdSource ?? 'none'}`);
     if (!result?.text) {
       await diagnoseSelectorState('post-wait evaluate() empty');
       return res.status(404).json({ error: 'No post text found' });
