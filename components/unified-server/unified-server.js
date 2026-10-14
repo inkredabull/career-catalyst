@@ -2086,10 +2086,13 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
       }
 
       // LinkedIn's relative post-age indicator (e.g. "3w", "2d ago", "5mo") — used both to strip
-      // it out of the scraped text (chrome, not content) and to flag posts a month or older.
+      // it out of the scraped text (chrome, not content) and to expose post age as metadata so a
+      // caller can decide for itself whether the post is too stale to use.
       const AGE_RE = /^(\d+)(mo|[smhdwy])(\s*ago)?(\s*•)?\s*$/i;
       const ageLine = (item.innerText || '').split('\n').map(l => l.trim()).find(l => AGE_RE.test(l));
-      const ageUnit = ageLine?.match(AGE_RE)?.[2]?.toLowerCase();
+      const ageMatch = ageLine?.match(AGE_RE);
+      const postAge = ageMatch ? `${ageMatch[1]}${ageMatch[2].toLowerCase()}` : null;
+      const ageUnit = ageMatch?.[2]?.toLowerCase();
       // LinkedIn only switches from "w" (weeks) to "mo" (months) once a post is roughly a month
       // old, so treating any "mo"/"y" reading as "older than a month" matches that cutover.
       const isOutdated = ageUnit === 'mo' || ageUnit === 'y';
@@ -2116,11 +2119,10 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
           .trim()
           .slice(0, 2000);
       }
-      if (isOutdated) text = 'Outdated content';
-      return { text, activityUrl, usedFallback, activityIdSource, isOutdated };
+      return { text, activityUrl, usedFallback, activityIdSource, postAge, isOutdated };
     }, POST_LIST_SELECTOR);
 
-    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} usedFallback=${result?.usedFallback ?? false} isOutdated=${result?.isOutdated ?? false} activityUrl=${result?.activityUrl || '(none)'} activityIdSource=${result?.activityIdSource ?? 'none'}`);
+    console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} usedFallback=${result?.usedFallback ?? false} postAge=${result?.postAge ?? '(none)'} isOutdated=${result?.isOutdated ?? false} activityUrl=${result?.activityUrl || '(none)'} activityIdSource=${result?.activityIdSource ?? 'none'}`);
     if (!result?.text) {
       await diagnoseSelectorState('post-wait evaluate() empty');
       return res.status(404).json({ error: 'No post text found' });

@@ -6,20 +6,16 @@ import { randomSleep, LINKEDIN_PACING_MS } from '../utils/delay';
 
 type FetchFn = (url: string, opts: object) => { getContentText(): string };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// Activity IDs are Unix-epoch snowflakes: id / 4194304 = ms since 1970-01-01.
-const activityAgeDays = (activityUrl: string): number | null => {
-  const idMatch = activityUrl.match(/activity[:/](\d+)/);
-  if (!idMatch?.[1]) return null;
-  return Math.floor((Date.now() - Math.floor(parseFloat(idMatch[1]) / 4194304)) / 86400000);
-};
-
 // ── Browser scraper ───────────────────────────────────────────────────────────
 
-const fetchMostRecentPostViaBrowser = (
-  linkedInUrl: string,
-): { text: string; activityUrl: string } | null => {
+interface BrowserPostResponse {
+  text: string;
+  activityUrl: string;
+  postAge: string | null;
+  isOutdated: boolean;
+}
+
+const fetchMostRecentPostViaBrowser = (linkedInUrl: string): BrowserPostResponse | null => {
   if (!NGROK_TUNNEL_URL) {
     console.log('[BrowserScraper] NGROK_TUNNEL_URL not set — rebuild required');
     return null;
@@ -34,7 +30,7 @@ const fetchMostRecentPostViaBrowser = (
     console.log(`[BrowserScraper] ${resp.getResponseCode()}: ${resp.getContentText().slice(0, 200)}`);
     return null;
   }
-  return JSON.parse(resp.getContentText()) as { text: string; activityUrl: string };
+  return JSON.parse(resp.getContentText()) as BrowserPostResponse;
 };
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -42,30 +38,27 @@ const fetchMostRecentPostViaBrowser = (
 export interface RecentPost {
   text: string;
   url: string;
+  postAge: string | null;
+  isOutdated: boolean;
 }
 
-/** Returns the most recent LinkedIn post (text + URL) for Zeitgeisty enrichment, or empty strings to skip. */
+/** Returns the most recent LinkedIn post (text + URL + age) for Zeitgeisty enrichment, or empty strings to skip. */
 export const fetchMostRecentPost = (linkedInUrl: string): RecentPost => {
-  const empty: RecentPost = { text: '', url: '' };
+  const empty: RecentPost = { text: '', url: '', postAge: null, isOutdated: false };
   const browser = fetchMostRecentPostViaBrowser(linkedInUrl);
   if (!browser?.text) {
     console.log('[BrowserScraper] no result — skipping Zeitgeisty');
     return empty;
   }
 
-  const ageDays = activityAgeDays(browser.activityUrl);
-  if (ageDays !== null) {
-    if (ageDays > 30) {
-      console.log(`[BrowserScraper] most recent post is ${ageDays}d old — skipping Zeitgeisty`);
-      return empty;
-    }
-    console.log(`[BrowserScraper] post is ${ageDays}d old`);
+  if (browser.isOutdated) {
+    console.log(`[BrowserScraper] most recent post is ${browser.postAge} old — flagging as outdated`);
   }
 
   randomSleep(LINKEDIN_PACING_MS.min, LINKEDIN_PACING_MS.max);
 
-  console.log(`[BrowserScraper] url=${browser.activityUrl} text="${browser.text.slice(0, 150)}"`);
-  return { text: browser.text, url: browser.activityUrl };
+  console.log(`[BrowserScraper] url=${browser.activityUrl} postAge=${browser.postAge} text="${browser.text.slice(0, 150)}"`);
+  return { text: browser.text, url: browser.activityUrl, postAge: browser.postAge, isOutdated: browser.isOutdated };
 };
 
 // ── Claude Zeitgeisty generator ───────────────────────────────────────────────

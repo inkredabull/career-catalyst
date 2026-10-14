@@ -203,6 +203,17 @@ export const doFetchContactToSheet = (runToken: string): { filled: number; candi
       const post = fetchMostRecentPost(linkedInUrl);
       logAndPush(scope, `[Zeitgeisty] postText (${post.text.length} chars): "${post.text.slice(0, 200)}"`);
       if (!post.text) { logAndPush(scope, '[Zeitgeisty] skip: no post text from browser scraper'); return; }
+      if (post.isOutdated) {
+        logAndPush(scope, `[Zeitgeisty] Row ${rowIdx + 1}: post is ${post.postAge} old — flagging as outdated, skipping Claude`);
+        candidates.push({
+          sheetRow: rowIdx + 2,
+          postText: post.text,
+          postUrl: post.url,
+          prompt: '',
+          suggestion: 'Outdated content',
+        });
+        return;
+      }
       const { prompt, result: zeitgeist } = generateZeitgeistyString(post.text, firstName, UrlFetchApp.fetch.bind(UrlFetchApp));
       if (zeitgeist) {
         logAndPush(scope, `[Zeitgeisty] Row ${rowIdx + 1} ready for review: "${zeitgeist.slice(0, 80)}"`);
