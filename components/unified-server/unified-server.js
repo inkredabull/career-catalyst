@@ -1956,6 +1956,9 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
   let context;
   try {
     context = await chromium.launchPersistentContext(LINKEDIN_PROFILE_DIR, { headless: !HEADFUL });
+    // Needed to read back the permalink after clicking "Copy link to post" below — this is the
+    // headless browser's own virtual clipboard, not the host machine's real OS clipboard.
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     const page = await context.newPage();
 
     // Snapshot of DOM state at the moment a wait times out — tells us apart "not there yet" from
@@ -2088,7 +2091,7 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
       // LinkedIn's relative post-age indicator (e.g. "3w", "2d ago", "5mo") — used both to strip
       // it out of the scraped text (chrome, not content) and to expose post age as metadata so a
       // caller can decide for itself whether the post is too stale to use.
-      const AGE_RE = /^(\d+)(mo|[smhdwy])(\s*ago)?(\s*•)?\s*$/i;
+      const AGE_RE = /^(\d+)(mo|[smhdwy])(\s*ago)?(\s*•\s*(Edited|Promoted))?(\s*•)?\s*$/i;
       const ageLine = (item.innerText || '').split('\n').map(l => l.trim()).find(l => AGE_RE.test(l));
       const ageMatch = ageLine?.match(AGE_RE);
       const postAge = ageMatch ? `${ageMatch[1]}${ageMatch[2].toLowerCase()}` : null;
@@ -2121,6 +2124,48 @@ app.post('/get-most-recent-linkedin-post', async (req, res) => {
       }
       return { text, activityUrl, usedFallback, activityIdSource, postAge, isOutdated };
     }, POST_LIST_SELECTOR);
+
+    // Static markup has no permalink (confirmed: no data-view-tracking-scope, no anchor href,
+    // and the visible "6mo" timestamp isn't even wrapped in a clickable element). The only
+    // surviving way to get the real URL is LinkedIn's own "Copy link to post" menu action —
+    // Playwright's real .click() (not a synthetic DOM click, which silently did nothing here)
+    // opens the control menu correctly; reading the clipboard afterward gets the link LinkedIn
+    // itself generates.
+    if (!result.activityUrl) {
+      // Reposts can carry more than one "Open control menu" button in the same post card (one for
+      // the reshare, one for the original post it wraps) — only one of them necessarily has a
+      // "Copy link" item, so try each until one works rather than assuming .first() is the right one.
+      const controlBtns = page.locator(POST_LIST_SELECTOR).first().locator('button[aria-label^="Open control menu"]');
+      const btnCount = await controlBtns.count();
+      const MENU_ATTEMPTS = 2; // the dropdown's render timing is flaky — same button, same post, sometimes needs a second try.
+      for (let i = 0; i < btnCount && !result.activityUrl; i++) {
+        for (let attempt = 1; attempt <= MENU_ATTEMPTS && !result.activityUrl; attempt++) {
+          try {
+            await controlBtns.nth(i).click({ timeout: 5000 });
+            const copyLinkItem = page.getByText(/copy link/i).first();
+            await copyLinkItem.waitFor({ state: 'visible', timeout: 5000 });
+            await copyLinkItem.click();
+            await page.waitForTimeout(500);
+            const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+            // LinkedIn's "Copy link to post" gives a lnkd.in shortlink (e.g. https://lnkd.in/p/xxx),
+            // not a www.linkedin.com URL directly.
+            if (/^https:\/\/(www\.linkedin\.com|lnkd\.in)\//.test(clipboardText || '')) {
+              result.activityUrl = clipboardText.trim();
+              result.activityIdSource = 'copy-link-menu';
+            } else {
+              console.warn(`[get-most-recent-linkedin-post] "Copy link to post" clipboard content didn't look like a URL (button ${i}, attempt ${attempt}): "${clipboardText}"`);
+            }
+          } catch (copyLinkErr) {
+            console.warn(`[get-most-recent-linkedin-post] "Copy link to post" extraction failed (button ${i}/${btnCount}, attempt ${attempt}/${MENU_ATTEMPTS}): ${copyLinkErr.message}`);
+            await page.keyboard.press('Escape').catch(() => {});
+            await page.waitForTimeout(500);
+          }
+        }
+      }
+      if (btnCount === 0) {
+        console.warn('[get-most-recent-linkedin-post] no "Open control menu" button found on the post — leaving activityUrl empty');
+      }
+    }
 
     console.log(`[get-most-recent-linkedin-post] done at +${Date.now() - t0}ms: textLen=${result?.text?.length ?? 0} usedFallback=${result?.usedFallback ?? false} postAge=${result?.postAge ?? '(none)'} isOutdated=${result?.isOutdated ?? false} activityUrl=${result?.activityUrl || '(none)'} activityIdSource=${result?.activityIdSource ?? 'none'}`);
     if (!result?.text) {
