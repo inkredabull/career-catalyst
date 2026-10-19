@@ -158,6 +158,41 @@ export const fetchContactToSheet = (): void => {
   SpreadsheetApp.getUi().showModalDialog(html, 'Do Lookup');
 };
 
+// ── Do Lookup (metadata only, no Zeitgeisty) ──────────────────────────────────
+
+const buildMetadataOnlyLookupHtml = (): string => {
+  const runNow = [
+    "window._runToken=String(Date.now())+'-'+Math.random().toString(36).slice(2);",
+    "window._shownCount=0;",
+    "window._logDiv=document.getElementById('log');",
+    "window._logDiv.textContent='';",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('lookup:'+window._runToken);};",
+    "window._poll();",
+    "window._timer=setInterval(window._poll,1000);",
+    "google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},1500);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).doFetchContactToSheet(window._runToken,false);",
+  ].join('');
+  return `<!DOCTYPE html><html><head><base target="_top"><style>
+body{font-family:sans-serif;padding:16px;min-width:320px}
+#loading{text-align:center;padding:8px 0;color:#555;font-size:14px}
+.spinner{display:inline-block;margin-right:6px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#log{margin-top:10px;height:200px;overflow-y:auto;background:#f7f7f7;border:1px solid #ddd;border-radius:3px;padding:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;text-align:left}
+</style></head><body>
+<div id="loading">
+<div><span class="spinner">⏳</span>Running lookup (no Zeitgeisty) — please wait…</div>
+<div id="log"></div>
+</div>
+<script>${runNow}</script>
+</body></html>`;
+};
+
+/** Menu entry: same contact lookup as "Do Lookup" (LinkedIn/Company/Recent/Recipient/Cell),
+ * but skips the Zeitgeisty/Claude step entirely — no review dialog, since there's nothing to review. */
+export const fetchContactMetadataToSheet = (): void => {
+  const html = HtmlService.createHtmlOutput(buildMetadataOnlyLookupHtml()).setWidth(420).setHeight(320);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Do Lookup (no Zeitgeisty)');
+};
+
 /** Writes reviewed/edited Zeitgeisty text into a specific sheet row. */
 export const applyZeitgeistyToRow = (sheetRow: number, text: string): void => {
   const sheet = SpreadsheetApp.getActiveSheet();
@@ -168,7 +203,10 @@ export const applyZeitgeistyToRow = (sheetRow: number, text: string): void => {
 };
 
 /** Called by the dialog; does the actual work with progress logging. */
-export const doFetchContactToSheet = (runToken: string): { filled: number; candidates: ZeitgeistyCandidate[] } => {
+export const doFetchContactToSheet = (
+  runToken: string,
+  includeZeitgeisty = true
+): { filled: number; candidates: ZeitgeistyCandidate[] } => {
   const scope = `lookup:${runToken}`;
   clearProgress(scope);
   const sheet = SpreadsheetApp.getActiveSheet();
@@ -243,11 +281,13 @@ export const doFetchContactToSheet = (runToken: string): { filled: number; candi
         const lastDate = getMostRecentInteractionDate(existingEmail);
         if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
       }
-      enrichZeitgeisty(
-        i,
-        String(row[linkedInIdx] ?? '').trim(),
-        String(row[firstNameIdx] ?? '').trim(),
-      );
+      if (includeZeitgeisty) {
+        enrichZeitgeisty(
+          i,
+          String(row[linkedInIdx] ?? '').trim(),
+          String(row[firstNameIdx] ?? '').trim(),
+        );
+      }
       filled++;
       continue;
     }
@@ -273,11 +313,13 @@ export const doFetchContactToSheet = (runToken: string): { filled: number; candi
       const lastDate = getMostRecentInteractionDate(contact.email);
       if (lastDate) sheet.getRange(i + 2, recentIdx + 1).setValue(lastDate);
     }
-    enrichZeitgeisty(
-      i,
-      contact.linkedin || String(row[linkedInIdx] ?? '').trim(),
-      contact.email.split('@')[0],
-    );
+    if (includeZeitgeisty) {
+      enrichZeitgeisty(
+        i,
+        contact.linkedin || String(row[linkedInIdx] ?? '').trim(),
+        contact.email.split('@')[0],
+      );
+    }
     filled++;
   }
 
