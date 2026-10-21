@@ -67,8 +67,9 @@ export const SUBJECT_LINE_CONFIG = [
   //   flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
   // },
   // { subject: 'Q2 2026 latest-and-greatest', defaultTopic: 'the latest', flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } },
+    // subject: "2-week AI sprint for {{Company}}",
   {
-    subject: "2-week AI sprint for {{Company}}",
+    subject: "Where your team’s AI setup goes next",
     defaultTopic: 'checking in around AI-efficiencies',
     flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
   },
