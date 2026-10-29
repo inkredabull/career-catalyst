@@ -33,12 +33,12 @@ export const sendRealSms = (to: string, message: string): void => {
   Logger.log('SMS response %s: %s', res.getResponseCode(), res.getContentText());
 };
 
-export const buildSmsMessage = (first: string, email: string, topic = 'making a connection'): string =>
+export const buildSmsMessage = (first: string, email: string, zeitgeisty: string, topic = 'making a connection'): string =>
   [
-    `Hi ${first}, is ${email} the best to reach you at? Just emailed you about ${topic}. Hope you've been well!`,
+    `Hi ${first}, is ${email} the best to reach you at? ${zeitgeisty} Just emailed you about ${topic} and hope I didn't land in Spam.`,
     // '- Anthony Bull',
   ].join('\n\n');
 
-export const notifyViaSMS = (first: string, email: string, number: string, topic = 'making a connection'): void => {
-  sendRealSms(normalizePhoneNumber(number), buildSmsMessage(first, email, topic));
+export const notifyViaSMS = (first: string, email: string, number: string, zeitgeisty: string, topic = 'making a connection'): void => {
+  sendRealSms(normalizePhoneNumber(number), buildSmsMessage(first, email, zeitgeisty, topic));
 };

@@ -329,7 +329,7 @@ export const sendViaGmail = (
 
     if (!isSelfOrMissing) {
       log('TRACE', 'Sending SMS to: %s', cellValue);
-      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, topic ?? draftSubject ?? subjectLine);
+      notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, row[COLS.ZEITGEISTY] ?? '', topic ?? draftSubject ?? subjectLine);
     }
   }
 
@@ -340,7 +340,7 @@ export const sendViaGmail = (
   }
   const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
   const resolvedTopic = topic ?? draftSubject ?? subjectLine;
-  const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], resolvedTopic);
+  const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], row[COLS.ZEITGEISTY] ?? '', resolvedTopic);
   log('TRACE', 'Queuing LinkedIn contact - URL: "%s", Message length: %s', linkedInUrl, message.length);
   return { url: linkedInUrl, message, firstName };
 };
