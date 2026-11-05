@@ -231,6 +231,7 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
 // ── Core send ─────────────────────────────────────────────────────────────────
 
 const time = <T>(scope: string, label: string, fn: () => T): T => {
+  pushProgress(scope, `${label}…`);
   const start = Date.now();
   const result = fn();
   pushProgress(scope, `${label} — ${Date.now() - start}ms`);
@@ -259,6 +260,7 @@ export const sendViaGmail = (
   emailTemplate?: { attachments: GoogleAppsScript.Base.Blob[] } | null,
   draftSubject?: string,
   topic?: string,
+  scope?: string,
 ): LinkedInContact | null => {
   const subjectLine = msgObj.subject;
   log('DEBUG', 'Sending via Gmail: %s', subjectLine);
@@ -273,7 +275,7 @@ export const sendViaGmail = (
 
     if (flags.ATTACH_RESUME) {
       const jobId = row[COLS.JOB_ID];
-      const metaResumeUrl = jobId ? getJobMetadata(jobId)?.resumeURL : undefined;
+      const metaResumeUrl = jobId ? getJobMetadata(jobId, scope)?.resumeURL : undefined;
       const fallbackResumeUrl = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.RESUME_URL);
       const resumeUrl = (metaResumeUrl?.includes('drive.google.com') ? metaResumeUrl : null)
         ?? (fallbackResumeUrl?.includes('drive.google.com') ? fallbackResumeUrl : null);
@@ -292,6 +294,7 @@ export const sendViaGmail = (
   }
 
   const emailProvider = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.EMAIL_PROVIDER) ?? 'sendgrid';
+  if (scope) pushProgress(scope, `Sending via ${emailProvider} to ${row[COLS.RECIPIENT]}…`);
   if (emailProvider === 'gmail') {
     GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, {
       htmlBody: msgObj.html,
@@ -329,6 +332,7 @@ export const sendViaGmail = (
 
     if (!isSelfOrMissing) {
       log('TRACE', 'Sending SMS to: %s', cellValue);
+      if (scope) pushProgress(scope, `Sending SMS notification for ${row[COLS.RECIPIENT]}…`);
       notifyViaSMS(firstName, row[COLS.RECIPIENT], cellValue, row[COLS.ZEITGEISTY] ?? '', topic ?? draftSubject ?? subjectLine);
     }
   }
@@ -338,6 +342,7 @@ export const sendViaGmail = (
     log('TRACE', 'Recipient "%s" is a self-test variant of MY_EMAIL — skipping LinkedIn tab', row[COLS.RECIPIENT]);
     return null;
   }
+  if (!row[COLS.LINKEDIN] && scope) pushProgress(scope, `Looking up LinkedIn URL for ${row[COLS.FULL_NAME] || firstName}…`);
   const linkedInUrl = row[COLS.LINKEDIN] || getLinkedInUrlByName(row[COLS.FULL_NAME] || firstName) || '';
   const resolvedTopic = topic ?? draftSubject ?? subjectLine;
   const message = buildSmsMessage(firstName, row[COLS.RECIPIENT], row[COLS.ZEITGEISTY] ?? '', resolvedTopic);
@@ -472,8 +477,8 @@ export const doSendTestEmail = (
   }
 
   row[COLS.RECIPIENT] = testRecipient;
-  const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
-  const linkedin = time(scope, `Sent to ${testRecipient}`, () => sendViaGmail(row, msgObj, emailTemplate, subject, topic));
+  const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject, scope);
+  const linkedin = time(scope, `Sent to ${testRecipient}`, () => sendViaGmail(row, msgObj, emailTemplate, subject, topic, scope));
   // No follow-up reminder for test sends — the recipient is you.
   if (linkedin) handOffToExtension([linkedin]);
   pushProgress(scope, `Done — test email sent to ${testRecipient}`);
@@ -535,9 +540,9 @@ export const doSendEmails = (
     if (row[COLS.EMAIL_SENT] === '') {
       pushProgress(scope, `${label}: ${row[COLS.RECIPIENT] || '(no recipient)'} — building email…`);
       try {
-        const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject);
+        const msgObj = fillInTemplateFromObject(emailTemplate.message, row, subject, scope);
         const linkedin = time(scope, `${label}: sent to ${row[COLS.RECIPIENT]}`, () =>
-          sendViaGmail(row, msgObj, emailTemplate, subject, topic)
+          sendViaGmail(row, msgObj, emailTemplate, subject, topic, scope)
         );
         if (linkedin) linkedInContacts.push(linkedin);
         // Queued only after sendViaGmail returns, so a throw above leaves no reminder for an
@@ -628,14 +633,16 @@ const escapeData = (str: string): string =>
     .replace(/[\r]/g, '\\r')
     .replace(/[\t]/g, '\\t');
 
-export const fillInTemplateFromObject = (template: MsgObj, data: Record<string, string>, subjectLine?: string): MsgObj => {
+export const fillInTemplateFromObject = (
+  template: MsgObj, data: Record<string, string>, subjectLine?: string, scope?: string
+): MsgObj => {
   let s = JSON.stringify(template);
 
   // Stage 0: Fetch job metadata first so {{Blurb}} and {{Intro}} can use it below
   const jobId = data[COLS.JOB_ID];
   log('INFO', 'Stage 0: jobId=%s', jobId || '(empty — check JobID column in sheet)');
   if (jobId) {
-    const meta = getJobMetadata(jobId);
+    const meta = getJobMetadata(jobId, scope);
     log('INFO', 'Stage 0: metadata %s', meta ? `found (company=${meta.Company})` : 'null — aborting row');
     // Fail closed: without metadata, {{Company}}/{{JobTitle*}}/{{Intro}} would silently render blank.
     if (!meta) {

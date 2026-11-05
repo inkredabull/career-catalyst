@@ -2,6 +2,7 @@
 // Base URL is bundled at build time from .env via NGROK_TUNNEL_URL.
 
 import { log } from '../utils/logger';
+import { pushProgress } from '../utils/progress';
 import { NGROK_TUNNEL_URL } from '../config/env';
 
 export interface JobMetadata {
@@ -28,8 +29,9 @@ const parseJsonSafely = (text: string, context: string): Record<string, string> 
   }
 };
 
-const generateThirdPersonBlurb = (baseUrl: string, jobId: string): string | null => {
+const generateThirdPersonBlurb = (baseUrl: string, jobId: string, scope?: string): string | null => {
   log('INFO', 'Calling /generate-blurb for %s', jobId);
+  if (scope) pushProgress(scope, `No cached blurb for ${jobId} — generating one now (can take ~30s)…`);
   let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
   try {
     response = UrlFetchApp.fetch(`${baseUrl}/generate-blurb`, {
@@ -41,6 +43,7 @@ const generateThirdPersonBlurb = (baseUrl: string, jobId: string): string | null
     });
   } catch (e) {
     log('ERROR', 'Network error calling /generate-blurb for %s: %s', jobId, e);
+    if (scope) pushProgress(scope, `/generate-blurb network error for ${jobId}: ${e}`);
     return null;
   }
 
@@ -48,18 +51,24 @@ const generateThirdPersonBlurb = (baseUrl: string, jobId: string): string | null
 
   if (response.getResponseCode() !== 200) {
     log('ERROR', '/generate-blurb failed [%s]: %s', response.getResponseCode(), response.getContentText());
+    if (scope) pushProgress(scope, `/generate-blurb failed [${response.getResponseCode()}] for ${jobId}`);
     return null;
   }
 
   const result = parseJsonSafely(response.getContentText(), `/generate-blurb ${jobId}`);
-  if (!result) return null;
+  if (!result) {
+    if (scope) pushProgress(scope, `/generate-blurb returned unparseable response for ${jobId} — tunnel down?`);
+    return null;
+  }
 
   if (!result['success']) {
     log('WARN', '/generate-blurb error for %s: %s', jobId, result['error']);
+    if (scope) pushProgress(scope, `/generate-blurb error for ${jobId}: ${result['error']}`);
     return null;
   }
 
   log('INFO', 'Blurb generated for %s (%s chars)', jobId, String(result['blurb']?.length ?? 0));
+  if (scope) pushProgress(scope, `Blurb generated for ${jobId}`);
   return result['blurb'] ?? null;
 };
 
@@ -92,7 +101,7 @@ export const checkMetadataServer = (): string | null => {
   return null;
 };
 
-export const getJobMetadata = (jobId: string): JobMetadata | null => {
+export const getJobMetadata = (jobId: string, scope?: string): JobMetadata | null => {
   if (!jobId) return null;
 
   const cache = CacheService.getScriptCache();
@@ -105,11 +114,13 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
   const baseUrl = NGROK_TUNNEL_URL;
   if (!baseUrl) {
     log('ERROR', 'NGROK_TUNNEL_URL not set in .env — rebuild required, cannot fetch metadata for %s', jobId);
+    if (scope) pushProgress(scope, `NGROK_TUNNEL_URL not set — cannot fetch metadata for ${jobId}`);
     return null;
   }
 
   const url = `${baseUrl}/llm?jobID=${encodeURIComponent(jobId)}`;
   log('INFO', 'Fetching job metadata for %s — URL: %s', jobId, url);
+  if (scope) pushProgress(scope, `Fetching job metadata for ${jobId} from unified-server…`);
   let response: GoogleAppsScript.URL_Fetch.HTTPResponse;
   try {
     response = UrlFetchApp.fetch(url, {
@@ -119,6 +130,7 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
     });
   } catch (e) {
     log('ERROR', 'Network error fetching job metadata for %s: %s', jobId, e);
+    if (scope) pushProgress(scope, `Network error fetching metadata for ${jobId}: ${e}`);
     return null;
   }
 
@@ -126,14 +138,19 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
 
   if (response.getResponseCode() !== 200) {
     log('ERROR', 'Job metadata fetch failed [%s] for %s: %s', response.getResponseCode(), jobId, response.getContentText().slice(0, 200));
+    if (scope) pushProgress(scope, `Job metadata fetch failed [${response.getResponseCode()}] for ${jobId}`);
     return null;
   }
 
   const data = parseJsonSafely(response.getContentText(), `/llm ${jobId}`);
-  if (!data) return null;
+  if (!data) {
+    if (scope) pushProgress(scope, `Job metadata response for ${jobId} wasn't valid JSON — tunnel down?`);
+    return null;
+  }
 
   if (data['success'] === false as unknown) {
     log('WARN', 'Job metadata error for %s: %s', jobId, data['error']);
+    if (scope) pushProgress(scope, `Job metadata error for ${jobId}: ${data['error']}`);
     return null;
   }
 
@@ -141,7 +158,7 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
 
   if (!thirdPersonBlurb) {
     log('INFO', 'No third-person blurb for %s — triggering generation (may take ~30s)', jobId);
-    thirdPersonBlurb = generateThirdPersonBlurb(baseUrl, jobId) ?? '';
+    thirdPersonBlurb = generateThirdPersonBlurb(baseUrl, jobId, scope) ?? '';
   }
 
   const meta: JobMetadata = {
@@ -154,6 +171,7 @@ export const getJobMetadata = (jobId: string): JobMetadata | null => {
   };
   cache.put(`job_${jobId}`, JSON.stringify(meta), CACHE_TTL);
   log('INFO', 'Job metadata cached for %s (company: %s)', jobId, meta.Company);
+  if (scope) pushProgress(scope, `Job metadata ready for ${jobId} (${meta.Company})`);
   return meta;
 };
 
