@@ -54,19 +54,24 @@ export const FLAGS = {
 // Subject lines with their flag overrides and default SMS/LinkedIn topic, in picker display order
 export const SUBJECT_LINE_CONFIG = [
   {
-    subject: 'Get your help for role as {{JobTitleShorthand}} at {{Company}}?',
+    subject: 'Get your help for {{JobTitleShorthand}} at {{Company}}?',
     defaultTopic: 'a role I could use your help to land',
     flags: { SEND_SMS: true, ATTACH_RESUME: true, ATTACH_PHOTO: true },
+  },
+  {
+    subject: 'Get your help for a role with Tribe AI?',
+    defaultTopic: 'a role I could use your help to land',
+    flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: true },
   },
   // {
   //   subject: 'Need some fractional ENG help?',
   //   defaultTopic: 'fractional ENG help',
   //   flags: { SEND_SMS: false, ATTACH_RESUME: false, ATTACH_PHOTO: false },
   // },
-  { subject: 'Q2 2026 latest-and-greatest', 
-    defaultTopic: 'the latest', 
-    flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } 
-  },
+  // { subject: 'Q2 2026 latest-and-greatest', 
+  //   defaultTopic: 'the latest', 
+  //   flags: { SEND_SMS: true, ATTACH_RESUME: false, ATTACH_PHOTO: true } 
+  // },
   {
     subject: "Where your team’s AI setup goes next",
     defaultTopic: 'checking in around AI-efficiencies',
