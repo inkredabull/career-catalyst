@@ -11,7 +11,7 @@ import {
 import { PROFILE } from '../config/profile';
 import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
 import { getLinkedInUrlByName, WarmupContact } from './contacts';
-import { containsTokens, draftsMatchingSubject, hasUnresolvedTokens, selectTemplateDraft } from './draft-template';
+import { containsTokens, draftsMatchingSubject, hasUnresolvedTokens, selectTemplateDraft, TemplateMessage } from './draft-template';
 import { sendEmailWithSendGrid } from './sendgrid';
 import { sendEmailWithResend } from './resend';
 
@@ -597,12 +597,22 @@ export const sendEmails = (subjectLine?: string): void => {
 
 // ── Template helpers (private) ────────────────────────────────────────────────
 
+/** Scoped to drafts whose subject *contains* subjectLine (Gmail's own index does the filtering),
+ *  so cost depends on matching drafts rather than every draft ever left in the mailbox. A thread
+ *  can hold non-draft messages alongside the draft (e.g. a draft reply in an existing conversation),
+ *  so isDraft() narrows to the actual draft message(s) before the exact-subject check below. */
+const draftMessagesMatchingSubject = (subjectLine: string): TemplateMessage[] => {
+  const escaped = subjectLine.replace(/"/g, '\\"');
+  const threads = GmailApp.search(`in:drafts subject:"${escaped}"`);
+  return threads.flatMap(t => t.getMessages()).filter(m => m.isDraft());
+};
+
 const getGmailTemplateFromDrafts = (subjectLine: string): {
   message: MsgObj;
   attachments: GoogleAppsScript.Base.Blob[];
 } => {
-  const drafts = GmailApp.getDrafts();
-  const matches = draftsMatchingSubject(drafts, subjectLine);
+  const candidates = draftMessagesMatchingSubject(subjectLine).map(msg => ({ getMessage: () => msg }));
+  const matches = draftsMatchingSubject(candidates, subjectLine);
   if (matches.length === 0) throw new Error(`Oops - can't find Gmail draft: ${subjectLine}`);
   if (matches.length > 1) {
     // Expected once a run has left copies behind — worth logging so an unexpectedly high count
