@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { requireEnv, ENV } from "./config/settings";
 import { JobResult, SearchResults } from "./linkedin";
 import { COMPANY_TARGETS } from "./config/boards";
@@ -106,7 +106,10 @@ export async function notify(
   passJobs?: SearchResults,
 ): Promise<void> {
   const email = requireEnv(ENV.MY_EMAIL);
-  const resend = new Resend(requireEnv(ENV.RESEND_API_KEY));
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: email, pass: requireEnv(ENV.GMAIL_APP_PASSWORD) },
+  });
 
   // Group by geography
   const groups = new Map<string, JobResult[]>();
@@ -162,8 +165,8 @@ export async function notify(
       ? `<details style="margin-top:20px"><summary style="font-size:12px;color:#9ca3af;cursor:pointer">Run log (${logs.length} lines)</summary><pre style="font-size:11px;color:#6b7280;white-space:pre-wrap;margin-top:8px">${logs.join("\n")}</pre></details>`
       : "";
 
-  await resend.emails.send({
-    from: "alerts@bluxomelabs.com",
+  await transporter.sendMail({
+    from: email,
     to: email,
     subject: `Jobs for ${new Date().toLocaleString("en-US", { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Los_Angeles" })}`,
     text: textSections.join("\n\n") + durationFooter,

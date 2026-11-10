@@ -1,7 +1,7 @@
 {
   "name": "@inkredabull/career-catalyst-alerts",
   "version": "2.0.0",
-  "description": "LinkedIn job-alert digest — Vercel cron + Resend email",
+  "description": "LinkedIn job-alert digest — Vercel cron + Gmail email",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel deploy --prod",
@@ -14,11 +14,12 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@google-cloud/storage": "^8.1.0",
-    "resend": "^4.0.0"
+    "nodemailer": "^10.5.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node": "^20.11.19",
+    "@types/nodemailer": "^8.0.2",
     "@typescript-eslint/eslint-plugin": "^7.0.1",
     "@typescript-eslint/parser": "^7.0.1",
     "@vercel/node": "^5.0.0",

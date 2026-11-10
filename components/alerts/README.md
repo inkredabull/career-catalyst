@@ -1,6 +1,6 @@
 # career-catalyst-alerts
 
-Vercel-hosted job alert system that searches LinkedIn, target companies' ATS boards, and the open web (via Exa) for new job postings, scores each one with Claude AI, and emails a digest using Resend.
+Vercel-hosted job alert system that searches LinkedIn, target companies' ATS boards, and the open web (via Exa) for new job postings, scores each one with Claude AI, and emails a digest through Gmail (SMTP).
 
 Runs on a Vercel cron schedule (every 4 hours). No manual intervention required once deployed.
 
@@ -31,7 +31,7 @@ Vercel Cron (every 4h)
                            GCS: score blobs (id → reasoning)
                    │
                    ▼
-            notify() ──► Resend email digest
+            notify() ──► Gmail email digest
                          • Grouped by geo (Top Applicant / SF Bay Area / Remote US / Other)
                          • 🟢/🟡 jobs with "Why?" score links
                          • Collapsible 🔴 Pass section
@@ -105,7 +105,7 @@ Each entry includes block buttons (👎 company / 👎 title) that hit `/api/blo
 | JD fetching | LinkedIn Voyager API + Jina Reader |
 | AI scoring | Anthropic Claude Haiku (`claude-haiku-4-5`) |
 | Storage | Google Cloud Storage (seen.json, stop-lists, score blobs) |
-| Email | Resend |
+| Email | Gmail SMTP (nodemailer) |
 | Language | TypeScript (strict) |
 | Tests | Jest (104 tests) |
 
@@ -137,7 +137,7 @@ src/
 ├── utils/text.ts        # normalizeWhitespace() — collapses U+00A0 from sources
 ├── scoring.ts           # Claude scoring: fetchJD (Voyager/Jina), scoreJob()
 ├── seen.ts              # GCS read/write: seen.json, stop-lists, score blobs
-├── notify.ts            # Email builder and Resend send: formatEntry(), notify()
+├── notify.ts            # Email builder and Gmail send: formatEntry(), notify()
 └── index.ts             # Orchestration: getResults(), getOpenReqs()
 api/
 ├── cron.ts              # POST /api/cron — Vercel cron entry point
@@ -151,12 +151,12 @@ api/
 
 | Variable | Description |
 |---|---|
-| `MY_EMAIL` | Digest recipient address |
+| `MY_EMAIL` | Gmail address the digest is sent from and to |
 | `LI_COOKIE` | LinkedIn session cookie (from browser DevTools) |
 | `LI_CSRF_TOKEN` | LinkedIn CSRF token (`ajax:...`) |
 | `EXA_API_KEY` | Exa API key for discovery searches |
 | `ANTHROPIC_API_KEY` | Anthropic API key for Claude scoring |
-| `RESEND_API_KEY` | Resend API key for email delivery |
+| `GMAIL_APP_PASSWORD` | Google app password for `MY_EMAIL` (requires 2-Step Verification) |
 | `GCS_BUCKET` | GCS bucket name for seen/stop-list/score storage |
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | GCS service account JSON (stringified) |
 | `CRON_SECRET` | Bearer token Vercel sends with cron requests |
