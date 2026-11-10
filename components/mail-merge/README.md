@@ -71,11 +71,9 @@ In the GAS editor (Extensions → Apps Script → Project Settings → Script Pr
 | Key | Value |
 |-----|-------|
 | `ANTHROPIC_API_KEY` | Your Anthropic API key |
-| `SENDGRID_API_KEY` | Your SendGrid API key (create a new one — never use old keys) |
-| `MY_EMAIL` | Your sending email address (must be a verified sender in SendGrid) |
+| `MY_EMAIL` | Your sending email address |
 | `MY_PHONE` | Your phone number (for SMS warmup) |
 | `NGROK_SMS_URL` | Your ngrok tunnel URL (optional, only if using SMS) |
-| `EMAIL_PROVIDER` | `gmail` (default) or `sendgrid` — see [Email provider toggle](#email-provider-toggle) |
 
 ---
 
@@ -119,7 +117,6 @@ src/
 ├── services/
 │   ├── message-generator.ts # LLM outreach generation via Anthropic API
 │   ├── gmail.ts             # Mail merge via Gmail drafts
-│   ├── sendgrid.ts          # Transactional email via SendGrid
 │   ├── sms.ts               # SMS via ngrok tunnel
 │   └── contacts.ts          # Google People API contact lookups
 ├── ui/
@@ -188,23 +185,6 @@ drafts with that subject, the **oldest one that still contains `{{tokens}}`** �
 oldest match if none do. Keep the original template draft around; deleting it and leaving only
 personalized copies makes Morning Warmup abort with a "no drafts created" notice rather than send
 everyone the same first name.
-
----
-
-## Email provider toggle
-
-All sends route through **Gmail by default** (`GmailApp.sendEmail`). The `EMAIL_PROVIDER` Script Property lets you opt in to SendGrid for open/click tracking.
-
-| `EMAIL_PROVIDER` value | Behaviour |
-|------------------------|-----------|
-| `gmail` (default, or unset) | Sends via `GmailApp.sendEmail`; no tracking |
-| `sendgrid` | Sends via SendGrid Web API (`/v3/mail/send`); open and click events appear in the SendGrid Activity dashboard |
-
-**SendGrid requirements (`EMAIL_PROVIDER=sendgrid`):**
-- `SENDGRID_API_KEY` must be set (full "Mail Send" permission)
-- `MY_EMAIL` must be a **Verified Sender** in SendGrid (Settings → Sender Authentication)
-
-To switch: open the GAS editor → Project Settings → Script Properties → set `EMAIL_PROVIDER` to `gmail` or `sendgrid`.
 
 ---
 

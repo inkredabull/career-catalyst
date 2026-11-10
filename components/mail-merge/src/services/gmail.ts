@@ -12,7 +12,6 @@ import { PROFILE } from '../config/profile';
 import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
 import { getLinkedInUrlByName, WarmupContact } from './contacts';
 import { containsTokens, draftsMatchingSubject, hasUnresolvedTokens, selectTemplateDraft, TemplateMessage } from './draft-template';
-import { sendEmailWithSendGrid } from './sendgrid';
 
 interface MsgObj {
   subject: string;
@@ -292,20 +291,11 @@ export const sendViaGmail = (
     }
   }
 
-  const emailProvider = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.EMAIL_PROVIDER) ?? 'gmail';
-  if (scope) pushProgress(scope, `Sending via ${emailProvider} to ${row[COLS.RECIPIENT]}…`);
-  if (emailProvider === 'sendgrid') {
-    sendEmailWithSendGrid(
-      row[COLS.RECIPIENT],
-      { subject: subjectLine, html: msgObj.html, text: msgObj.text },
-      { attachments: params.attachments },
-    );
-  } else {
-    GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, {
-      htmlBody: msgObj.html,
-      attachments: params.attachments,
-    });
-  }
+  if (scope) pushProgress(scope, `Sending via Gmail to ${row[COLS.RECIPIENT]}…`);
+  GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, {
+    htmlBody: msgObj.html,
+    attachments: params.attachments,
+  });
 
   const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
