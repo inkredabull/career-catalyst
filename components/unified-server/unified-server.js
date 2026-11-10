@@ -142,7 +142,6 @@ ${'='.repeat(80)}
       const response = await this.anthropic.messages.create({
         model: cvModel,
         max_tokens: 150,
-        temperature: 0.5,
         messages: [
           {
             role: 'user',
