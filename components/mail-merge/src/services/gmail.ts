@@ -13,7 +13,6 @@ import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
 import { getLinkedInUrlByName, WarmupContact } from './contacts';
 import { containsTokens, draftsMatchingSubject, hasUnresolvedTokens, selectTemplateDraft, TemplateMessage } from './draft-template';
 import { sendEmailWithSendGrid } from './sendgrid';
-import { sendEmailWithResend } from './resend';
 
 interface MsgObj {
   subject: string;
@@ -293,25 +292,19 @@ export const sendViaGmail = (
     }
   }
 
-  const emailProvider = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.EMAIL_PROVIDER) ?? 'sendgrid';
+  const emailProvider = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.EMAIL_PROVIDER) ?? 'gmail';
   if (scope) pushProgress(scope, `Sending via ${emailProvider} to ${row[COLS.RECIPIENT]}…`);
-  if (emailProvider === 'gmail') {
-    GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, {
-      htmlBody: msgObj.html,
-      attachments: params.attachments,
-    });
-  } else if (emailProvider === 'resend') {
-    sendEmailWithResend(
-      row[COLS.RECIPIENT],
-      { subject: subjectLine, html: msgObj.html, text: msgObj.text },
-      { attachments: params.attachments },
-    );
-  } else {
+  if (emailProvider === 'sendgrid') {
     sendEmailWithSendGrid(
       row[COLS.RECIPIENT],
       { subject: subjectLine, html: msgObj.html, text: msgObj.text },
       { attachments: params.attachments },
     );
+  } else {
+    GmailApp.sendEmail(row[COLS.RECIPIENT], subjectLine, msgObj.text, {
+      htmlBody: msgObj.html,
+      attachments: params.attachments,
+    });
   }
 
   const firstName = row[COLS.FIRST_NAME] || row[COLS.FULL_NAME]?.trim().split(/\s+/)[0] || '';

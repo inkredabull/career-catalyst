@@ -75,8 +75,7 @@ In the GAS editor (Extensions → Apps Script → Project Settings → Script Pr
 | `MY_EMAIL` | Your sending email address (must be a verified sender in SendGrid) |
 | `MY_PHONE` | Your phone number (for SMS warmup) |
 | `NGROK_SMS_URL` | Your ngrok tunnel URL (optional, only if using SMS) |
-| `EMAIL_PROVIDER` | `sendgrid` (default), `resend`, or `gmail` — see [Email provider toggle](#email-provider-toggle) |
-| `RESEND_API_KEY` | Resend API key (only required when `EMAIL_PROVIDER=resend`) |
+| `EMAIL_PROVIDER` | `gmail` (default) or `sendgrid` — see [Email provider toggle](#email-provider-toggle) |
 
 ---
 
@@ -194,23 +193,18 @@ everyone the same first name.
 
 ## Email provider toggle
 
-All sends route through **SendGrid by default**, which injects open/click tracking pixels automatically. The `EMAIL_PROVIDER` Script Property lets you switch back to Gmail (e.g. for local testing or if SendGrid isn't configured yet).
+All sends route through **Gmail by default** (`GmailApp.sendEmail`). The `EMAIL_PROVIDER` Script Property lets you opt in to SendGrid for open/click tracking.
 
 | `EMAIL_PROVIDER` value | Behaviour |
 |------------------------|-----------|
-| `sendgrid` (default, or unset) | Sends via SendGrid Web API (`/v3/mail/send`); open and click events appear in the SendGrid Activity dashboard |
-| `resend` | Sends via Resend API (`/emails`); open and click tracking enabled by default; same vendor used by `components/alerts` |
-| `gmail` | Sends via `GmailApp.sendEmail`; no tracking, behaves like the original implementation |
+| `gmail` (default, or unset) | Sends via `GmailApp.sendEmail`; no tracking |
+| `sendgrid` | Sends via SendGrid Web API (`/v3/mail/send`); open and click events appear in the SendGrid Activity dashboard |
 
 **SendGrid requirements (`EMAIL_PROVIDER=sendgrid`):**
 - `SENDGRID_API_KEY` must be set (full "Mail Send" permission)
 - `MY_EMAIL` must be a **Verified Sender** in SendGrid (Settings → Sender Authentication)
 
-**Resend requirements (`EMAIL_PROVIDER=resend`):**
-- `RESEND_API_KEY` must be set (create at resend.com/api-keys)
-- `MY_EMAIL` domain must be verified in Resend (Domains → Add Domain); same domain auth as SendGrid but set up separately in Resend's dashboard
-
-To switch: open the GAS editor → Project Settings → Script Properties → set `EMAIL_PROVIDER` to `sendgrid`, `resend`, or `gmail`.
+To switch: open the GAS editor → Project Settings → Script Properties → set `EMAIL_PROVIDER` to `gmail` or `sendgrid`.
 
 ---
 
