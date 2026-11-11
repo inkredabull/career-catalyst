@@ -1,7 +1,7 @@
 {
   "name": "@inkredabull/career-catalyst-networker",
   "version": "1.0.0",
-  "description": "Unified LinkedIn networking CLI — discovery, outreach, and lifecycle tracking",
+  "description": "Unified LinkedIn networking CLI \u2014 discovery, outreach, and lifecycle tracking",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -14,7 +14,9 @@
     "watch": "tsx watch src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "capture": "tsx src/index.ts capture",
+    "process": "tsx src/index.ts process"
   },
   "keywords": [
     "linkedin",
@@ -30,7 +32,8 @@
     "commander": "^14.0.1",
     "dotenv": "^17.2.3",
     "openai": "^6.2.0",
-    "@inkredabull/career-catalyst-linkedin-automation": "*"
+    "@inkredabull/career-catalyst-linkedin-automation": "*",
+    "@inkredabull/career-catalyst-core": "*"
   },
   "devDependencies": {
     "@types/node": "^24.7.0",

@@ -10,6 +10,8 @@
  *   mark-withdrawn <ids>    Manually mark contacts as withdrawn
  *   mark-complete <ids>     Manually mark contacts as complete
  *   migrate <csv>           One-time import of withdrawn_log.csv
+ *   capture <url>           Luma/Partiful attendees -> names file + sheet tab + reminder
+ *   process <url|file>      capture, then run discover batches until the file is empty
  */
 
 import 'dotenv/config';
@@ -26,6 +28,8 @@ import { registerReview } from './commands/review.js';
 import { registerReinvite } from './commands/reinvite.js';
 import { registerMark } from './commands/mark.js';
 import { registerMigrate } from './commands/migrate.js';
+import { registerCapture } from './commands/capture.js';
+import { registerProcess } from './commands/process.js';
 
 const program = new Command();
 
@@ -40,5 +44,7 @@ registerReview(program);
 registerReinvite(program);
 registerMark(program);
 registerMigrate(program);
+registerCapture(program);
+registerProcess(program);
 
 program.parse();

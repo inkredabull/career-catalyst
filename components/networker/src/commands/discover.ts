@@ -19,12 +19,16 @@ function clampBatchSize(input?: string): number {
   return n;
 }
 
-export function registerDiscover(program: Command): void {
-  program
-    .command('discover <file>')
-    .description('Look up LinkedIn profiles for a list of names (one per line)')
-    .option('--batch-size <n>', 'Names to process per run (clamped to 10–15)')
-    .action(async (filePath: string, opts: { batchSize?: string }) => {
+export interface DiscoverResult {
+  /** True when the run stopped before consuming any names (bad token, no credits, etc.). */
+  aborted: boolean;
+  /** Names still left in the file after this batch. */
+  remaining: number;
+}
+
+/** One discover batch. Exported so `process` can loop it until the file is empty. */
+export async function runDiscover(filePath: string, opts: { batchSize?: string }): Promise<DiscoverResult> {
+      let remainingCount = 0;
       const batchSize = clampBatchSize(opts.batchSize ?? process.env.BATCH_SIZE);
       const eventInfo = parseEventFromFileName(filePath);
 
@@ -35,7 +39,7 @@ export function registerDiscover(program: Command): void {
       if (!process.env.ENRICHLAYER_API_TOKEN) {
         console.log('ENRICHLAYER_API_TOKEN not set — aborting before consuming any names from the file.');
         console.log('Set the token and re-run.');
-        return;
+        return { aborted: true, remaining: 0 };
       }
 
       const content = readFileSync(filePath, 'utf-8');
@@ -49,18 +53,19 @@ export function registerDiscover(program: Command): void {
         profiles = cached.filter(p => p.isTargetContact && !p.error);
         if (profiles.length === 0) {
           console.log('No cached target contacts found for this event.');
-          return;
+          return { aborted: false, remaining: 0 };
         }
         console.log(`Found ${profiles.length} cached target contact(s)\n`);
       } else {
         const batch = parsedNames.slice(0, batchSize);
         const remaining = parsedNames.slice(batchSize);
+        remainingCount = remaining.length;
 
         const before = await getCreditBalance();
         if (before == null) {
           console.log('Could not verify EnrichLayer credit balance — the API token appears to be invalid.');
           console.log('Aborting before consuming any names from the file. Fix the token and re-run.');
-          return;
+          return { aborted: true, remaining: parsedNames.length };
         }
         console.log(`Credit balance before: ${before}\n`);
 
@@ -113,5 +118,15 @@ export function registerDiscover(program: Command): void {
       const t3 = targets.filter(p => p.priorityTier === 'TIER_3').length;
       console.log(`Profiles: ${profiles.length}  |  Targets: ${targets.length}  |  T1=${t1} T2=${t2} T3=${t3}`);
       console.log(`\nTo send invites: networker send ${filePath} --send-tier tier_1`);
+      return { aborted: false, remaining: remainingCount };
+}
+
+export function registerDiscover(program: Command): void {
+  program
+    .command('discover <file>')
+    .description('Look up LinkedIn profiles for a list of names (one per line)')
+    .option('--batch-size <n>', 'Names to process per run (clamped to 10–15)')
+    .action(async (filePath: string, opts: { batchSize?: string }) => {
+      await runDiscover(filePath, opts);
     });
 }
