@@ -68,6 +68,20 @@ If the file is empty, loads cached target contacts from a previous run instead.
 
 ---
 
+### `process` / `capture`: one command from event URL to discovered contacts
+
+```bash
+npm run process -- "https://luma.com/durable-ai-august?tk=dLkg5B"   # quote the URL (zsh treats ? as a glob)
+npm run process -- "data/lists/<Event> on 8-26-26.csv"              # resume an existing names file
+npm run capture -- "<url>"                                          # capture only, no discover loop
+```
+
+`capture` automates the manual setup: it opens the event in your logged-in Chrome, opens the Going/Went list, scrolls to the bottom collecting names, writes `data/lists/<Event> on M-D-YY.csv`, creates a `<Event> on M/D` tab in the Meetup Networker Google Sheet (never overwrites an existing tab), and adds a Reminder to the "2. Build with purpose" list. `process` then runs `discover` batch after batch until the file is empty, pausing between batches (`Enter` = next, `q` = stop; `--no-pause` to run straight through). Flags: `--no-sheet`, `--no-reminder`, `--out-dir`, `--batch-size`.
+
+Requirements: Chrome with View > Developer > "Allow JavaScript from Apple Events" enabled, and the Chrome profile must be registered for the event (Luma hides the guest list otherwise). Optional env: `MEETUP_NETWORKER_SPREADSHEET_ID` to override the sheet. Luma is verified against the live page; Partiful uses generic selectors and is best-effort.
+
+---
+
 ### `send` — open Chrome tabs and inject connect modals (new contacts)
 
 ```bash
