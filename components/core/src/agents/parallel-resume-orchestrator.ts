@@ -1,11 +1,14 @@
 import { ResumeClassifierAgent } from './classifier';
+import { ThemeSelectorAgent, ThemeSelectionResult } from './theme-selector';
 import { ResumeGeneratorAgent, GeneratorResult } from './generator';
 import { ResumeCriticAgent } from './resume-critic-agent';
 import { ProviderFactory } from '../providers/provider-factory';
-import { JobListing } from '../types';
+import { JobListing, ClassificationResult } from '../types';
 import { LLMProviderConfig } from '../providers/llm-provider';
 import { getCritiqueAndJudgeMaxAttempts, getLLMAutoConfirm, getResumeOutputDir, getResumeGenerationConfig } from '../config';
 import { resolveFromProjectRoot } from '../utils/project-root';
+import { loadOrGenerate } from '../utils/json-cache';
+import { pauseForFileReview } from '../utils/pause-for-review';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -33,6 +36,7 @@ export interface ParallelResumeOptions {
   numModels?: number;
   skipCritique?: boolean;
   skipJudge?: boolean;
+  skipThemes?: boolean;
   outputDir?: string;
   preview?: boolean;
 }
@@ -226,35 +230,56 @@ export class ParallelResumeOrchestrator {
     console.log('📍 Step 1: Classification (shared)');
     console.log('──────────────────────────────────');
     const classificationCachePath = path.resolve('logs', jobId, 'resume', 'classification.json');
-    let classification: Awaited<ReturnType<ResumeClassifierAgent['classify']>>;
-    let classificationCost: number;
+    const classifierStartTime = Date.now();
+    const { value: classification, fromCache: classificationFromCache } = await loadOrGenerate<ClassificationResult>(
+      classificationCachePath,
+      () => new ResumeClassifierAgent(this.classifierApiKey).classify(job.description, cvSummary)
+    );
+    const classificationDuration = (Date.now() - classifierStartTime) / 1000;
+    // Estimate classifier cost (Haiku 4.5: ~$0.25/$1.25 per MTok, ~500 tokens in/200 out)
+    const classificationCost = classificationFromCache ? 0 : (500 * 0.25 / 1000000) + (200 * 1.25 / 1000000);
 
-    if (fs.existsSync(classificationCachePath)) {
-      const cached = JSON.parse(fs.readFileSync(classificationCachePath, 'utf-8'));
-      classification = cached;
-      classificationCost = 0;
+    if (classificationFromCache) {
       console.log(`✅ Classification loaded from cache (domain=${classification.domain}, $0.0000)`);
       console.log(`   Domain: ${classification.domain}`);
       console.log(`   Format: ${classification.format}`);
       console.log(`   Roles: ${classification.rolesIncluded}\n`);
     } else {
-      const classifierStartTime = Date.now();
-      const classifier = new ResumeClassifierAgent(this.classifierApiKey);
-      classification = await classifier.classify(job.description, cvSummary);
-      const classificationDuration = (Date.now() - classifierStartTime) / 1000;
-
-      // Estimate classifier cost (Haiku 4.5: ~$0.25/$1.25 per MTok, ~500 tokens in/200 out)
-      classificationCost = (500 * 0.25 / 1000000) + (200 * 1.25 / 1000000);
-
-      // Persist for future runs
-      fs.mkdirSync(path.dirname(classificationCachePath), { recursive: true });
-      fs.writeFileSync(classificationCachePath, JSON.stringify(classification, null, 2));
-
       console.log(`✅ Classification complete (${classificationDuration.toFixed(1)}s)`);
       console.log(`   Domain: ${classification.domain}`);
       console.log(`   Format: ${classification.format}`);
       console.log(`   Roles: ${classification.rolesIncluded}`);
       console.log(`   Cost: ~$${classificationCost.toFixed(4)}\n`);
+    }
+
+    // Step 1b: Priority themes (shared across all models, cached per job)
+    console.log('🎯 Step 1b: Priority Themes (shared)');
+    console.log('──────────────────────────────────');
+    let themes: string | undefined;
+
+    if (options.skipThemes) {
+      console.log('⏭️  Skipped (--skip-themes)\n');
+    } else {
+      const themesCachePath = path.resolve('logs', jobId, 'resume', 'themes.json');
+      const themesAlreadyCached = fs.existsSync(themesCachePath);
+      const { value: themeResult, fromCache: themesFromCache } = await loadOrGenerate<ThemeSelectionResult>(
+        themesCachePath,
+        () => new ThemeSelectorAgent(this.classifierApiKey).selectThemes(job.description, cvSummary)
+      );
+
+      console.log(themesFromCache ? '✅ Themes loaded from cache' : '✅ Themes selected');
+      console.log(themeResult.themes);
+      console.log(`   Primary: ${themeResult.primary}`);
+      console.log(`   (cache: ${themesCachePath})\n`);
+
+      themes = themeResult.themes;
+
+      if (!themesAlreadyCached) {
+        await pauseForFileReview(themesCachePath, 'the proposed themes');
+        // Re-read from disk in case the file was hand-edited during the pause
+        const reread = JSON.parse(fs.readFileSync(themesCachePath, 'utf-8')) as ThemeSelectionResult;
+        themes = reread.themes;
+      }
     }
 
     // Step 2: Parallel generation with different models
@@ -278,7 +303,9 @@ export class ParallelResumeOrchestrator {
       modelsToUse,
       classification,
       job,
-      cvContent
+      cvContent,
+      undefined,
+      themes
     );
 
     console.log('\n📁 Step 3: PDF Generation & Organization');
@@ -414,7 +441,7 @@ export class ParallelResumeOrchestrator {
         console.log('──────────────────────────────────');
 
         const improvedResults = await this.runParallelGeneration(
-          modelsForRegen, classification, job, cvContent, critiqueMap
+          modelsForRegen, classification, job, cvContent, critiqueMap, themes
         );
 
         console.log(`\n🎨 Step 6: PDF Re-generation${attemptLabel}`);
@@ -570,7 +597,8 @@ export class ParallelResumeOrchestrator {
     classification: any,
     job: JobListing,
     cvContent: string,
-    critiqueMap?: Map<string, { recommendations: string[]; rating: number }>
+    critiqueMap?: Map<string, { recommendations: string[]; rating: number }>,
+    themes?: string
   ): Promise<Array<PromiseSettledResult<{ success: boolean; result?: GeneratorResult; error?: string }>>> {
     const { mode, maxRoles } = this.config.sharedSettings;
     const experienceFormat = classification.format as 'standard' | 'split';
@@ -599,7 +627,8 @@ export class ParallelResumeOrchestrator {
           classification,
           job,
           cvContent,
-          recommendations
+          recommendations,
+          themes
         });
         return { success: true, result };
       } catch (error) {

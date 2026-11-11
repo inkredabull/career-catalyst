@@ -590,6 +590,7 @@ program
   .option('-c, --config <file>', 'Config file path (default: parallel-config.json)')
   .option('--no-critique', 'Skip critique workflow (faster)')
   .option('--skip-judge', 'Skip PDF judge validation')
+  .option('--skip-themes', 'Skip theme selection pass entirely')
   .option('--output <dir>', 'Output directory (default: RESUME_OUTPUT_DIR from .env)')
   .option('--regen', 'Rebuild PDFs from saved markdown without re-generating content')
   .option('--preview', 'Show pipeline stages without executing. Use: npm run dev -- resume <jobId> --preview')
@@ -632,6 +633,7 @@ program
           numModels: options.numModels ?? 1,
           skipCritique: !options.critique,
           skipJudge: options.skipJudge,
+          skipThemes: options.skipThemes,
           outputDir: options.output,
           preview: !!options.preview,
         }

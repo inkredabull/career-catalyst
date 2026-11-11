@@ -2340,6 +2340,20 @@ ${project.result}`;
 
     console.log('\n🎯 Focus Story Generation - Determining focal theme from job description...');
 
+    // Prefer the theme already selected for this job's resume, if one exists,
+    // so interview prep stays consistent with whatever drove resume generation.
+    const resumeThemesPath = resolveFromProjectRoot('logs', this.currentJobId, 'resume', 'themes.json');
+    if (fs.existsSync(resumeThemesPath)) {
+      const resumeThemes = JSON.parse(fs.readFileSync(resumeThemesPath, 'utf-8'));
+      const primary = resumeThemes.primary as string | undefined;
+      if (primary) {
+        this.cachedFocalTheme = primary;
+        console.log(`✅ Using theme from resume generation: "${primary}"`);
+        console.log('');
+        return primary;
+      }
+    }
+
     const themes = await this.extractJobThemes(job);
 
     // Pick the top "high" importance theme, falling back to the first theme
