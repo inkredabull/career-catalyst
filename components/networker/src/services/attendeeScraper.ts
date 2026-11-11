@@ -110,7 +110,13 @@ const CAPTURE_SCRIPT = `
         S.error = S.error || 'guest list not found (no clickable Going/Went list or modal had no names)';
         return;
       }
-      var scroller = d.querySelector('.overflow-auto') || d;
+      // Luma nests two overflow-auto elements: the modal body (barely scrolls) and the real guest
+      // list. Use the nearest scrollable ancestor of an actual row, not the first match.
+      var scroller = d;
+      var row = d.querySelector('a[href*="/user/"], .name');
+      for (var el = row; el && el !== d.parentElement; el = el.parentElement) {
+        if (/(auto|scroll)/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight + 5) { scroller = el; break; }
+      }
       var seen = new Map();
       var stable = 0;
       for (var i = 0; i < 400 && stable < 6; i++) {

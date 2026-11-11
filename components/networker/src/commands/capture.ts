@@ -46,7 +46,9 @@ export async function captureEvent(url: string, opts: CaptureOptions = {}): Prom
   mkdirSync(outDir, { recursive: true });
   const filePath = resolve(outDir, `${eventName}.csv`);
 
-  if (existsSync(filePath)) {
+  // A leftover empty file is just a fully processed run (discover empties it), so it is safe to replace.
+  const isStale = existsSync(filePath) && readFileSync(filePath, 'utf-8').trim() === '';
+  if (existsSync(filePath) && !isStale) {
     throw new Error(`${filePath} already exists (a previous run may be partly processed). Delete it or pass --out-dir to use another folder.`);
   }
   writeFileSync(filePath, ev.names.join('\n') + '\n', 'utf-8');
@@ -77,7 +79,7 @@ export async function captureEvent(url: string, opts: CaptureOptions = {}): Prom
   if (opts.reminder !== false) {
     try {
       createReminder({
-        title: `Process ${ev.title} attendees (${ev.month}/${ev.day})`,
+        title: `Run through Meetup Networker : Process ${ev.title} attendees (${ev.month}/${ev.day})`,
         body: `${ev.names.length} names captured from ${url}\nResume: npm run process -- "${filePath}"`,
       });
       console.log(`Reminder created in "${DEFAULT_REMINDER_LIST}"`);
