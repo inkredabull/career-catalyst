@@ -32,3 +32,20 @@ export async function createEventTab(tabName: string, names: string[]): Promise<
   });
   return 'created';
 }
+
+/** Deletes a tab by name. Only call for a tab this run created. */
+export async function deleteEventTab(tabName: string): Promise<boolean> {
+  const raw = process.env.MEETUP_NETWORKER_SPREADSHEET_ID ?? DEFAULT_SPREADSHEET;
+  const spreadsheetId = raw.startsWith('http') ? extractSpreadsheetId(raw) : raw;
+
+  const sheets = (new GoogleSheetsClient() as any).sheets;
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties(sheetId,title)' });
+  const match = (meta.data.sheets ?? []).find((x: any) => x.properties.title === tabName);
+  if (!match) return false;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests: [{ deleteSheet: { sheetId: match.properties.sheetId } }] },
+  });
+  return true;
+}

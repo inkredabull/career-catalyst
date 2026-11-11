@@ -6,15 +6,16 @@
  */
 
 import { Command } from 'commander';
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { scrapeEvent } from '../services/attendeeScraper.js';
-import { createEventTab, sheetTabName } from '../services/sheetTab.js';
+import { createEventTab, deleteEventTab, sheetTabName } from '../services/sheetTab.js';
 import { createReminder, DEFAULT_REMINDER_LIST } from '../services/reminder.js';
 
 export interface CaptureOptions {
   outDir?: string;
   sheet?: boolean;      // commander --no-sheet sets this to false
+  keepSheet?: boolean;  // --keep-sheet: do not delete the tab after the CSV is saved
   reminder?: boolean;   // commander --no-reminder sets this to false
 }
 
@@ -56,6 +57,18 @@ export async function captureEvent(url: string, opts: CaptureOptions = {}): Prom
     try {
       const r = await createEventTab(tab, ev.names);
       console.log(r === 'created' ? `Sheet tab created: "${tab}"` : `Sheet tab "${tab}" already exists; left untouched.`);
+
+      // The CSV is the working copy; once it is verifiably on disk, remove the tab we created.
+      // Never deletes a tab that already existed before this run.
+      if (r === 'created' && !opts.keepSheet) {
+        const saved = readFileSync(filePath, 'utf-8').split('\n').filter(l => l.trim()).length;
+        if (saved === ev.names.length) {
+          const removed = await deleteEventTab(tab);
+          console.log(removed ? `CSV saved (${saved} names); sheet tab deleted.` : 'Sheet tab already gone.');
+        } else {
+          console.warn(`CSV has ${saved} names but ${ev.names.length} were captured; keeping the sheet tab.`);
+        }
+      }
     } catch (err) {
       console.warn(`Could not create sheet tab (continuing): ${err instanceof Error ? err.message : err}`);
     }
@@ -83,6 +96,7 @@ export function registerCapture(program: Command): void {
     .option('--out-dir <dir>', 'Where to write the names file', 'data/lists')
     .option('--no-sheet', 'Skip creating the Google Sheet tab')
     .option('--no-reminder', 'Skip creating the Reminder')
+    .option('--keep-sheet', 'Keep the Google Sheet tab instead of deleting it after the CSV is saved')
     .action(async (url: string, opts: CaptureOptions) => {
       try {
         const r = await captureEvent(url, opts);

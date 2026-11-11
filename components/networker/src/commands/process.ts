@@ -65,6 +65,7 @@ export function registerProcess(program: Command): void {
     .option('--out-dir <dir>', 'Where to write the names file', 'data/lists')
     .option('--no-sheet', 'Skip creating the Google Sheet tab')
     .option('--no-reminder', 'Skip creating the Reminder')
+    .option('--keep-sheet', 'Keep the Google Sheet tab instead of deleting it after the CSV is saved')
     .option('--no-pause', 'Do not pause between discover batches')
     .action(async (target: string, opts: ProcessOptions) => {
       try {
