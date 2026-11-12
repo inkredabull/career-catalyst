@@ -26,7 +26,11 @@ function blurb(): readonly string[] {
 // ── Warmup ────────────────────────────────────────────────────────────────────
 
 function sendWarmup(): void {
-  createWarmupDrafts(pickRandomContacts());
+  Logger.log('sendWarmup: starting pickRandomContacts()');
+  const start = Date.now();
+  const contacts = pickRandomContacts();
+  Logger.log('sendWarmup: pickRandomContacts() returned %s contact(s) — %sms', contacts.length, Date.now() - start);
+  createWarmupDrafts(contacts);
 }
 
 // ── Outreach message generation ───────────────────────────────────────────────
@@ -113,23 +117,32 @@ function refreshJobMetadataFn(): void {
 
 // ── Expose to GAS global scope ────────────────────────────────────────────────
 
+// onOpen is a GAS simple trigger — the literal name is required by the platform, do not rename.
+// resumeURL/testEmail/blurb are custom sheet functions referenced in spreadsheet cell formulas
+// (e.g. =resumeURL(jobId)) — renaming would break formulas already in the live sheet.
+//
+// Everything else is prefixed so the "Select function to run" dropdown clusters the handful of
+// functions meant to be run directly (run_*) apart from dialog-callback functions that require
+// arguments supplied by an HTML dialog's google.script.run call and would error if run manually
+// from the dropdown (cb_*) — see the "contacts is not iterable" incident from running
+// createWarmupDrafts (an internal helper, not even in this list) directly with no arguments.
 const g = global as unknown as Record<string, unknown>;
 g['onOpen'] = onOpen;
 g['resumeURL'] = resumeURL;
 g['testEmail'] = testEmail;
 g['blurb'] = blurb;
-g['sendEmails'] = sendEmails;
-g['sendTestEmail'] = sendTestEmail;
-g['queueEmails'] = queueEmails;
-g['doSendEmails'] = doSendEmails;
-g['doSendTestEmail'] = doSendTestEmail;
-g['fetchContactToSheet'] = fetchContactToSheet;
-g['fetchContactMetadataToSheet'] = fetchContactMetadataToSheet;
-g['doFetchContactToSheet'] = doFetchContactToSheet;
-g['applyZeitgeistyToRow'] = applyZeitgeistyToRow;
-g['getLinkedInUrlToSheet'] = getLinkedInUrlToSheet;
-g['sendWarmup'] = sendWarmup;
-g['generateMessageForRow'] = generateMessageForRow;
-g['refreshJobMetadata'] = refreshJobMetadataFn;
-g['showJobMetadata'] = showJobMetadataFn;
-g['getSendProgress'] = getSendProgress;
+g['run_sendEmails'] = sendEmails;
+g['run_sendTestEmail'] = sendTestEmail;
+g['run_queueEmails'] = queueEmails;
+g['cb_doSendEmails'] = doSendEmails;
+g['cb_doSendTestEmail'] = doSendTestEmail;
+g['run_fetchContactToSheet'] = fetchContactToSheet;
+g['run_fetchContactMetadataToSheet'] = fetchContactMetadataToSheet;
+g['cb_doFetchContactToSheet'] = doFetchContactToSheet;
+g['cb_applyZeitgeistyToRow'] = applyZeitgeistyToRow;
+g['run_getLinkedInUrlToSheet'] = getLinkedInUrlToSheet;
+g['run_sendWarmup'] = sendWarmup;
+g['run_generateMessageForRow'] = generateMessageForRow;
+g['run_refreshJobMetadata'] = refreshJobMetadataFn;
+g['run_showJobMetadata'] = showJobMetadataFn;
+g['cb_getSendProgress'] = getSendProgress;

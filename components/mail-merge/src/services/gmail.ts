@@ -211,8 +211,11 @@ export const registerLinkedInNudge = (
 const generateNudgeId = (): string => Utilities.getUuid().replace(/-/g, '').slice(0, 12);
 
 export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
+  Logger.log('createWarmupDrafts: starting for %s contact(s)', contacts.length);
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
+  const templateStart = Date.now();
   const emailTemplate = getGmailTemplateFromDrafts(WARMUP_TEMPLATE);
+  Logger.log('createWarmupDrafts: fetched draft template — %sms', Date.now() - templateStart);
   const flags = getFlagsForSubject(WARMUP_TEMPLATE);
 
   // Every warmup draft carries the template's subject, so a stale mailbox can leave nothing but
@@ -272,7 +275,7 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
         linkedInLine = `\nLinkedIn: ${buildNudgeShortLink(NGROK_TUNNEL_URL, nudgeId)}`;
       }
     }
-    draftLines.push(`${displayName} (${email})\nDraft: ${draftSearchUrl}${linkedInLine}\nContacts: ${contactUrl}`);
+    draftLines.push(`${displayName} (${email})\nContacts: ${contactUrl}\nDraft: ${draftSearchUrl}${linkedInLine}`);
   }
 
   const body = draftLines.join('\n\n');
@@ -433,7 +436,7 @@ const buildSubjectPickerHtml = (options: SubjectOption[], actionFn: string): str
     "window._shownCount=0;",
     "window._logDiv=document.getElementById('log');",
     "window._logDiv.textContent='';",
-    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('send:'+runToken);};",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).cb_getSendProgress('send:'+runToken);};",
     "window._poll();",
     "window._timer=setInterval(window._poll,1000);",
     `google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},2000);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();document.getElementById('form').style.display='block';document.getElementById('loading').style.display='none';alert(e.message);}).${actionFn}(s,t,runToken);`,
@@ -474,7 +477,7 @@ const showSubjectPickerDialog = (action: 'send' | 'test'): void => {
     SpreadsheetApp.getUi().alert('No subject lines configured. Add entries to SUBJECT_LINES in settings.ts.');
     return;
   }
-  const actionFn = action === 'send' ? 'doSendEmails' : 'doSendTestEmail';
+  const actionFn = action === 'send' ? 'cb_doSendEmails' : 'cb_doSendTestEmail';
   const html = HtmlService.createHtmlOutput(buildSubjectPickerHtml(options, actionFn))
     .setWidth(500)
     .setHeight(420);

@@ -104,13 +104,13 @@ const buildDoLookupHtml = (): string => {
     "window._shownCount=0;",
     "window._logDiv=document.getElementById('log');",
     "window._logDiv.textContent='';",
-    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('lookup:'+window._runToken);};",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).cb_getSendProgress('lookup:'+window._runToken);};",
     "window._poll();",
     "window._timer=setInterval(window._poll,1000);",
     "window._renderCandidate=function(){var c=window._candidates[window._idx];document.getElementById('reviewCount').textContent='Reviewing '+(window._idx+1)+' of '+window._candidates.length;document.getElementById('postText').textContent=c.postText;var link=document.getElementById('postUrl');if(c.postUrl){link.href=c.postUrl;link.textContent=c.postUrl;link.style.display='inline';}else{link.removeAttribute('href');link.textContent='(no URL found for this post)';link.style.display='inline';}document.getElementById('suggestion').textContent=c.suggestion;document.getElementById('prompt').textContent=c.prompt;document.getElementById('edit').value=c.suggestion;};",
     "window._advance=function(){window._idx++;if(window._idx>=window._candidates.length){google.script.host.close();}else{window._renderCandidate();}};",
-    "window._submitRow=function(){var c=window._candidates[window._idx];google.script.run.withSuccessHandler(window._advance).withFailureHandler(function(e){alert(e.message);}).applyZeitgeistyToRow(c.sheetRow,document.getElementById('edit').value);};",
-    "google.script.run.withSuccessHandler(function(result){clearInterval(window._timer);window._poll();var candidates=(result&&result.candidates)||[];if(candidates.length===0){setTimeout(function(){google.script.host.close();},3000);}else{window._candidates=candidates;window._idx=0;document.getElementById('loading').style.display='none';document.getElementById('review').style.display='block';window._renderCandidate();}}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).doFetchContactToSheet(window._runToken);",
+    "window._submitRow=function(){var c=window._candidates[window._idx];google.script.run.withSuccessHandler(window._advance).withFailureHandler(function(e){alert(e.message);}).cb_applyZeitgeistyToRow(c.sheetRow,document.getElementById('edit').value);};",
+    "google.script.run.withSuccessHandler(function(result){clearInterval(window._timer);window._poll();var candidates=(result&&result.candidates)||[];if(candidates.length===0){setTimeout(function(){google.script.host.close();},3000);}else{window._candidates=candidates;window._idx=0;document.getElementById('loading').style.display='none';document.getElementById('review').style.display='block';window._renderCandidate();}}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).cb_doFetchContactToSheet(window._runToken);",
   ].join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -166,10 +166,10 @@ const buildMetadataOnlyLookupHtml = (): string => {
     "window._shownCount=0;",
     "window._logDiv=document.getElementById('log');",
     "window._logDiv.textContent='';",
-    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).getSendProgress('lookup:'+window._runToken);};",
+    "window._poll=function(){google.script.run.withSuccessHandler(function(lines){var all=lines||[];var fresh=all.slice(window._shownCount);if(fresh.length){if(window._shownCount>0)window._logDiv.textContent+='\\n';window._logDiv.textContent+=fresh.join('\\n');window._shownCount=all.length;window._logDiv.scrollTop=window._logDiv.scrollHeight;}}).withFailureHandler(function(){}).cb_getSendProgress('lookup:'+window._runToken);};",
     "window._poll();",
     "window._timer=setInterval(window._poll,1000);",
-    "google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},1500);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).doFetchContactToSheet(window._runToken,false);",
+    "google.script.run.withSuccessHandler(function(){clearInterval(window._timer);window._poll();setTimeout(function(){google.script.host.close();},1500);}).withFailureHandler(function(e){clearInterval(window._timer);window._poll();alert(e.message);google.script.host.close();}).cb_doFetchContactToSheet(window._runToken,false);",
   ].join('');
   return `<!DOCTYPE html><html><head><base target="_top"><style>
 body{font-family:sans-serif;padding:16px;min-width:320px}
@@ -365,13 +365,20 @@ export const getLinkedInUrl = (person: PersonResource): string => {
 export const getAllContacts = (): PersonResource[] => {
   let people: PersonResource[] = [];
   let pageToken: string | undefined;
+  let page = 0;
 
   do {
+    const pageStart = Date.now();
     const response = People.People!.Connections!.list('people/me', {
       pageSize: 1000,
       personFields: 'names,emailAddresses,urls,memberships',
       pageToken,
     });
+    page++;
+    Logger.log(
+      'getAllContacts: page %s fetched %s connection(s) — %sms',
+      page, response.connections?.length ?? 0, Date.now() - pageStart
+    );
     if (response.connections?.length) people = people.concat(response.connections);
     pageToken = response.nextPageToken != null ? response.nextPageToken : undefined;
   } while (pageToken);
@@ -418,7 +425,9 @@ export const pickRandomContacts = (count = 5): WarmupContact[] => {
 
   const HARDCODED_EXCLUDED_LABELS = ['Archetype/Unhelpful'];
 
+  const groupsStart = Date.now();
   const groups = getContactGroupInfo();
+  Logger.log('pickRandomContacts: fetched %s contact group(s) — %sms', groups.length, Date.now() - groupsStart);
   const excludedIds = new Set(
     groups
       .filter(g =>
@@ -431,7 +440,9 @@ export const pickRandomContacts = (count = 5): WarmupContact[] => {
     groups.filter(g => g.groupType === 'USER_CONTACT_GROUP').map(g => g.id)
   );
 
-  const all = getAllContacts().filter(contact => {
+  const contactsStart = Date.now();
+  const fetched = getAllContacts();
+  const all = fetched.filter(contact => {
     if (!contact.names?.[0]?.displayName) return false;
     if (contact.emailAddresses?.some(e => excludedEmails.has((e.value ?? '').toLowerCase()))) return false;
     const memberships = contact.memberships ?? [];
@@ -444,6 +455,10 @@ export const pickRandomContacts = (count = 5): WarmupContact[] => {
       m => excludedIds.has(m.contactGroupMembership!.contactGroupId!)
     );
   });
+  Logger.log(
+    'pickRandomContacts: fetched %s contact(s), %s after filtering — %sms',
+    fetched.length, all.length, Date.now() - contactsStart
+  );
 
   shuffle(all);
   return all.slice(0, count).map(contact => {
