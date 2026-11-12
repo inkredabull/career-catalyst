@@ -355,6 +355,13 @@ export const getWorkUrl = (person: PersonResource): string | null => {
   return null;
 };
 
+export const getLinkedInUrl = (person: PersonResource): string => {
+  const li = (person.urls ?? []).find(
+    u => u.type?.toLowerCase() === 'linkedin' || u.value?.toLowerCase().includes('linkedin.com')
+  );
+  return li?.value ?? '';
+};
+
 export const getAllContacts = (): PersonResource[] => {
   let people: PersonResource[] = [];
   let pageToken: string | undefined;
@@ -399,6 +406,7 @@ export interface WarmupContact {
   displayName: string;
   contactUrl: string;
   email: string;
+  linkedinUrl: string;
 }
 
 export const pickRandomContacts = (count = 5): WarmupContact[] => {
@@ -442,7 +450,7 @@ export const pickRandomContacts = (count = 5): WarmupContact[] => {
     const displayName = contact.names?.[0]?.displayName ?? 'No Name';
     const homeEmail = contact.emailAddresses?.find(e => e.type === 'home');
     const email = homeEmail?.value ?? contact.emailAddresses?.[0]?.value ?? '';
-    return { displayName, contactUrl: getLocalURL(displayName), email };
+    return { displayName, contactUrl: getLocalURL(displayName), email, linkedinUrl: getLinkedInUrl(contact) };
   });
 };
 

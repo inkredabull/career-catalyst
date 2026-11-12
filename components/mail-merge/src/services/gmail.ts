@@ -12,6 +12,7 @@ import { PROFILE } from '../config/profile';
 import { notifyViaSMS, buildSmsMessage, normalizePhoneNumber } from './sms';
 import { getLinkedInUrlByName, WarmupContact } from './contacts';
 import { containsTokens, draftsMatchingSubject, hasUnresolvedTokens, selectTemplateDraft, TemplateMessage } from './draft-template';
+import { NGROK_TUNNEL_URL } from '../config/env';
 
 interface MsgObj {
   subject: string;
@@ -166,6 +167,18 @@ function randomDelay(min,max){return new Promise(function(r){setTimeout(r, Math.
 
 const WARMUP_TEMPLATE = "Quick Favor - Exploring What's Next";
 
+/** Builds a link to unified-server's /warmup-linkedin-nudge, which re-triggers the same
+ *  CC_LI_MESSAGES bridge the bulk "Send Emails" flow posts from its GAS dialog — but reachable
+ *  from a plain email link, since the warmup trigger runs headless with no open Sheets tab to
+ *  postMessage from. Empty when there's no server to route through or no LinkedIn URL to nudge. */
+export const buildLinkedInNudgeLink = (
+  baseUrl: string, linkedinUrl: string, message: string, firstName: string
+): string => {
+  if (!baseUrl || !linkedinUrl) return '';
+  return `${baseUrl}/warmup-linkedin-nudge?url=${encodeURIComponent(linkedinUrl)}`
+    + `&message=${encodeURIComponent(message)}&firstName=${encodeURIComponent(firstName)}`;
+};
+
 export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
   const emailTemplate = getGmailTemplateFromDrafts(WARMUP_TEMPLATE);
@@ -192,7 +205,7 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
 
   const draftLines: string[] = [];
 
-  for (const { displayName, contactUrl, email } of contacts) {
+  for (const { displayName, contactUrl, email, linkedinUrl } of contacts) {
     if (!email) {
       Logger.log('Skipping warmup draft for %s — no email address', displayName);
       draftLines.push(`${displayName} (no email — draft skipped)\n${contactUrl}`);
@@ -218,7 +231,13 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
     Logger.log('Created warmup draft for %s (%s)', displayName, email);
 
     const draftSearchUrl = `https://mail.google.com/mail/u/0/#search/in:drafts+to:${encodeURIComponent(email)}`;
-    draftLines.push(`${displayName} (${email})\nDraft: ${draftSearchUrl}\nContacts: ${contactUrl}`);
+    const firstName = parts[0] ?? '';
+    const topic = getTopicForSubject(WARMUP_TEMPLATE);
+    const nudgeMessage = buildSmsMessage(firstName, email, '', topic);
+    const linkedInLine = linkedinUrl
+      ? `\nLinkedIn: ${buildLinkedInNudgeLink(NGROK_TUNNEL_URL, linkedinUrl, nudgeMessage, firstName)}`
+      : '';
+    draftLines.push(`${displayName} (${email})\nDraft: ${draftSearchUrl}${linkedInLine}\nContacts: ${contactUrl}`);
   }
 
   const body = draftLines.join('\n\n');
