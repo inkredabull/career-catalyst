@@ -416,6 +416,55 @@ export interface WarmupContact {
   linkedinUrl: string;
 }
 
+const WARMUP_SKIP_IF_CONTACTED_WITHIN_DAYS = 60;
+// Each candidate check costs one GmailApp.search call (via getMostRecentInteractionDate) — this
+// bounds the worst case (most of the contact list recently emailed) to a fixed number of searches
+// rather than scanning the whole shuffled list sequentially.
+const MAX_CANDIDATES_TO_CHECK = 50;
+
+export interface SelectWarmupCandidatesResult {
+  picked: WarmupContact[];
+  checked: number;
+  skippedNoEmail: number;
+  skippedRecent: number;
+}
+
+/** Walks `candidates` (expected pre-shuffled) and picks up to `count` that have an email and
+ *  haven't been contacted (either direction) more recently than `cutoffMs`, stopping as soon as
+ *  enough are found or `maxCandidatesToCheck` is reached — so a good hit-rate day costs only a
+ *  handful of lookups rather than checking the entire list. `getLastContactedMs` is injected
+ *  (rather than calling getMostRecentInteractionDate directly) so this selection logic is
+ *  unit-testable without GmailApp. */
+export const selectWarmupCandidates = (
+  candidates: PersonResource[],
+  count: number,
+  cutoffMs: number,
+  maxCandidatesToCheck: number,
+  getLastContactedMs: (email: string) => number | null,
+): SelectWarmupCandidatesResult => {
+  const picked: WarmupContact[] = [];
+  let checked = 0;
+  let skippedNoEmail = 0;
+  let skippedRecent = 0;
+
+  for (const contact of candidates) {
+    if (picked.length >= count || checked >= maxCandidatesToCheck) break;
+    checked++;
+
+    const displayName = contact.names?.[0]?.displayName ?? 'No Name';
+    const homeEmail = contact.emailAddresses?.find(e => e.type === 'home');
+    const email = homeEmail?.value ?? contact.emailAddresses?.[0]?.value ?? '';
+    if (!email) { skippedNoEmail++; continue; }
+
+    const lastContactedMs = getLastContactedMs(email);
+    if (lastContactedMs !== null && lastContactedMs > cutoffMs) { skippedRecent++; continue; }
+
+    picked.push({ displayName, contactUrl: getLocalURL(displayName), email, linkedinUrl: getLinkedInUrl(contact) });
+  }
+
+  return { picked, checked, skippedNoEmail, skippedRecent };
+};
+
 export const pickRandomContacts = (count = 5): WarmupContact[] => {
   const props = PropertiesService.getScriptProperties();
   const rawPrefixes = props.getProperty(SCRIPT_PROPS.WARMUP_EXCLUDE_LABEL_PREFIXES) ?? '';
@@ -461,12 +510,17 @@ export const pickRandomContacts = (count = 5): WarmupContact[] => {
   );
 
   shuffle(all);
-  return all.slice(0, count).map(contact => {
-    const displayName = contact.names?.[0]?.displayName ?? 'No Name';
-    const homeEmail = contact.emailAddresses?.find(e => e.type === 'home');
-    const email = homeEmail?.value ?? contact.emailAddresses?.[0]?.value ?? '';
-    return { displayName, contactUrl: getLocalURL(displayName), email, linkedinUrl: getLinkedInUrl(contact) };
-  });
+  const cutoffMs = Date.now() - WARMUP_SKIP_IF_CONTACTED_WITHIN_DAYS * 24 * 60 * 60 * 1000;
+  const result = selectWarmupCandidates(
+    all, count, cutoffMs, MAX_CANDIDATES_TO_CHECK,
+    email => getMostRecentInteractionDate(email)?.getTime() ?? null
+  );
+  Logger.log(
+    'pickRandomContacts: picked %s of %s requested (checked %s, skipped %s no-email, %s contacted within %s days)',
+    result.picked.length, count, result.checked, result.skippedNoEmail, result.skippedRecent,
+    WARMUP_SKIP_IF_CONTACTED_WITHIN_DAYS
+  );
+  return result.picked;
 };
 
 // ── Contact reclassification ──────────────────────────────────────────────────
