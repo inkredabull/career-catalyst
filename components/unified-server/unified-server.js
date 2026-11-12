@@ -12,6 +12,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { handleSend, requireSendAuth } = require('@inkredabull/career-catalyst-sms-bridge');
 const ngrok = require('@ngrok/ngrok');
 const { requireFollowAuth, followHandler, startFollowWorker, stopFollowWorker } = require('./linkedin-follow');
+const { registerNudgeHandler, nudgeRedirectHandler } = require('./warmup-nudge-store');
 const { chromium } = require('playwright');
 const LINKEDIN_PROFILE_DIR = path.join(__dirname, '.linkedin-profile');
 
@@ -562,39 +563,15 @@ app.get('/extract', (req, res) => {
   });
 });
 
-// GET /warmup-linkedin-nudge — Morning Warmup email "LinkedIn" link handler
-// Re-triggers the same CC_LI_MESSAGES bridge the bulk "Send Emails" flow posts from its GAS
-// dialog (see components/chrome-extension/extension/content.js's CC_LI_MESSAGES listener, which
-// has no origin/source check), so a click here prefills LinkedIn's message compose box exactly
-// like a bulk send does — just reached via a clicked email link instead of an open Sheets tab.
-app.get('/warmup-linkedin-nudge', (req, res) => {
-  const { url, message, firstName } = req.query;
-  if (!url) {
-    return res.status(400).send('<p>Missing url parameter.</p>');
-  }
-
-  // JSON.stringify safely escapes quotes/backslashes/newlines for embedding as a JS string
-  // literal, but not a literal "</script>" substring inside the value, which would otherwise
-  // close the tag early — escape that separately before embedding.
-  const escapeForScriptTag = (s) => JSON.stringify(s ?? '').replace(/<\/script/gi, '<\\/script');
-
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Opening LinkedIn…</title></head>
-<body style="font-family:sans-serif;padding:32px">
-  <p>Opening LinkedIn and preparing your message…</p>
-  <p style="color:#888;font-size:13px">You'll be redirected automatically.</p>
-  <script>
-    window.postMessage({
-      type: 'CC_LI_MESSAGES',
-      contacts: [{
-        url: ${escapeForScriptTag(url)},
-        message: ${escapeForScriptTag(message)},
-        firstName: ${escapeForScriptTag(firstName)}
-      }]
-    }, '*');
-    setTimeout(function () { location.href = ${escapeForScriptTag(url)}; }, 300);
-  </script>
-</body></html>`);
-});
+// Morning Warmup email "LinkedIn" link handlers — re-trigger the same CC_LI_MESSAGES bridge the
+// bulk "Send Emails" flow posts from its GAS dialog (see
+// components/chrome-extension/extension/content.js's CC_LI_MESSAGES listener, which has no
+// origin/source check), so a click prefills LinkedIn's message compose box exactly like a bulk
+// send does — just reached via a clicked email link instead of an open Sheets tab. mail-merge
+// registers the payload ahead of time (POST) so the digest email can carry a short /n/<id> link
+// instead of spelling the message out in a query string.
+app.post('/warmup-linkedin-nudge', registerNudgeHandler);
+app.get('/n/:id', nudgeRedirectHandler);
 
 // Extract endpoint (from CLI server)
 app.post('/extract', async (req, res) => {

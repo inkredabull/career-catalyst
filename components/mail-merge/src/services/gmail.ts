@@ -167,17 +167,48 @@ function randomDelay(min,max){return new Promise(function(r){setTimeout(r, Math.
 
 const WARMUP_TEMPLATE = "Quick Favor - Exploring What's Next";
 
-/** Builds a link to unified-server's /warmup-linkedin-nudge, which re-triggers the same
- *  CC_LI_MESSAGES bridge the bulk "Send Emails" flow posts from its GAS dialog — but reachable
- *  from a plain email link, since the warmup trigger runs headless with no open Sheets tab to
- *  postMessage from. Empty when there's no server to route through or no LinkedIn URL to nudge. */
-export const buildLinkedInNudgeLink = (
-  baseUrl: string, linkedinUrl: string, message: string, firstName: string
-): string => {
-  if (!baseUrl || !linkedinUrl) return '';
-  return `${baseUrl}/warmup-linkedin-nudge?url=${encodeURIComponent(linkedinUrl)}`
-    + `&message=${encodeURIComponent(message)}&firstName=${encodeURIComponent(firstName)}`;
+/** Short link to unified-server's /n/:id, which looks up a payload previously stashed there by
+ *  registerLinkedInNudge and re-triggers the same CC_LI_MESSAGES bridge the bulk "Send Emails"
+ *  flow posts from its GAS dialog — but reachable from a plain email link, since the warmup
+ *  trigger runs headless with no open Sheets tab to postMessage from. Empty when there's no
+ *  server to route through or no id to look up. */
+export const buildNudgeShortLink = (baseUrl: string, id: string): string =>
+  (!baseUrl || !id) ? '' : `${baseUrl}/n/${id}`;
+
+/** Registers {url, message, firstName} under `id` with unified-server ahead of time, so the
+ *  digest email can carry a short /n/<id> link (built via buildNudgeShortLink) instead of one
+ *  with the message text spelled out in a query string. Returns false (logged, not thrown) on
+ *  any failure, so a down server just means no LinkedIn line for this contact rather than
+ *  aborting the whole warmup run. */
+export const registerLinkedInNudge = (
+  baseUrl: string, id: string, linkedinUrl: string, message: string, firstName: string
+): boolean => {
+  if (!baseUrl) return false;
+  try {
+    const response = UrlFetchApp.fetch(`${baseUrl}/warmup-linkedin-nudge`, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'ngrok-skip-browser-warning': '1' },
+      payload: JSON.stringify({ id, url: linkedinUrl, message, firstName }),
+      muteHttpExceptions: true,
+    });
+    if (response.getResponseCode() !== 200) {
+      log(
+        'ERROR', 'Failed to register LinkedIn nudge for %s [%s]: %s',
+        id, response.getResponseCode(), response.getContentText().slice(0, 200)
+      );
+      return false;
+    }
+    return true;
+  } catch (e) {
+    log('ERROR', 'Network error registering LinkedIn nudge for %s: %s', id, e);
+    return false;
+  }
 };
+
+/** Short, URL-safe id for a registered nudge — doesn't need to be globally unguessable, just
+ *  distinct enough to avoid collisions across the handful of contacts in a single warmup run. */
+const generateNudgeId = (): string => Utilities.getUuid().replace(/-/g, '').slice(0, 12);
 
 export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
   const myEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS.MY_EMAIL) ?? '';
@@ -232,11 +263,15 @@ export const createWarmupDrafts = (contacts: WarmupContact[]): void => {
 
     const draftSearchUrl = `https://mail.google.com/mail/u/0/#search/in:drafts+to:${encodeURIComponent(email)}`;
     const firstName = parts[0] ?? '';
-    const topic = getTopicForSubject(WARMUP_TEMPLATE);
-    const nudgeMessage = buildSmsMessage(firstName, email, '', topic);
-    const linkedInLine = linkedinUrl
-      ? `\nLinkedIn: ${buildLinkedInNudgeLink(NGROK_TUNNEL_URL, linkedinUrl, nudgeMessage, firstName)}`
-      : '';
+    let linkedInLine = '';
+    if (linkedinUrl && NGROK_TUNNEL_URL) {
+      const topic = getTopicForSubject(WARMUP_TEMPLATE);
+      const nudgeMessage = buildSmsMessage(firstName, email, '', topic);
+      const nudgeId = generateNudgeId();
+      if (registerLinkedInNudge(NGROK_TUNNEL_URL, nudgeId, linkedinUrl, nudgeMessage, firstName)) {
+        linkedInLine = `\nLinkedIn: ${buildNudgeShortLink(NGROK_TUNNEL_URL, nudgeId)}`;
+      }
+    }
     draftLines.push(`${displayName} (${email})\nDraft: ${draftSearchUrl}${linkedInLine}\nContacts: ${contactUrl}`);
   }
 
