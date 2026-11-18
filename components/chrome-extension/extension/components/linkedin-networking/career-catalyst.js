@@ -1119,11 +1119,11 @@ async function _doConnectWithNote(outreach, LOG) {
   };
   // "Add a note" may vary in aria-label — also find by button text across all roots
   const findAddNote = () => {
-    let btn = deepQ('button[aria-label="Add a note"]');
+    let btn = deepQ('button[aria-label="Add a note"]') || deepQ('a[aria-label="Add a note"]');
     if (btn) return btn;
     const roots = [document, ...Array.from(document.querySelectorAll('*')).filter(h => h.shadowRoot).map(h => h.shadowRoot)];
     for (const root of roots) {
-      btn = Array.from(root.querySelectorAll('button')).find(b =>
+      btn = Array.from(root.querySelectorAll('button, a')).find(b =>
         (b.innerText || b.textContent || '').trim().toLowerCase().includes('add a note')
       );
       if (btn) return btn;
