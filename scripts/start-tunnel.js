@@ -41,9 +41,14 @@ async function main() {
 
   console.log(`🚇 Opening ngrok tunnel → localhost:${PORT} …`);
 
+  // A static/reserved domain (free on ngrok's own plan) means the tunnel URL never changes
+  // across restarts, so NGROK_TUNNEL_URL never goes stale — falls back to a fresh random
+  // subdomain each time if unset, same as before.
+  const staticDomain = process.env.NGROK_STATIC_DOMAIN;
   const listener = await ngrok.forward({
     addr: PORT,
     authtoken,
+    ...(staticDomain ? { domain: staticDomain } : {}),
   });
 
   const url = listener.url();

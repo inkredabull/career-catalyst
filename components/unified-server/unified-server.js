@@ -2228,7 +2228,15 @@ app.listen(PORT, () => {
 
   // Start ngrok tunnel if NGROK_AUTHTOKEN is present
   if (process.env.NGROK_AUTHTOKEN) {
-    ngrok.forward({ addr: PORT, authtoken: process.env.NGROK_AUTHTOKEN })
+    ngrok.forward({
+      addr: PORT,
+      authtoken: process.env.NGROK_AUTHTOKEN,
+      // A static/reserved domain (free on ngrok's own plan) means the tunnel URL never changes
+      // across restarts, so NGROK_TUNNEL_URL never goes stale — no more rebuilding/redeploying
+      // mail-merge (or updating the alerts component's Vercel env var) after every restart.
+      // Falls back to a fresh random subdomain each time if unset, same as before.
+      ...(process.env.NGROK_STATIC_DOMAIN ? { domain: process.env.NGROK_STATIC_DOMAIN } : {}),
+    })
       .then((listener) => {
         const url = listener.url();
         console.log(`🚇 ngrok tunnel: ${url}`);
